@@ -107,6 +107,26 @@ for (const lang of ['zh', 'en']) {
   });
 }
 
+test('資深・撕開的便條：不寫出密碼，只說「那個冬夜的月和日」；日期在資深模式至少有兩個獨立來源', () => {
+  for (const lang of ['zh', 'en']) {
+    const v = G.NOTE_LINES_V[lang], n = G.NOTE_LINES[lang];
+    assert.equal(v.length, n.length);
+    const full = v.map(l => l[0] + l[1]).join('\n');
+    assert.ok(!/\d{3,}/.test(full) && !full.includes('08'), `資深便條不應出現密碼數字（${lang}）`);
+    assert.ok(lang === 'zh' ? /冬夜的月和日/.test(full) : /month and day of that winter night/.test(full));
+    assert.ok(full.includes(G.NOTE_ORDER_TEXT[lang]), '沖洗順序照樣橫跨撕口、拼起來讀得到');
+    // 只有密碼那一行不同
+    v.forEach((l, i) => { if (i !== 2) assert.deepEqual(l, n[i]); });
+  }
+  // 日期 1999-12-08 的來源：日記一（抽屜）與窗邊的照片背面（抽屜，資深專屬）
+  const page1 = G.docs.page1.body.zh.join(''), photo = G.PHOTOS.find(p => p.id === 'ph_e').back.zh;
+  assert.ok(/12 月 8 日/.test(page1), '日記一寫著 12 月 8 日');
+  assert.ok(/1999\.12\.8/.test(photo) && /彗星/.test(photo), '照片背面寫著 1999.12.8 爸爸的彗星');
+  assert.equal(G.TRAPDOOR_CODE, '1208');
+  assert.equal(G.noteLines('veteran'), G.NOTE_LINES_V);
+  assert.equal(G.noteLines('novice'), G.NOTE_LINES);
+});
+
 test('顯影藥劑：24 種排列中只有一種同時滿足卡片四條規則', () => {
   const colors = G.BOTTLES.map(b => b.id); // 由左到右
   const chems = ['developer', 'stop', 'fixer', 'water'];

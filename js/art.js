@@ -878,8 +878,8 @@
 
   // 撕開的便條：沿一道斜向的撕口分成左右兩半（兩種語言的字寬不同，版面各自設定）
   const NOTE_LAYOUT = { zh: { base: 150, step: 16, W: 440, size: 21 }, en: { base: 300, step: 10, W: 640, size: 20 } };
-  function note(which) {
-    const lines = G.NOTE_LINES[LANG] || G.NOTE_LINES.zh, n = lines.length;
+  function note(which, mode) {
+    const all = G.noteLines(mode), lines = all[LANG] || all.zh, n = lines.length;
     const lay = NOTE_LAYOUT[LANG] || NOTE_LAYOUT.zh;
     const lh = 34, top = 24, W = lay.W, H = top + n * lh + 16;
     const tearAt = i => lay.base + i * lay.step;                         // 第 i 行的撕口位置

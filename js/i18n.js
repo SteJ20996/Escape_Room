@@ -161,6 +161,10 @@
     openCabinet: L('看種子櫃的鎖', 'Look at the cabinet lock'),
     readWeightBox: L('看砝碼盒', 'Look at the weight box'),
     balanceEmpty: L('全部拿下來', 'Clear both pans'),
+    balanceReadNone: L('兩個盤子都是空的。', 'Both pans are empty.'),
+    balanceReadL: L('左盤沉了下去。', 'The left pan sinks.'),
+    balanceReadR: L('右盤沉了下去。', 'The right pan sinks.'),
+    balanceReadEven: L('兩邊一樣重，指針直直指向上方。', 'Both sides weigh the same; the pointer stands straight up.'),
 
     // 相框
     photosTitle: L('相框牆', 'Picture Frames'),

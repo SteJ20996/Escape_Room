@@ -274,8 +274,10 @@ test('［資深］燈號：沒先呼叫「晴」，周伯不會回應；問「�
   const key = P.solve('signal', ['-.-', '...']);
   assert.ok(!P.s.flags.zhouReplied, '問鑰匙不會得到句數');
   assert.ok(key.messages.some(m => txt(m).includes(G.signalText(G.ZHOU_REPLY.key))));
+  const wrongBefore = P.s.stats.wrong;
   const bad = P.E.submit(P.s, 'signal', ['.-', '.-']);
   assert.equal(bad.solved, false);
+  assert.equal(P.s.stats.wrong, wrongBefore, '周伯看不懂只是溝通失敗，不算錯誤嘗試');
   const pot = P.solve('signal', ['---', '...']);
   assert.ok(P.s.flags.zhouReplied);
   assert.ok(pot.messages.some(m => txt(m).includes(G.signalText(G.ZHOU_REPLY.pot))));

@@ -199,6 +199,12 @@
       ['', '— Lu'],
     ],
   };
+  // 資深模式：便條不寫出密碼，只說是「那個冬夜的月和日」——要去日記一、窗邊的照片或周伯的日誌裡找日期
+  const NOTE_LINES_V = {
+    zh: NOTE_LINES.zh.map((l, i) => (i === 2 ? ['門鎖密碼是那', '個冬夜的月和日。'] : l)),
+    en: NOTE_LINES.en.map((l, i) => (i === 2 ? ['Its code is the month and d', 'ay of that winter night.'] : l)),
+  };
+  const noteLines = mode => (mode === 'veteran' ? NOTE_LINES_V : NOTE_LINES);
   const NOTE_ORDER_TEXT = { zh: '顯影→停影→定影→清水', en: 'developer → stop bath → fixer → water' };
   const TRAPDOOR_CODE = '1208';
 
@@ -441,15 +447,15 @@
     clipping: {
       title: L('舊剪報', 'Old Newspaper Clipping'), style: 'news',
       body: L([
-        '《山城日報》1999 年 12 月 11 日',
+        '《山城晚報》1999 年 12 月 11 日',
         '【新彗星現身東南夜空　韓嶽教授率先發現】',
-        '本報訊　天文學家韓嶽教授昨日宣布，他於本月十日夜間，在東南方的天空中發現一顆從未被記錄的彗星。國際天文組織已初步確認，暫定名為「韓嶽彗星」。韓教授表示：「這是我觀測生涯中最幸運的一夜。」',
+        '本報訊　天文學家韓嶽教授今日宣布，他於本月十日夜間，在東南方的天空中發現一顆從未被記錄的彗星。國際天文組織已初步確認，暫定名為「韓嶽彗星」。韓教授表示：「這是我觀測生涯中最幸運的一夜。」',
         '據韓教授公布的觀測資料，彗星當晚位於赤經 5 時 27 分、赤緯 −17 度附近。',
         '（剪報的「十日」旁，有人用紅筆重重畫了一個問號。）',
       ], [
-        'Mountain City Daily · 11 December 1999',
+        'Mountain City Evening News · 11 December 1999',
         'NEW COMET IN THE SOUTHEAST SKY — PROF. HAN YUE FIRST TO SPOT IT',
-        'Astronomer Professor Han Yue announced yesterday that on the night of the 10th he discovered a previously unrecorded comet in the southeastern sky. The International Astronomical Organization has given preliminary confirmation and provisionally named it Comet Han Yue. "It was the luckiest night of my observing life," Professor Han said.',
+        'Astronomer Professor Han Yue announced today that on the night of the 10th he discovered a previously unrecorded comet in the southeastern sky. The International Astronomical Organization has given preliminary confirmation and provisionally named it Comet Han Yue. "It was the luckiest night of my observing life," Professor Han said.',
         'According to the observations Professor Han released, the comet lay near right ascension 5h 27m, declination −17° that night.',
         '(Beside "the 10th", someone has drawn a heavy question mark in red ink.)',
       ]),
@@ -674,7 +680,7 @@
         `晴 ${signalText(['qing'])}　好 ${signalText(['ok'])}　？ ${signalText(['ask'])}　盆 ${signalText(['pot'])}　鑰 ${signalText(['key'])}　真 ${signalText(['true'])}　句 ${signalText(['sayings'])}`,
         ['1', '2', '3', '4', '5'].map(d => `${d} ${signalText([d])}`).join('　'),
         ['6', '7', '8', '9', '0'].map(d => `${d} ${signalText([d])}`).join('　'),
-        '找周伯：先發「晴」，等他回「好」。想問什麼，就發那件事的字，再發「？」。',
+        '找周伯：先發「晴」，等他回「好」。想問哪一樣東西，就發那樣東西的字，再發「？」。',
         '周伯家的燈，從儲物間的小窗看得最清楚。',
       ], [
         '(A child\'s handwriting, with neat additions by Old Zhou)',
@@ -682,7 +688,7 @@
         `QING ${signalText(['qing'])}   OK ${signalText(['ok'])}   ? ${signalText(['ask'])}   POT ${signalText(['pot'])}   KEY ${signalText(['key'])}   TRUE ${signalText(['true'])}   SAYINGS ${signalText(['sayings'])}`,
         ['1', '2', '3', '4', '5'].map(d => `${d} ${signalText([d])}`).join('   '),
         ['6', '7', '8', '9', '0'].map(d => `${d} ${signalText([d])}`).join('   '),
-        'To call Zhou: send QING first and wait for him to answer OK. To ask about something, send its word and then "?".',
+        'To call Zhou: send QING first and wait for him to answer OK. To ask about a thing, send the word for that thing and then "?".',
         'Zhou\'s lamp is easiest to see from the little window in the storeroom.',
       ]),
     },
@@ -1779,14 +1785,13 @@
         };
         if (!ctx.flag('zhouCalled')) {
           if (said === 'qing') { ctx.set('zhouCalled'); reply(ZHOU_REPLY.call, 'zhou_call'); return true; }
-          ctx.wrong();
+          // 打燈號是在溝通、不是在猜答案：沒有回應或看不懂都不算錯誤嘗試
           ctx.say(L('你對著山谷打了一陣燈號。對面的燈一動也不動。', 'You flash a signal across the valley. The far light doesn\'t stir.'), 'bad');
           return false;
         }
         if (said === 'qing') { reply(ZHOU_REPLY.call, 'zhou_call'); return true; }
         if (said === 'pot ask') { const first = !ctx.flag('zhouReplied'); ctx.set('zhouReplied'); reply(ZHOU_REPLY.pot, 'zhou_pot', first ? 'good' : 'event'); return true; }
         if (said === 'key ask') { reply(ZHOU_REPLY.key, 'zhou_key'); return true; }
-        ctx.wrong();
         ctx.say(L(`山谷對面的燈閃了一下：${signalText(ZHOU_REPLY.unknown)}——周伯沒看懂。`, `The light across the valley flashes once: ${signalText(ZHOU_REPLY.unknown)} — Zhou didn't understand.`), 'bad', { signal: ZHOU_REPLY.unknown.map(w => SIGNAL_OF[w]) });
         return false;
       },
@@ -2308,7 +2313,9 @@
         s => (has(s, 'note_left') || has(s, 'note_right') || has(s, 'note_full'))
           ? L('撕成兩半的便條要拼起來才讀得懂：一半在書房的廢紙簍，一半夾在天文台的觀測日誌裡。溫室工作台底下很暗，用能亮的手電筒照照看。', 'The torn note only makes sense in one piece: one half is in the study\'s wastebasket, the other tucked into the observatory\'s log. It\'s dark under the greenhouse workbench — try a working flashlight there.')
           : L('書房的廢紙簍和天文台的觀測日誌裡各有半張便條。溫室工作台底下很暗，用能亮的手電筒照照看。', 'The study\'s wastebasket and the observatory\'s log each hold half of a note. It\'s dark under the greenhouse workbench — try a working flashlight there.'),
-        L(`用手電筒照溫室的工作台底下，會找到活板門；密碼在拼好的便條上：${TRAPDOOR_CODE}。`, `Shine the flashlight under the greenhouse workbench to find a trapdoor. The code is on the mended note: ${TRAPDOOR_CODE}.`),
+        s => (VET(s)
+          ? L(`用手電筒照溫室的工作台底下，會找到活板門。便條說密碼是「那個冬夜的月和日」：陸觀拍到彗星的那一夜是 1999 年 12 月 8 日（日記一、窗邊的照片背面都有寫），所以是 ${TRAPDOOR_CODE}。`, `Shine the flashlight under the greenhouse workbench to find a trapdoor. The note says the code is "the month and day of that winter night": the night Lu Guan photographed the comet was 8 December 1999 (Diary Page I and the back of the window photo both say so), so it's ${TRAPDOOR_CODE}.`)
+          : L(`用手電筒照溫室的工作台底下，會找到活板門；密碼在拼好的便條上：${TRAPDOOR_CODE}。`, `Shine the flashlight under the greenhouse workbench to find a trapdoor. The code is on the mended note: ${TRAPDOOR_CODE}.`)),
       ],
     },
     {
@@ -2388,7 +2395,7 @@
     BOOKS, COLOR_NAMES, DRAWER_CODE, DRAWER_TRAP, GRID_DIGITS, TRANSPARENCY_STARS, SAFE_CODE, POTS, POT_ANSWER,
     MOONSET, CLOCK_ANSWER, VALVES, BEDS, evalValves, MIRROR_GRID, traceBeam, MIRROR_SOLUTIONS,
     CONSTELLATIONS, CONSTELLATION_ORDER, DIRECTIONS, SKY_FIELDS, COMET_DIRECTION, DIAL_ANSWER,
-    NOTE_LINES, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
+    NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
     POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,

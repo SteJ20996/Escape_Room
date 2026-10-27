@@ -41,7 +41,7 @@ const CLUES = {
     valves: { room: 'greenhouse', clue: s => !!s.flags.wheelInstalled, why: '園丁守則與已裝上的手輪' },
     skylight: { room: 'greenhouse', clue: () => true, why: '鏡子格子圖（光路要自己推）' },
     dial: { room: 'observatory', clue: s => !!s.flags.eyepieceInstalled, why: '剪報/日記的「東南」、目鏡、倒像便條、星座圖' },
-    trapdoor: { room: 'greenhouse', clue: noteReady, why: '兩半便條' },
+    trapdoor: { room: 'greenhouse', clue: s => noteReady(s) && !!s.flags.drawerOpen, why: '兩半便條（「那個冬夜的月和日」）與抽屜裡的日記一、窗邊的照片' },
     develop: { room: 'darkroom', clue: noteReady, why: '便條上的順序、牆上的流程表與藥瓶卡片' },
   },
 };

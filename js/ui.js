@@ -597,11 +597,11 @@
       case 'grid': return `<div class="art-box narrow">${Art.gridSvg({ digits: true })}</div>`;
       case 'transparency': return `<div class="art-box narrow">${Art.gridSvg({ digits: false, stars: true })}</div>`;
       case 'overlay': return `<div class="art-box narrow">${Art.gridSvg({ digits: true, stars: true })}</div><p class="lead">${tx('overlayLead')}</p>`;
-      case 'note_left': return `<div class="art-box narrow">${Art.note('left')}</div><p class="lead">${tx('noteLeftLead')}</p>`;
-      case 'note_right': return `<div class="art-box narrow">${Art.note('right')}</div><p class="lead">${tx('noteRightLead')}</p>`;
+      case 'note_left': return `<div class="art-box narrow">${Art.note('left', app.s.mode)}</div><p class="lead">${tx('noteLeftLead')}</p>`;
+      case 'note_right': return `<div class="art-box narrow">${Art.note('right', app.s.mode)}</div><p class="lead">${tx('noteRightLead')}</p>`;
       case 'note_full': {
-        const lines = (G.NOTE_LINES[LANG] || G.NOTE_LINES.zh).map(l => l[0] + l[1]).filter(Boolean);
-        return `<div class="art-box">${Art.note('full')}</div><div class="paper hand"><h3>${tx('transcript')}</h3><p>${lines.map(esc).join('<br>')}</p></div>`;
+        const all = G.noteLines(app.s.mode), lines = (all[LANG] || all.zh).map(l => l[0] + l[1]).filter(Boolean);
+        return `<div class="art-box">${Art.note('full', app.s.mode)}</div><div class="paper hand"><h3>${tx('transcript')}</h3><p>${lines.map(esc).join('<br>')}</p></div>`;
       }
       case 'diary': {
         const pages = app.s.flags.diaryPages || [];
@@ -946,9 +946,14 @@
       const place = Object.assign({}, app.s.puz.balance);
       const things = G.BALANCE_THINGS.filter(th => !th.item || app.s.inv.includes(th.item));
       const sideOf = id => place[id] || '';
+      // 圖之外也用文字說出結果（只說哪邊重，和真的天平一樣）
+      const sum = side => G.BALANCE_THINGS.reduce((n, th) => n + (place[th.id] === side ? th.w : 0), 0);
+      const l = sum('L'), r = sum('R');
+      const read = !l && !r ? 'balanceReadNone' : l > r ? 'balanceReadL' : r > l ? 'balanceReadR' : 'balanceReadEven';
       return {
         title: T('balanceTitle'),
         html: `<p class="lead">${tx('balanceLead')}</p><div class="art-box">${Art.balanceSvg(place)}</div>
+          <p class="balance-read" aria-live="polite">${tx(read)}</p>
           <div class="pan-list">${things.map(th => `<div class="pan-row"><span class="pan-name">${esc(cap(tr(th.name)))}</span><div class="seg" role="group" aria-label="${esc(cap(tr(th.name)))}">${['L', '', 'R'].map(side => `<button class="btn small ${sideOf(th.id) === side ? 'cur' : ''}" type="button" data-pan="${th.id}:${side}" aria-pressed="${sideOf(th.id) === side}">${tx(side === 'L' ? 'panLeft' : side === 'R' ? 'panRight' : 'panOff')}</button>`).join('')}</div></div>`).join('')}</div>
           ${app.s.inv.includes('paperweight') ? '' : `<p class="notice">${tx('w5Missing')}</p>`}
           ${center(`<button class="btn small" type="button" data-act="clear">${tx('balanceEmpty')}</button>${app.s.flags.cabinetOpen ? '' : `<button class="btn small" type="button" data-act="cabinet">${tx('openCabinet')}</button>`}<button class="btn small" type="button" data-doc="weight_box">${tx('readWeightBox')}</button>`)}`,

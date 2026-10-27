@@ -17,7 +17,7 @@ function collect(node, path, out, seen = new Set()) {
 const pairs = [];
 collect(G, 'G', pairs);
 // 撕開的便條每行刻意有一邊是空的（整行落在撕口一側），由 puzzles.test.js 專門檢查
-const checked = pairs.filter(p => p.path !== 'G.NOTE_LINES');
+const checked = pairs.filter(p => p.path !== 'G.NOTE_LINES' && p.path !== 'G.NOTE_LINES_V');
 
 test('遊戲資料中的雙語文字數量合理', () => {
   assert.ok(pairs.length > 250, `只找到 ${pairs.length} 組`);
@@ -113,7 +113,7 @@ test('美術：英文模式下，所有場景與謎題圖裡都沒有中文；�
     out.push(['poster', Art.poster()], ['bookshelf', Art.bookshelf()], ['plate', Art.plate()]);
     for (const d of G.DIRECTIONS) out.push(['eyepiece ' + d.id, Art.eyepiece(d.id)]);
     for (const o of [{ digits: true }, { digits: false, stars: true }, { digits: true, stars: true }]) out.push(['grid', Art.gridSvg(o)]);
-    for (const w of ['left', 'right', 'full']) out.push(['note ' + w, Art.note(w)]);
+    for (const w of ['left', 'right', 'full']) for (const m of ['novice', 'veteran']) out.push([`note ${w} ${m}`, Art.note(w, m)]);
     out.push(['valves', Art.valvesSvg({ V1: true }, false)], ['mirrors', Art.mirrorsSvg(G.MIRROR_GRID.initial)], ['clock', Art.clockSvg(3, 15)], ['dial', Art.dialSvg(['key', 'boat', 'bird'])]);
     for (const id of Object.keys(G.items)) out.push(['icon ' + id, Art.icon(id)]);
     return out;

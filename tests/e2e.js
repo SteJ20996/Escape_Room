@@ -472,9 +472,13 @@ async function vetStoreroom(P) {
   ok(await page.locator('#modal-body .notice').count() === 0, '帶著紙鎮時不應提示缺砝碼');
   const pan = async (id, side) => page.click(`#modal-body [data-pan="${id}:${side}"]`);
   // 先比兩罐：蕨 vs 月 → 蕨重；再用砝碼秤出月＝3
+  const read = () => page.locator('#modal-body .balance-read').innerText();
+  ok((await read()) === ui('balanceReadNone', P.lang), '空的天平');
   await pan('tin_fern', 'L'); await pan('tin_moon', 'R');
+  ok((await read()) === ui('balanceReadL', P.lang), '蕨類比月光花重：左盤沉下去');
   await pan('tin_fern', ''); await pan('tin_moon', '');
   await pan('tin_moon', 'L'); await pan('w2', 'L'); await pan('w5', 'R');
+  ok((await read()) === ui('balanceReadEven', P.lang), '月光花＋2 兩＝5 兩：平衡');
   await P.shot('balance');
   await page.click('#modal-body [data-act=clear]');
   ok(await page.locator('#modal-body [data-pan$=":L"].cur').count() === 0, '清空天平');
@@ -611,9 +615,15 @@ async function vetDarkroom(P, { dryingLine = true } = {}) {
   await P.room('observatory');
   await P.obj('o_log'); await P.close();
   await P.combine('note_left', 'note_right');
+  await P.item('note_full'); await page.click('[data-detail=view]');
+  await P.modalHas(X(/冬夜的月和日/, /month and day of that winter night/), '資深便條只給謎面');
+  ok(!(await page.locator('#modal-body').innerText()).includes('1208'), '資深便條不直接寫出密碼');
+  await P.shot('note-full-v'); await P.close();
   await P.room('greenhouse');
   await P.obj('g_trapdoor');
-  await P.lockType('1208');
+  await P.lockType('1210');                                  // 韓嶽宣稱的日期
+  await P.feedback(X(/^鎖紋絲不動。$/, /^The lock doesn't budge\.$/));
+  await P.lockType('1208');                                  // 陸觀拍到彗星的那一夜
   await P.obj('g_trapdoor');
   await P.use('red_bulb', 'd_socket');
   if (dryingLine) await P.obj('d_line');
@@ -949,7 +959,9 @@ async function switchRun(browser) {
   await P.room('study');
   await P.obj('s_drawer');
   await P.lockType('3751');
-  const before = await page.evaluate(() => JSON.stringify(window.__stargazer.state));
+  // 比較時排除遊戲計時（它每秒都在走，與語言無關）
+  const snap = () => page.evaluate(() => JSON.stringify(Object.assign({}, window.__stargazer.state, { stats: Object.assign({}, window.__stargazer.state.stats, { playMs: 0 }) })));
+  const before = await snap();
   await page.click('#btn-lang');
   ok(await page.evaluate(() => window.__stargazer.lang) === 'en', '狀態列的按鈕切換到英文');
   const en = player(page, 'en');
@@ -957,7 +969,7 @@ async function switchRun(browser) {
   ok((await page.locator('#room-name').innerText()).trim() === G.rooms.study.name.en, '房間名稱換成英文');
   ok(/drawer springs open/.test(await page.locator('#narration').innerText()), '剛才的敘述也換成英文');
   ok((await page.locator('#log').innerText()).includes(G.items.flashlight_dead.name.en), '紀錄也換成英文');
-  const after = await page.evaluate(() => JSON.stringify(window.__stargazer.state));
+  const after = await snap();
   ok(before === after, '切換語言不改變遊戲狀態');
   // 在對話框打開時切換：選單裡的語言按鈕
   await en.obj('s_drawer');
@@ -972,6 +984,27 @@ async function switchRun(browser) {
   await en.obj('s_painting');
   await en.said(X(/保險箱/, /a safe is set into the wall/));
   await page.context().close();
+}
+
+// 撕開的便條：兩種語言 × 兩種難度 × 左半／右半／拼好，每一行字都要落在紙上（字寬只有在瀏覽器裡才量得到）
+async function noteLayoutRun(browser) {
+  for (const lang of ['zh', 'en']) {
+    const page = await setup(browser, lang);
+    await page.evaluate(() => document.fonts.ready);
+    for (const mode of ['novice', 'veteran']) for (const w of ['left', 'right', 'full']) {
+      const bad = await page.evaluate(([mode, w]) => {
+        const d = document.createElement('div'); d.style.width = '640px';
+        d.innerHTML = window.Art.note(w, mode); document.body.appendChild(d);
+        const svg = d.querySelector('svg'), vb = svg.viewBox.baseVal;
+        const out = [...svg.querySelectorAll('text')].map(t => ({ s: t.textContent, bb: t.getBBox() }))
+          .filter(({ bb }) => bb.x < vb.x + 12 || bb.x + bb.width > vb.x + vb.width - 12).map(r => r.s);
+        d.remove();
+        return out;
+      }, [mode, w]);
+      ok(!bad.length, `便條（${lang}／${mode}／${w}）有字超出紙張：${JSON.stringify(bad)}`);
+    }
+    await page.context().close();
+  }
 }
 
 /* ---------- 主流程 ---------- */
@@ -991,6 +1024,7 @@ async function switchRun(browser) {
     summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}`);
   }
   if (LANGS.length > 1) await switchRun(browser);
+  await noteLayoutRun(browser);
   await browser.close();
   console.log(`走完的結局 ${summary.join('；')}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);
   if (errors.length) { console.error('主控台錯誤：', errors); process.exit(1); }

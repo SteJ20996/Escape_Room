@@ -211,15 +211,32 @@
       if (!s.puz || typeof s.puz !== 'object') errs.push('機關狀態無效');
       if (!s.stats || typeof s.stats !== 'object') errs.push('統計無效');
       if (s.ending && !G.endings[s.ending]) errs.push('結局無效');
+      const dp = s.flags && s.flags.diaryPages;
+      if (dp !== undefined && (!Array.isArray(dp) || dp.some(p => !G.PAGES.includes(p)) || new Set(dp).size !== dp.length)) errs.push('日記頁面無效');
+      if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push('物品重複');
       if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push('所在房間尚未解鎖');
       return errs;
     }
     function normalize(s) {
-      // 補上舊存檔可能缺少的欄位
-      s.hints = s.hints || {};
-      s.visited = s.visited || { [s.room]: true };
-      s.puz = Object.assign({ dome: 'N', valves: {}, mirrors: Object.assign({}, G.MIRROR_GRID.initial) }, s.puz || {});
-      s.stats = Object.assign({ actions: 0, wrong: 0, hints: 0, playMs: 0 }, s.stats || {});
+      // 補上舊存檔可能缺少的欄位，並把純顯示用的欄位修正到合法範圍（不影響遊戲邏輯）
+      if (!s || typeof s !== 'object') return s;
+      const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+      s.hints = obj(s.hints);
+      s.visited = obj(s.visited);
+      s.visited[s.room] = true;
+      const puz = obj(s.puz);
+      const dome = G.DIRECTIONS.some(d => d.id === puz.dome) ? puz.dome : 'N';
+      const valves = {};
+      for (const v of G.VALVES) valves[v.id] = !!obj(puz.valves)[v.id];
+      const mirrors = {};
+      for (const m of G.MIRROR_GRID.mirrors) {
+        const d = obj(puz.mirrors)[m.id];
+        mirrors[m.id] = d === '/' || d === '\\' ? d : G.MIRROR_GRID.initial[m.id];
+      }
+      s.puz = { dome, valves, mirrors };
+      const st = obj(s.stats);
+      s.stats = {};
+      for (const k of ['actions', 'wrong', 'hints', 'playMs']) s.stats[k] = Number.isFinite(+st[k]) && +st[k] >= 0 ? +st[k] : 0;
       return s;
     }
 

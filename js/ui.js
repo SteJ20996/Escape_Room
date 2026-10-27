@@ -292,7 +292,10 @@
     if (!view) {
       back.hidden = true;
       $('modal-body').innerHTML = '';
-      if (app.lastFocus && document.contains(app.lastFocus)) app.lastFocus.focus();
+      const lf = app.lastFocus;
+      // 原本的焦點若已隱藏（例如開場按鈕），改把焦點交給房間裡的第一個物件
+      if (lf && document.contains(lf) && lf !== document.body && lf.offsetParent !== null) lf.focus();
+      else if (app.screen === 'game') { const first = $('objects').querySelector('button'); if (first) first.focus(); }
       return;
     }
     const keep = fresh ? null : focusKey(document.activeElement);

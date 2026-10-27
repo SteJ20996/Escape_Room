@@ -394,6 +394,32 @@ async function exitWith(P, choice, endingTitle) {
     await page.context().close();
   }
 
+  // 只用鍵盤：Tab 到場景熱點、Enter 觸發、直接打數字開鎖、Esc 關閉與放下
+  {
+    const page = await setup(browser);
+    const label = () => page.evaluate(() => { const a = document.activeElement; return (a.getAttribute('aria-label') || a.textContent || '').trim(); });
+    await page.focus('#btn-new'); await page.keyboard.press('Enter');
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Enter');
+    ok(await page.locator('#modal-back').isVisible(), '鍵盤：開場後打開信');
+    await page.keyboard.press('Escape');
+    ok(!(await page.locator('#modal-back').isVisible()), '鍵盤：Esc 關閉');
+    ok((await label()) === '大門', '鍵盤：關閉信後焦點回到房間物件');
+    let found = false;
+    for (let i = 0; i < 40 && !found; i++) { await page.keyboard.press('Tab'); found = (await label()) === '衣帽架'; }
+    ok(found, '鍵盤：Tab 可以到達場景中的熱點');
+    await page.keyboard.press('Enter');
+    ok(/手電筒/.test(await page.locator('#narration').innerText()), '鍵盤：Enter 觸發場景熱點');
+    await page.locator('#objects [data-obj="f_study_door"]').focus(); await page.keyboard.press('Enter');
+    await page.locator('#objects [data-obj="s_drawer"]').focus(); await page.keyboard.press('Enter');
+    await page.keyboard.type('3751'); await page.keyboard.press('Enter');
+    ok(/抽屜彈開/.test(await page.locator('#narration').innerText()), '鍵盤：直接打數字開鎖');
+    await page.locator('#inventory [data-item="battery"]').focus(); await page.keyboard.press('Enter');
+    ok(await page.evaluate(() => document.body.classList.contains('holding')), '鍵盤：選取物品');
+    await page.keyboard.press('Escape');
+    ok(!(await page.evaluate(() => document.body.classList.contains('holding'))), '鍵盤：Esc 放下物品');
+    await page.context().close();
+  }
+
   // 手機寬度：不得出現水平捲動
   {
     const page = await setup(browser, { width: 390, height: 844 });

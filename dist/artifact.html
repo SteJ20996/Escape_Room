@@ -1,0 +1,3656 @@
+<title>觀星者之屋</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="瀏覽器密室逃脫：在亡師的老宅裡找回日、月、星三枚徽章，揭開一顆彗星的真名。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Serif+TC:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/*
+ * 觀星者之屋 — 樣式
+ * 刻意只有一套夜色主題：整個故事發生在一個雨後的夜晚。
+ * 版面：左邊是房間場景（16:9），右邊是物品欄與紀錄；窄螢幕時上下堆疊。
+ */
+:root {
+  color-scheme: dark;
+  --night: #0b1020;
+  --night-2: #111830;
+  --night-3: #19223f;
+  --rule: #2a3558;
+  --star: #ece6d6;
+  --dim: #9ea6bf;
+  --brass: #c9a24f;
+  --brass-hi: #e8c97f;
+  --brass-ink: #2a1d08;
+  --paper: #efe6cf;
+  --paper-2: #e4d8b9;
+  --paper-ink: #2b2418;
+  --paper-dim: #6b5a3a;
+  --good: #8cc49a;
+  --bad: #e39a8a;
+  --event: #c3b4f2;
+  --note: #94bde4;
+  --safelight: #c0392b;
+  --shadow: rgba(0, 0, 0, .45);
+  --font-ui: "Noto Serif TC", "Songti TC", "PMingLiU", "WenQuanYi Zen Hei", serif;
+  --font-hand: "LXGW WenKai TC", "Kaiti TC", "DFKai-SB", var(--font-ui);
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--star);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- 共用按鈕 ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4em;
+  min-height: 40px; padding: .35em 1em;
+  background: var(--night-3); border: 1px solid var(--rule); border-radius: 8px;
+  cursor: pointer; letter-spacing: .04em;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn:disabled { opacity: .45; cursor: not-allowed; border-color: var(--rule); color: var(--dim); }
+.btn.primary { background: var(--brass); border-color: var(--brass-hi); color: var(--brass-ink); font-weight: 700; }
+.btn.primary:hover { background: var(--brass-hi); color: var(--brass-ink); }
+.btn.danger { border-color: #6a3a34; }
+.btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+.btn.small { min-height: 32px; padding: .15em .7em; font-size: .9em; }
+.btn.ghost { background: transparent; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ---------- 標題畫面 ---------- */
+.screen { min-height: 100%; }
+#title {
+  position: relative; min-height: 100%; display: grid; place-items: center; overflow: hidden;
+  padding-block: 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+#sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.title-card { position: relative; text-align: center; max-width: 34rem; }
+.title-eyebrow { color: var(--dim); letter-spacing: .5em; font-size: .85rem; margin: 0 0 .5rem; }
+.title-main {
+  font-size: clamp(2.6rem, 9vw, 4.6rem); line-height: 1.15; margin: 0; font-weight: 700;
+  letter-spacing: .18em; color: var(--brass-hi); text-wrap: balance;
+  text-shadow: 0 0 28px rgba(232, 201, 127, .25);
+}
+.title-sub { margin: .6rem 0 2rem; color: var(--star); letter-spacing: .3em; }
+.title-menu { display: grid; gap: 10px; justify-items: stretch; max-width: 18rem; margin: 0 auto; }
+.title-foot { margin-top: 1.6rem; color: var(--dim); font-size: .85rem; }
+
+/* ---------- 開場 ---------- */
+#intro { display: grid; place-items: center; min-height: 100%; padding-block: 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.intro-card { max-width: 36rem; }
+.intro-text { font-size: 1.15rem; line-height: 2.1; min-height: 9em; }
+.intro-text p { margin: 0 0 1em; animation: fadeUp .7s both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 遊戲畫面 ---------- */
+.app {
+  max-width: 1320px; margin: 0 auto;
+  padding-block: 10px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.topbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  padding-block: 6px 12px; border-bottom: 1px solid var(--rule); margin-bottom: 14px;
+}
+.brand { font-weight: 700; letter-spacing: .2em; color: var(--brass-hi); }
+.room-name { font-size: 1.25rem; letter-spacing: .12em; }
+.progress { display: flex; gap: 6px; align-items: center; }
+.emb {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font-size: .9rem; border: 1px dashed var(--rule); color: var(--dim);
+}
+.emb.held { border: 1px solid var(--brass); color: var(--brass-hi); }
+.emb.inserted { background: var(--brass); color: var(--brass-ink); border: 1px solid var(--brass-hi); font-weight: 700; }
+.chip { font-size: .85rem; color: var(--dim); border: 1px solid var(--rule); border-radius: 999px; padding: .1em .7em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip.on { color: var(--brass-hi); border-color: var(--brass); }
+.topbar .spacer { flex: 1 1 auto; }
+.topbar .row { gap: 6px; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 16px; align-items: start; }
+.main-col, .side-col { min-width: 0; display: grid; gap: 12px; }
+
+.scene-wrap {
+  position: relative; aspect-ratio: 16 / 9; max-width: 100%;
+  border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; background: #000;
+  box-shadow: 0 12px 30px var(--shadow);
+}
+.scene-svg { width: 100%; height: 100%; display: block; }
+.hs { cursor: pointer; transition: filter .15s; }
+.hs:hover, .hs:focus-visible, .hs.flash { filter: drop-shadow(0 0 5px rgba(232, 201, 127, .95)) brightness(1.18); outline: none; }
+body.holding .hs { cursor: crosshair; }
+.scene-tip {
+  position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px);
+  background: rgba(9, 12, 24, .85); border: 1px solid var(--rule); border-radius: 6px;
+  padding: .15em .7em; font-size: .9rem; pointer-events: none;
+}
+.ring { animation: ring .5s ease-in-out infinite alternate; transform-origin: 620px 340px; }
+@keyframes ring { from { opacity: .3; } to { opacity: 1; } }
+.glint { animation: glint 2.4s ease-in-out infinite; }
+@keyframes glint { 0%, 70%, 100% { opacity: .15; } 80% { opacity: 1; } }
+
+.narration {
+  min-height: 3.4em; padding: 10px 14px; border-radius: var(--radius);
+  background: linear-gradient(90deg, rgba(201, 162, 79, .10), rgba(201, 162, 79, 0) 70%);
+  border-left: 3px solid var(--brass); display: grid; gap: 4px;
+}
+.narration p { margin: 0; }
+.objects { display: flex; flex-wrap: wrap; gap: 6px; }
+.objects .label { color: var(--dim); font-size: .85rem; margin-right: 4px; align-self: center; }
+.obj-btn { min-height: 34px; padding: .1em .75em; font-size: .92rem; border-radius: 999px; }
+
+.nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.nav .btn { min-height: 34px; font-size: .92rem; }
+.nav .btn.here { border-color: var(--brass); color: var(--brass-hi); background: rgba(201, 162, 79, .12); }
+
+.panel { background: var(--night-2); border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px; }
+.panel h2 { font-size: .95rem; letter-spacing: .2em; color: var(--dim); margin: 0 0 8px; font-weight: 600; }
+
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 8px; }
+.inv-tile {
+  display: grid; justify-items: center; gap: 4px; padding: 8px 4px 6px; min-height: 84px;
+  background: var(--night-3); border: 1px solid var(--rule); border-radius: 8px; cursor: pointer;
+  text-align: center; font-size: .78rem; line-height: 1.3;
+}
+.inv-tile:hover { border-color: var(--brass); }
+.inv-tile.sel { border-color: var(--brass-hi); box-shadow: 0 0 0 2px rgba(232, 201, 127, .35) inset; background: #232c4d; }
+.inv-tile.target { border-style: dashed; border-color: var(--note); }
+.seal {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 1.05rem; font-weight: 700; border: 2px solid currentColor;
+}
+.seal.k-paper { color: #d9cfb3; } .seal.k-tool { color: #9fb6cc; } .seal.k-key { color: #d8b04f; }
+.seal.k-page { color: #c9b08a; } .seal.k-emblem { color: #f2d27c; background: rgba(242, 210, 124, .14); }
+.seal.k-evidence { color: #f4f0e6; background: rgba(255, 255, 255, .08); }
+.inv-empty { color: var(--dim); font-size: .9rem; margin: 0; }
+.item-detail { margin-top: 10px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.item-detail h3 { margin: 0 0 4px; font-size: 1.02rem; color: var(--brass-hi); }
+.item-detail p { margin: 0 0 8px; font-size: .92rem; color: var(--star); }
+.hold-tip { font-size: .85rem; color: var(--note); margin: 0 0 8px; }
+
+.log { display: grid; gap: 6px; max-height: 300px; overflow-y: auto; font-size: .93rem; }
+.log p { margin: 0; padding-left: 10px; border-left: 2px solid var(--rule); }
+.log p.fresh { border-left-color: var(--brass); }
+.log p.old { opacity: .55; }
+.m-good { color: var(--good); } .m-bad { color: var(--bad); } .m-event { color: var(--event); }
+.m-item { color: var(--brass-hi); } .m-note { color: var(--note); font-size: .88em; } .m-room { color: var(--dim); font-style: italic; }
+
+/* ---------- 對話框 ---------- */
+.modal-back {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: rgba(4, 6, 14, .78); backdrop-filter: blur(3px);
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.modal {
+  width: min(860px, 100%); max-height: 100%; overflow: auto;
+  background: var(--night-2); border: 1px solid var(--rule); border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+}
+.modal-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--night-2); border-bottom: 1px solid var(--rule);
+}
+.modal-head h2 { margin: 0; font-size: 1.1rem; letter-spacing: .1em; flex: 1; min-width: 0; text-wrap: balance; }
+.modal-body { padding: 16px; display: grid; gap: 14px; }
+.modal-body > * { min-width: 0; }
+.lead { margin: 0; color: var(--dim); }
+.feedback { min-height: 1.6em; margin: 0; }
+.feedback p { margin: 0; }
+.art { width: 100%; height: auto; display: block; max-width: 100%; border-radius: 8px; }
+.art-box { max-width: 560px; margin: 0 auto; width: 100%; }
+.art-box.narrow { max-width: 380px; }
+.eyepiece { max-width: 400px; margin: 0 auto; }
+
+/* 紙本文件 */
+.paper {
+  background: var(--paper); color: var(--paper-ink); border-radius: 4px; padding: 22px 26px;
+  box-shadow: 0 6px 18px var(--shadow); max-width: 40rem; margin: 0 auto; width: 100%;
+}
+.paper p { margin: 0 0 .8em; }
+.paper p:last-child { margin-bottom: 0; }
+.paper.hand { font-family: var(--font-hand); font-size: 1.12rem; line-height: 1.9; background: linear-gradient(var(--paper), var(--paper-2)); }
+.paper.news { font-size: .98rem; columns: 1; }
+.paper.news p:first-child { font-size: .85rem; color: var(--paper-dim); letter-spacing: .1em; border-bottom: 1px solid #b9ab88; padding-bottom: .4em; }
+.paper.news p:nth-child(2) { font-weight: 700; font-size: 1.18rem; }
+.paper.news p:last-child { font-family: var(--font-hand); color: #8a2a20; }
+.paper.plain { background: #d8cfba; font-size: 1.02rem; }
+.paper.table p { font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin: 0 0 .3em; letter-spacing: .05em; }
+.paper.table p:first-child { font-family: var(--font-ui); font-weight: 700; border-bottom: 1px solid #b9ab88; padding-bottom: .3em; }
+.paper h3 { margin: 0 0 .6em; font-size: 1rem; color: var(--paper-dim); font-family: var(--font-ui); letter-spacing: .1em; }
+.paper + .paper { margin-top: 12px; }
+
+/* 數字鎖 */
+.lock { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.wheel { display: grid; justify-items: center; gap: 4px; }
+.wheel .digit {
+  width: 58px; height: 70px; display: grid; place-items: center; border-radius: 8px;
+  background: linear-gradient(#1b1408, #3a2a12 45%, #1b1408); border: 2px solid var(--brass);
+  font-family: var(--font-mono); font-size: 2rem; color: var(--brass-hi); font-variant-numeric: tabular-nums;
+}
+.wheel .btn { width: 58px; min-height: 34px; padding: 0; }
+
+/* 選擇器（星盤、時鐘） */
+.picker { display: grid; gap: 8px; justify-items: center; }
+.picker-row { display: grid; grid-template-columns: 4.5em 44px minmax(6em, auto) 44px; align-items: center; gap: 8px; }
+.picker-row .name { text-align: center; font-size: 1.2rem; font-weight: 700; color: var(--brass-hi); }
+.picker-row .lbl { color: var(--dim); text-align: right; }
+
+/* 花盆 */
+.pots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.pot { background: var(--night-3); border: 1px solid var(--rule); border-radius: 8px; padding: 12px; display: grid; gap: 8px; }
+.pot h3 { margin: 0; font-size: 1.05rem; color: var(--brass-hi); }
+.pot q { font-family: var(--font-hand); font-size: 1.1rem; quotes: "「" "」"; }
+
+/* 羅盤 */
+.compass { display: grid; grid-template-columns: repeat(3, minmax(64px, 96px)); gap: 8px; justify-content: center; }
+.compass .center { display: grid; place-items: center; border: 1px dashed var(--rule); border-radius: 8px; color: var(--dim); font-size: .85rem; text-align: center; }
+.compass .btn.cur { background: var(--brass); color: var(--brass-ink); border-color: var(--brass-hi); }
+
+/* 顯影 */
+.bottles { display: grid; grid-template-columns: repeat(4, minmax(60px, 96px)); gap: 10px; justify-content: center; }
+.bottle-btn { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; background: #2a0c08; border: 1px solid #6a2a20; border-radius: 8px; cursor: pointer; }
+.bottle-btn:hover { border-color: #ff8a70; }
+.bottle-btn .bottle { width: 44px; height: 72px; }
+.slots { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.slot { min-width: 76px; padding: 6px 8px; border: 1px dashed #6a2a20; border-radius: 6px; text-align: center; font-size: .92rem; }
+.slot.filled { border-style: solid; background: #2a0c08; }
+.darkroom-tone { background: #1a0605; border-color: #4a1612; }
+
+/* 對話 */
+.dialogue { display: grid; gap: 10px; }
+.dialogue p { margin: 0; }
+.dialogue .speaker { color: var(--dim); font-size: .85rem; letter-spacing: .1em; }
+.dialogue .line { font-size: 1.05rem; }
+.choices { display: grid; gap: 8px; }
+.choices .btn { justify-content: flex-start; text-align: left; min-height: 48px; }
+.confirm { border: 1px solid var(--bad); border-radius: 8px; padding: 12px; display: grid; gap: 8px; }
+
+/* 筆記、提示、存檔 */
+.list { display: grid; gap: 8px; }
+.list .btn { justify-content: space-between; }
+.hint { border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+.hint h3 { margin: 0; font-size: 1rem; }
+.hint ol { margin: 0; padding-left: 1.3em; }
+.hint li { margin: 0 0 4px; }
+.slot-card { border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+.slot-card .meta { color: var(--dim); font-size: .88rem; }
+textarea.code {
+  width: 100%; min-height: 84px; resize: vertical; font-family: var(--font-mono); font-size: .8rem;
+  background: #070a14; color: var(--star); border: 1px solid var(--rule); border-radius: 6px; padding: 8px;
+}
+.notice { margin: 0; font-size: .9rem; color: var(--note); }
+.warn { color: var(--bad); }
+
+/* 結局 */
+#ending { display: grid; place-items: center; min-height: 100%; padding-block: 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.ending-card { max-width: 40rem; display: grid; gap: 16px; }
+.ending-rank { color: var(--dim); letter-spacing: .4em; margin: 0; }
+.ending-title { font-size: clamp(2rem, 7vw, 3.2rem); margin: 0; color: var(--brass-hi); letter-spacing: .15em; text-wrap: balance; }
+.ending-text p { margin: 0 0 1em; font-size: 1.08rem; line-height: 2; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.stat { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; }
+.stat b { display: block; font-size: 1.3rem; color: var(--brass-hi); font-variant-numeric: tabular-nums; }
+.stat span { font-size: .82rem; color: var(--dim); }
+.gallery { display: grid; gap: 8px; }
+.gal { display: flex; gap: 10px; align-items: baseline; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px; }
+.gal.locked { color: var(--dim); border-style: dashed; }
+.gal .rk { font-size: .8rem; color: var(--dim); min-width: 5em; }
+
+@media (max-width: 960px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .log { max-height: 200px; }
+}
+@media (max-width: 520px) {
+  body { font-size: 15px; }
+  .room-name { font-size: 1.1rem; }
+  .wheel .digit { width: 48px; height: 60px; font-size: 1.7rem; }
+  .wheel .btn { width: 48px; }
+  .picker-row { grid-template-columns: 3.5em 40px minmax(4.5em, auto) 40px; }
+  .paper { padding: 16px 16px; }
+  .bottles { grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+<div id="title" class="screen">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="title-card">
+    <p class="title-eyebrow">密室逃脫</p>
+    <h1 class="title-main">觀星者之屋</h1>
+    <p class="title-sub">最後的觀測</p>
+    <div class="title-menu">
+      <button class="btn primary" id="btn-new" type="button">新遊戲</button>
+      <button class="btn" id="btn-continue" type="button">繼續遊戲</button>
+      <button class="btn" id="btn-load" type="button">讀取存檔</button>
+      <button class="btn" id="btn-gallery" type="button">結局圖鑑</button>
+      <button class="btn" id="btn-help" type="button">遊戲說明</button>
+    </div>
+    <p class="title-foot" id="title-foot">五個房間・十一道謎題・五種結局</p>
+  </div>
+</div>
+
+<div id="intro" class="screen" hidden>
+  <div class="intro-card">
+    <div class="intro-text" id="intro-text" aria-live="polite"></div>
+    <div class="row">
+      <button class="btn primary" id="btn-intro-next" type="button">繼續</button>
+      <button class="btn ghost small" id="btn-intro-skip" type="button">跳過開場</button>
+    </div>
+  </div>
+</div>
+
+<div id="game" class="screen" hidden>
+  <div class="app">
+    <header class="topbar">
+      <span class="brand">觀星者之屋</span>
+      <span class="room-name" id="room-name" aria-live="polite"></span>
+      <span class="progress" id="progress" aria-label="徽章進度"></span>
+      <span class="chip" id="chip-pages"></span>
+      <span class="chip" id="chip-plate" hidden>玻璃底片</span>
+      <span class="chip" id="chip-time" title="遊戲時間"></span>
+      <span class="spacer"></span>
+      <div class="row">
+        <button class="btn small" id="btn-hints" type="button">提示</button>
+        <button class="btn small" id="btn-notes" type="button">線索筆記</button>
+        <button class="btn small" id="btn-save" type="button">存檔</button>
+        <button class="btn small" id="btn-menu" type="button">選單</button>
+      </div>
+    </header>
+    <div class="stage">
+      <div class="main-col">
+        <div class="scene-wrap">
+          <div id="scene"></div>
+          <div class="scene-tip" id="scene-tip" hidden></div>
+        </div>
+        <div class="narration" id="narration" aria-live="polite"></div>
+        <div class="objects" id="objects" aria-label="這個房間裡可以互動的東西"></div>
+        <nav class="nav" id="nav" aria-label="前往其他房間"></nav>
+      </div>
+      <aside class="side-col">
+        <section class="panel" aria-labelledby="inv-h">
+          <h2 id="inv-h">物品</h2>
+          <div class="inv-grid" id="inventory"></div>
+          <div class="item-detail" id="item-detail" hidden></div>
+        </section>
+        <section class="panel" aria-labelledby="log-h">
+          <h2 id="log-h">紀錄</h2>
+          <div class="log" id="log"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div id="ending" class="screen" hidden>
+  <div class="ending-card" id="ending-card"></div>
+</div>
+
+<div class="modal-back" id="modal-back" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <button class="btn small ghost" id="modal-back-btn" type="button" hidden>← 返回</button>
+      <h2 id="modal-title"></h2>
+      <button class="btn small" id="modal-close" type="button" aria-label="關閉">關閉</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+/*
+ * 觀星者之屋 — 遊戲內容與規則
+ * 房間、熱點、物品、線索文件、謎題、組合、結局與提示都定義在這裡。
+ * 引擎（engine.js）只負責執行；這個檔案是唯一的「設計真相」。
+ * 同時支援瀏覽器（window.GAME_DATA）與 Node（module.exports，供測試用）。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.GAME_DATA = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  /* ================================================================
+   * 一、謎題資料（UI 與引擎共用，測試會逐一驗證其唯一解）
+   * ================================================================ */
+
+  // 謎題 1：書架色碼。書架由左到右的排列（刻意不按卷數排序）。
+  const BOOKS = [
+    { vol: 7, color: 'yellow' }, { vol: 2, color: 'brown' }, { vol: 5, color: 'blue' },
+    { vol: 9, color: 'brown' }, { vol: 1, color: 'green' }, { vol: 4, color: 'brown' },
+    { vol: 3, color: 'red' }, { vol: 8, color: 'brown' }, { vol: 6, color: 'brown' },
+  ];
+  const DRAWER_ORDER = ['red', 'yellow', 'blue', 'green'];
+  const DRAWER_CODE = DRAWER_ORDER.map(c => BOOKS.find(b => b.color === c).vol).join('');
+  // 常見誤解：數的是書在架上的位置而不是卷數
+  const DRAWER_TRAP = DRAWER_ORDER.map(c => BOOKS.findIndex(b => b.color === c) + 1).join('');
+
+  // 謎題 3：星圖疊合。5×5 數字方格紙 + 透明星圖膠片。
+  const GRID_DIGITS = [
+    [8, 3, 6, 1, 9],
+    [2, 5, 4, 0, 7],
+    [9, 1, 7, 3, 6],
+    [6, 0, 2, 8, 4],
+    [3, 7, 5, 9, 1],
+  ];
+  const TRANSPARENCY_STARS = [
+    { r: 0, c: 0 }, { r: 0, c: 4 }, { r: 1, c: 2, mark: 1 }, { r: 1, c: 4 }, { r: 2, c: 0 },
+    { r: 2, c: 3 }, { r: 3, c: 2, mark: 3 }, { r: 3, c: 4 }, { r: 4, c: 1, mark: 2 }, { r: 4, c: 3 },
+  ];
+  const SAFE_CODE = TRANSPARENCY_STARS.filter(s => s.mark)
+    .sort((a, b) => a.mark - b.mark)
+    .map(s => GRID_DIGITS[s.r][s.c]).join('');
+
+  // 謎題 2：花盆證詞。四句話只有一句為真。
+  const POTS = [
+    { id: 'rose', name: '玫瑰', says: '鑰匙在薰衣草盆裡。', truth: k => k === 'lavender' },
+    { id: 'lavender', name: '薰衣草', says: '鑰匙不在我這裡。', truth: k => k !== 'lavender' },
+    { id: 'sage', name: '鼠尾草', says: '鑰匙在我這裡。', truth: k => k === 'sage' },
+    { id: 'mint', name: '薄荷', says: '鑰匙不在玫瑰盆裡。', truth: k => k !== 'rose' },
+  ];
+  const POT_ANSWER = 'rose';
+
+  // 謎題 6：最後的觀測（日誌 + 月落表 → 時刻）
+  const MOONSET = [
+    ['一日', '00:42'], ['二日', '01:29'], ['三日', '02:15'],
+    ['四日', '03:04'], ['五日', '03:56'], ['六日', '04:51'],
+  ];
+  const CLOCK_ANSWER = { h: 3, m: 15 };
+
+  // 謎題 7：灌溉管線
+  const VALVES = [
+    { id: 'V1', src: 'rain', to: ['moon', 'cactus'] },
+    { id: 'V2', src: 'rain', to: ['fern'] },
+    { id: 'V3', src: 'fert', to: ['moon', 'fern'] },
+    { id: 'V4', src: 'fert', to: ['fern'] },
+    { id: 'V5', src: 'rain', to: ['moon'] },
+  ];
+  const BEDS = {
+    moon: { name: '月光花', need: { rain: true, fert: false } },
+    fern: { name: '蕨類', need: { rain: true, fert: true } },
+    cactus: { name: '仙人掌', need: { rain: false, fert: false } },
+  };
+  function evalValves(open) {
+    const got = {};
+    for (const b of Object.keys(BEDS)) got[b] = { rain: false, fert: false };
+    for (const v of VALVES) if (open && open[v.id]) for (const b of v.to) got[b][v.src] = true;
+    const problems = [];
+    if (got.cactus.rain || got.cactus.fert) problems.push('仙人掌那一格的土開始積水——守則說這個月一滴水都不能給它。');
+    if (got.moon.fert) problems.push('肥料水正流向月光花！');
+    else if (!got.moon.rain) problems.push('月光花那一格還是乾的。');
+    if (!got.fern.rain && !got.fern.fert) problems.push('蕨類一滴水也沒喝到。');
+    else if (!got.fern.rain) problems.push('蕨類只喝到肥料水，還缺雨水。');
+    else if (!got.fern.fert) problems.push('蕨類只喝到雨水，土還是很貧瘠——它也需要肥料。');
+    return { got, ok: problems.length === 0, problems };
+  }
+
+  // 謎題 8：月光折射。光從天窗（第 0 欄上方）往下射入，要從第 4 列右側射出照到月光花。
+  const MIRROR_GRID = {
+    cols: 6, rows: 5,
+    entry: { c: 0, r: 0, d: 'down' },
+    target: { side: 'right', r: 4 },
+    mirrors: [
+      { id: 'A', c: 0, r: 2 }, { id: 'B', c: 2, r: 2 }, { id: 'C', c: 2, r: 0 },
+      { id: 'D', c: 4, r: 0 }, { id: 'E', c: 4, r: 3 }, { id: 'F', c: 3, r: 3 },
+      { id: 'G', c: 3, r: 4 },
+    ],
+    blocks: [{ c: 1, r: 4 }, { c: 5, r: 1 }],
+    initial: { A: '/', B: '\\', C: '\\', D: '/', E: '\\', F: '\\', G: '/' },
+  };
+  const DIRS = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] };
+  const REFLECT = {
+    '/': { right: 'up', up: 'right', left: 'down', down: 'left' },
+    '\\': { right: 'down', down: 'right', left: 'up', up: 'left' },
+  };
+  function traceBeam(config) {
+    const g = MIRROR_GRID;
+    let c = g.entry.c, r = g.entry.r, d = g.entry.d;
+    const path = [{ c, r: -1 }];
+    const seen = new Set();
+    for (let step = 0; step < 200; step++) {
+      if (c < 0 || c >= g.cols || r < 0 || r >= g.rows) {
+        path.push({ c, r });
+        const side = c < 0 ? 'left' : c >= g.cols ? 'right' : r < 0 ? 'top' : 'bottom';
+        const hit = side === g.target.side && r === g.target.r;
+        return { path, hit, exit: { side, c, r } };
+      }
+      path.push({ c, r });
+      if (g.blocks.some(b => b.c === c && b.r === r)) return { path, hit: false, exit: { side: 'block', c, r } };
+      const m = g.mirrors.find(x => x.c === c && x.r === r);
+      if (m) d = REFLECT[(config && config[m.id]) || g.initial[m.id]][d];
+      const key = c + ',' + r + ',' + d;
+      if (seen.has(key)) return { path, hit: false, exit: { side: 'loop', c, r } };
+      seen.add(key);
+      c += DIRS[d][0]; r += DIRS[d][1];
+    }
+    return { path, hit: false, exit: { side: 'loop', c, r } };
+  }
+
+  // 窮舉所有鏡子組合，找出能照到月光花的解（提示文字由此產生，避免與謎面不一致）
+  function solveMirrors() {
+    const ids = MIRROR_GRID.mirrors.map(m => m.id);
+    const sols = [];
+    for (let mask = 0; mask < (1 << ids.length); mask++) {
+      const cfg = {};
+      ids.forEach((id, i) => { cfg[id] = (mask >> i) & 1 ? '\\' : '/'; });
+      if (traceBeam(cfg).hit) sols.push(cfg);
+    }
+    return sols;
+  }
+  const MIRROR_SOLUTIONS = solveMirrors();
+
+  // 謎題 9：倒立的星空。陸觀自己命名的八個星座（座標在 0–100 的方框內）。
+  const CONSTELLATIONS = {
+    lamp: { name: '燈', stars: [[50, 8], [28, 88], [74, 70]], lines: [[0, 1], [1, 2], [2, 0]] },
+    bird: { name: '鳥', stars: [[8, 22], [50, 52], [94, 16], [56, 94]], lines: [[0, 1], [1, 2], [1, 3]] },
+    boat: { name: '舟', stars: [[10, 58], [90, 58], [72, 88], [30, 88], [44, 6]], lines: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 0], [4, 1]] },
+    key: { name: '鑰', stars: [[12, 16], [40, 8], [26, 38], [56, 58], [82, 84], [94, 64]], lines: [[0, 1], [1, 2], [2, 0], [2, 3], [3, 4], [4, 5]] },
+    bow: { name: '弓', stars: [[30, 4], [14, 26], [8, 50], [14, 74], [30, 96], [58, 50], [92, 50]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 6]] },
+    fish: { name: '魚', stars: [[14, 50], [34, 28], [62, 28], [80, 50], [62, 72], [34, 72], [96, 30], [96, 70]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [3, 6], [3, 7]] },
+    crown: { name: '冠', stars: [[8, 88], [50, 88], [92, 88], [8, 34], [30, 58], [50, 10], [70, 58], [92, 34], [50, 62]], lines: [[0, 1], [1, 2], [0, 3], [2, 7], [3, 4], [4, 5], [5, 6], [6, 7]] },
+    tower: { name: '塔', stars: [[50, 4], [38, 26], [62, 26], [34, 48], [66, 48], [30, 70], [70, 70], [26, 94], [74, 94], [50, 94]], lines: [[0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [6, 8], [7, 9], [9, 8]] },
+  };
+  const CONSTELLATION_ORDER = ['lamp', 'bird', 'boat', 'key', 'bow', 'fish', 'crown', 'tower'];
+  const DIRECTIONS = [
+    { id: 'N', name: '北' }, { id: 'NE', name: '東北' }, { id: 'E', name: '東' }, { id: 'SE', name: '東南' },
+    { id: 'S', name: '南' }, { id: 'SW', name: '西南' }, { id: 'W', name: '西' }, { id: 'NW', name: '西北' },
+  ];
+  // 每個方位真實天空中由高到低的三個星座
+  const SKY_FIELDS = {
+    N: ['crown', 'lamp', 'fish'], NE: ['tower', 'bow', 'lamp'], E: ['fish', 'bird', 'crown'],
+    SE: ['key', 'boat', 'bird'], S: ['bow', 'key', 'tower'], SW: ['lamp', 'crown', 'boat'],
+    W: ['boat', 'tower', 'bow'], NW: ['bird', 'fish', 'key'],
+  };
+  const COMET_DIRECTION = 'SE';
+  const DIAL_ANSWER = SKY_FIELDS[COMET_DIRECTION].slice(); // [外環, 中環, 內環]
+
+  // 謎題 10：撕成兩半的便條（每行在撕裂處分成左右兩段）
+  const NOTE_LINES = [
+    ['阿遙：', ''],
+    ['溫室工作台底', '下有一扇活板門，'],
+    ['門鎖密碼是 12', '08，那個冬夜的日期。'],
+    ['暗房裡只能開紅燈', '，白光會毀掉底片。'],
+    ['沖洗順序：顯影→停', '影→定影→清水。'],
+    ['藥瓶標籤我撕了，看', '架上的卡片。'],
+    ['', '—— 陸'],
+  ];
+  const TRAPDOOR_CODE = '1208';
+
+  // 謎題 11：顯影藥劑（瓶蓋顏色由左到右）
+  const BOTTLES = [
+    { id: 'red', name: '紅蓋', content: 'water' },
+    { id: 'blue', name: '藍蓋', content: 'fixer' },
+    { id: 'yellow', name: '黃蓋', content: 'developer' },
+    { id: 'white', name: '白蓋', content: 'stop' },
+  ];
+  const CHEM_NAMES = { developer: '顯影液', stop: '停影液', fixer: '定影液', water: '清水' };
+  const DEVELOP_SEQUENCE = ['developer', 'stop', 'fixer', 'water'];
+  const DEVELOP_ANSWER = DEVELOP_SEQUENCE.map(ch => BOTTLES.find(b => b.content === ch).id);
+
+  const EMBLEMS = ['emblem_sun', 'emblem_moon', 'emblem_star'];
+  const PAGES = ['page1', 'page2', 'page3', 'page4'];
+
+  /* ================================================================
+   * 二、線索文件（可在「線索筆記」中隨時重讀）
+   * ================================================================ */
+  const P = s => s; // 只是標示純文字段落
+  const docs = {
+    letter: {
+      title: '陸觀的信', style: 'hand',
+      body: [
+        '阿遙：',
+        '抱歉，用這種方式迎接你。',
+        '大門已經被我設下的機關鎖上了。屋裡藏著三枚徽章——日、月、星。把它們嵌回大門，門就會打開。',
+        '這屋子裡的每一道鎖，答案都在屋子裡。不必求助任何書本或旁人，只要仔細看、慢慢想。',
+        '還有一件事。二十年前那個冬夜的真相，我藏在「光照不到的地方」。要不要把它帶出這扇門，由你決定。',
+        '—— 陸觀',
+      ],
+    },
+    clipping: {
+      title: '舊剪報', style: 'news',
+      body: [
+        '《山城日報》1999 年 12 月 11 日',
+        '【新彗星現身東南夜空　韓嶽教授率先發現】',
+        '本報訊　天文學家韓嶽教授昨日宣布，他於本月十日夜間，在東南方的天空中發現一顆從未被記錄的彗星。國際天文組織已初步確認，暫定名為「韓嶽彗星」。韓教授表示：「這是我觀測生涯中最幸運的一夜。」',
+        '（剪報的「十日」旁，有人用紅筆重重畫了一個問號。）',
+      ],
+    },
+    drawer_note: {
+      title: '抽屜鎖上的便條', style: 'hand',
+      body: ['紅、黃、藍、綠——', '照這個順序，它們各是第幾卷？'],
+    },
+    bookshelf: { title: '書架上的《星空圖鑑》', view: 'bookshelf' },
+    painting_back: {
+      title: '油畫背面的字', style: 'hand',
+      body: ['（畫框背面，鉛筆字）', '星星會告訴你數字。'],
+    },
+    pots_rule: {
+      title: '花盆架上的木牌', style: 'plain',
+      body: [
+        '四個花盆裡，只有一個埋著東西。',
+        '盆上刻的四句話裡，只有一句是真的。',
+        ...POTS.map(p => `${p.name}盆：「${p.says}」`),
+      ],
+    },
+    garden_rules: {
+      title: '園丁守則', style: 'plain',
+      body: [
+        '十月澆水守則',
+        '・月光花：只喝雨水。沾到一滴肥料水就會枯萎。',
+        '・蕨類：雨水和肥料水都要。',
+        '・仙人掌：這個月一滴水都不能給。',
+        '・月光花只在月光照到它時開花。天窗下的反光鏡可以轉動。',
+        '打開總閘之前，先把每個閥門設好。',
+      ],
+    },
+    eyepiece_box: {
+      title: '目鏡盒蓋內側的字', style: 'hand',
+      body: ['目鏡又滾到地圖櫃底下去了。', '那裡太暗，下次記得帶燈。'],
+    },
+    telescope_note: {
+      title: '望遠鏡上的便條', style: 'hand',
+      body: ['提醒自己：', '這支折射鏡看到的像是倒過來的——上下顛倒，左右也相反。'],
+    },
+    dial_inscription: {
+      title: '星盤上的刻字', style: 'plain',
+      body: [
+        '轉動三環，對準彗星初次現身的方位上那三個星座。',
+        '外環：位置最高者。中環：居中者。內環：位置最低者。',
+        '——以真實的天空為準。',
+      ],
+    },
+    poster: { title: '手繪星座圖', view: 'poster' },
+    almanac: {
+      title: '十月月落時刻表', style: 'table',
+      body: ['十月　月落時刻', ...MOONSET.map(([d, t]) => `${d}　${t}`)],
+    },
+    obs_log: {
+      title: '觀測日誌（最後幾頁）', style: 'hand',
+      body: [
+        '九月二十八日　晴　——　東方的「鳥」清晰可見。',
+        '十月一日　陰　——　無法觀測。',
+        '十月三日　晴　——　最後一次觀測。照老規矩，等月亮落下後整整一小時才開始，月光會淹沒暗星。咳得厲害，手也不穩了，也許這真是最後一次。',
+        '（之後的頁面全是空白。）',
+      ],
+    },
+    clock_inscription: {
+      title: '落地鐘上的刻字', style: 'plain',
+      body: ['讓指針回到我最後一次觀測開始的那一刻。'],
+    },
+    bottle_card: {
+      title: '藥瓶架上的卡片', style: 'hand',
+      body: [
+        '藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：紅、藍、黃、白。',
+        '一、清水放在架子的最左邊或最右邊。',
+        '二、定影液的瓶蓋既不是白色，也不是紅色。',
+        '三、顯影液就在停影液的緊左邊。',
+        '四、白色瓶蓋裡裝的不是清水。',
+      ],
+    },
+    darkroom_warning: {
+      title: '活板門內側的警告', style: 'plain',
+      body: ['暗房——只准開紅燈。', '白光會毀掉一切。'],
+    },
+    page1: {
+      title: '日記殘頁（一）', style: 'hand',
+      body: [
+        '1999 年 12 月 8 日',
+        '雲散了。十點過後，我在東南方的天空看見一團模糊的光，拖著短短的尾巴。星圖上沒有它。',
+        '我拍了三張玻璃底片，每張曝光二十分鐘。手一直在抖——如果我沒弄錯，這是一顆從未被記錄過的彗星。',
+      ],
+    },
+    page2: {
+      title: '日記殘頁（二）', style: 'hand',
+      body: [
+        '1999 年 12 月 9 日',
+        '我把消息告訴了韓老師。他說要幫我核對軌道，借走了我的觀測紀錄和兩張已沖洗的底片。',
+        '第三張我還沒沖，就先收進了暗房的避光盒裡。說不上為什麼，我留了個心眼。',
+      ],
+    },
+    page3: {
+      title: '日記殘頁（三）', style: 'hand',
+      body: [
+        '1999 年 12 月 12 日',
+        '報紙頭版：「韓嶽教授發現新彗星」。坐標、時刻，和我的紀錄一模一樣——連我抄錯了又劃掉的那個「7」，他也照抄了上去。',
+        '我打了十一通電話，他一通也沒接。',
+      ],
+    },
+    page4: {
+      title: '日記殘頁（四）', style: 'hand',
+      body: [
+        '九月二十日',
+        '醫生說，我的時間不多了。二十年來，我一次也沒有打開那個避光盒。我恨過他，後來不恨了，只是累。',
+        '阿遙，第三張底片留給你。彗星每晚都在群星之間移動，底片上它和星星的相對位置，就是那一夜的日期，誰也偽造不了。再加上那個被照抄的錯誤——你會知道該怎麼做。',
+        '或者，你也可以讓它繼續沉睡。由你決定。',
+      ],
+    },
+  };
+
+  /* ================================================================
+   * 三、物品
+   * ================================================================ */
+  const items = {
+    letter: { name: '陸觀的信', glyph: '信', kind: 'paper', desc: '老師寫給你的最後一封信。', doc: 'letter' },
+    flashlight_dead: { name: '手電筒（沒電）', glyph: '筒', kind: 'tool', desc: '一支老式金屬手電筒。按下開關沒有反應——電池倉是空的。' },
+    battery: { name: '電池', glyph: '電', kind: 'tool', desc: '兩節還算新的電池，用橡皮筋綁在一起。' },
+    flashlight: { name: '手電筒', glyph: '光', kind: 'tool', desc: '裝上電池的手電筒，光線又白又亮。可以照亮黑暗的角落。' },
+    grid_paper: { name: '數字方格紙', glyph: '格', kind: 'paper', desc: '一張 5×5 的方格紙，每格寫著一個數字。四個角上各畫著一個小十字。', view: 'grid' },
+    transparency: { name: '星圖膠片', glyph: '膠', kind: 'paper', desc: '一張透明膠片，畫著十顆星星，其中三顆被圈起來，標著①②③。四個角上各畫著一個小十字。', view: 'transparency' },
+    overlay: { name: '疊合的星圖', glyph: '疊', kind: 'paper', desc: '星圖膠片疊在方格紙上，四角的十字對得整整齊齊。', view: 'overlay' },
+    greenhouse_key: { name: '溫室鑰匙', glyph: '葉', kind: 'key', desc: '一把鐵鑰匙，握柄做成葉子的形狀。' },
+    trowel: { name: '小鏟子', glyph: '鏟', kind: 'tool', desc: '園藝用的小鏟子，鏟刃有點鈍了。' },
+    brass_key: { name: '黃銅鑰匙', glyph: '銅', kind: 'key', desc: '一把沾著泥土的黃銅鑰匙，匙柄刻著樓梯的圖樣。' },
+    valve_wheel: { name: '閥門手輪', glyph: '輪', kind: 'tool', desc: '黃銅手輪，背面貼著紙條：「溫室總閘」。' },
+    eyepiece: { name: '望遠鏡目鏡', glyph: '鏡', kind: 'tool', desc: '一枚黃銅框的目鏡，鏡片上沾了點灰，擦一擦還能用。' },
+    red_bulb: { name: '紅色燈泡', glyph: '泡', kind: 'tool', desc: '從觀測桌的檯燈上轉下來的紅色燈泡。陸觀說過：看星星和沖底片，都只用紅光。' },
+    note_left: { name: '便條（左半）', glyph: '左', kind: 'paper', desc: '被撕成兩半的便條，這是左半邊。字跡是陸觀的。', view: 'note_left' },
+    note_right: { name: '便條（右半）', glyph: '右', kind: 'paper', desc: '被撕成兩半的便條，這是右半邊。夾在觀測日誌裡當書籤。', view: 'note_right' },
+    note_full: { name: '拼好的便條', glyph: '條', kind: 'paper', desc: '兩半便條沿著撕口拼在一起，終於能讀了。', view: 'note_full' },
+    page1: { name: '日記殘頁（一）', glyph: '壹', kind: 'page', desc: '從日記上撕下的一頁。', doc: 'page1' },
+    page2: { name: '日記殘頁（二）', glyph: '貳', kind: 'page', desc: '從日記上撕下的一頁，邊緣被煙燻黑了。', doc: 'page2' },
+    page3: { name: '日記殘頁（三）', glyph: '參', kind: 'page', desc: '從日記上撕下的一頁，紙上有淚痕似的水漬。', doc: 'page3' },
+    page4: { name: '日記殘頁（四）', glyph: '肆', kind: 'page', desc: '從日記上撕下的一頁，字跡已經有些顫抖。', doc: 'page4' },
+    diary: { name: '陸觀的日記', glyph: '記', kind: 'page', desc: '你把找到的殘頁按日期裝訂在一起。', view: 'diary' },
+    emblem_sun: { name: '日徽', glyph: '日', kind: 'emblem', desc: '一枚沉甸甸的黃銅徽章，刻著光芒四射的太陽。' },
+    emblem_moon: { name: '月徽', glyph: '月', kind: 'emblem', desc: '一枚銀白色的徽章，刻著一彎新月。' },
+    emblem_star: { name: '星徽', glyph: '星', kind: 'emblem', desc: '一枚深藍色的琺瑯徽章，嵌著一顆八角星。' },
+    plate: { name: '玻璃底片', glyph: '底', kind: 'evidence', desc: '剛沖洗出來的玻璃底片。群星之間，一顆拖著短尾的彗星清清楚楚。片角刻著：1999.12.08　陸觀。', view: 'plate' },
+  };
+
+  /* ================================================================
+   * 四、房間
+   * ================================================================ */
+  const rooms = {
+    foyer: {
+      name: '門廳',
+      accessible: () => true,
+      enterText: () => '門廳。熄滅的吊燈垂在挑高的天花板下，正對面是那扇鎖死的大門。左邊是書房，右邊是溫室，樓梯通往天文台。',
+      onEnter(ctx) {
+        if (ctx.has('plate') && !ctx.flag('phoneRinging') && !ctx.flag('phoneDone')) {
+          ctx.set('phoneRinging');
+          ctx.say('鈴——鈴——門廳裡那台老電話突然響了起來。', 'event');
+        }
+      },
+    },
+    study: {
+      name: '書房',
+      accessible: () => true,
+      enterText: () => '書房裡瀰漫著舊紙和菸草的味道。書架、書桌、壁爐，牆上掛著一幅星空油畫。',
+    },
+    greenhouse: {
+      name: '溫室',
+      accessible: s => !!s.flags.greenhouseOpen,
+      enterText: () => '雨剛停，玻璃頂上還掛著水珠。雲散了，月光從天窗斜斜地照進來。空氣又濕又暖。',
+    },
+    observatory: {
+      name: '天文台',
+      accessible: s => !!s.flags.gateOpen,
+      enterText: () => '天文台。圓頂下立著一支黃銅折射望遠鏡，牆上貼滿了星圖。',
+    },
+    darkroom: {
+      name: '暗房',
+      accessible: s => !!s.flags.trapdoorOpen,
+      enterText: s => s.flags.darkroomLit
+        ? '紅色的安全燈把暗房染成一片暗紅。'
+        : '你沿著梯子爬下去，四周伸手不見五指。',
+      onEnter(ctx) {
+        if (!ctx.flag('darkroomLit')) {
+          ctx.say('借著頭頂溫室透下來的一點微光，你看見活板門內側貼著一張紙：「暗房——只准開紅燈。白光會毀掉一切。」', 'event');
+          ctx.note('darkroom_warning');
+        }
+      },
+    },
+  };
+
+  /* ================================================================
+   * 五、熱點（房間裡可以互動的東西）
+   *   examine(ctx)       —— 直接點擊
+   *   use[itemId](ctx)   —— 拿著某個物品點擊
+   *   useAny(ctx, item)  —— 其他物品的預設反應（可省略）
+   * ================================================================ */
+  const allInserted = s => EMBLEMS.every(e => s.flags['inserted_' + e]);
+  const insertEmblem = e => ctx => {
+    ctx.take(e);
+    ctx.set('inserted_' + e);
+    ctx.say(`你把${items[e].name}按進大門上對應的凹槽，「喀」的一聲，嵌得嚴絲合縫。`, 'good');
+    if (allInserted(ctx.s)) ctx.say('三枚徽章全部歸位。門內傳來齒輪轉動的聲音——大門的鎖開了。', 'event');
+  };
+
+  const hotspots = [
+    /* ---------------- 門廳 ---------------- */
+    {
+      id: 'f_door', room: 'foyer', name: '大門',
+      examine(ctx) {
+        const s = ctx.s;
+        if (allInserted(s)) { ctx.open({ view: 'exit' }); return; }
+        const parts = EMBLEMS.map(e => `${items[e].glyph}：${s.flags['inserted_' + e] ? '已嵌入' : '空'}`);
+        ctx.say(`厚重的橡木大門，門把紋絲不動。門板中央有一塊黃銅面板，上面有三個凹槽（${parts.join('，')}）。`);
+      },
+      use: { emblem_sun: insertEmblem('emblem_sun'), emblem_moon: insertEmblem('emblem_moon'), emblem_star: insertEmblem('emblem_star') },
+      useAny(ctx) { ctx.say('大門的機關只認那三枚徽章。'); },
+    },
+    {
+      id: 'f_mailslot', room: 'foyer', name: '信件口',
+      examine(ctx) {
+        if (ctx.flag('phoneDone')) ctx.say('信件口外一片漆黑。門外那輛車的引擎聲已經遠去了。');
+        else ctx.say('門上的黃銅信件口。往外推只能推開一條細縫——夠塞進一封信，人是絕對過不去的。');
+      },
+      use: {
+        plate(ctx) {
+          if (ctx.flag('phoneRinging')) ctx.say('電話還在響。也許該先聽聽是誰。');
+          else ctx.say('你把底片湊近信件口，又收了回來。外面沒有人在等它。');
+        },
+      },
+    },
+    {
+      id: 'f_phone', room: 'foyer', name: '老電話',
+      examine(ctx) {
+        if (ctx.flag('phoneRinging')) { ctx.open({ view: 'phone' }); return; }
+        if (ctx.flag('phoneDone')) { ctx.say('聽筒裡只剩嘟嘟聲。'); return; }
+        ctx.say('一台黑色轉盤電話。你拿起聽筒——線路是通的，但撥不出去，好像只能接聽。');
+      },
+    },
+    {
+      id: 'f_clock', room: 'foyer', name: '落地鐘',
+      examine(ctx) {
+        if (ctx.flag('clockSolved')) { ctx.say('落地鐘停在三點十五分，鐘擺箱的小門敞開著，裡面已經空了。'); return; }
+        ctx.note('clock_inscription');
+        ctx.open({ view: 'clock' });
+      },
+    },
+    {
+      id: 'f_coat', room: 'foyer', name: '衣帽架',
+      examine(ctx) {
+        if (!ctx.flag('coatSearched')) {
+          ctx.set('coatSearched');
+          ctx.say('衣帽架上掛著陸觀的舊大衣。你摸了摸口袋——');
+          ctx.give('flashlight_dead');
+        } else ctx.say('舊大衣上還留著淡淡的菸草味。口袋已經空了。');
+      },
+    },
+    {
+      id: 'f_umbrella', room: 'foyer', name: '傘架',
+      examine(ctx) { ctx.say('傘架裡只有一把黑傘，傘尖還在滴水——那是你自己的。'); },
+    },
+    {
+      id: 'f_window', room: 'foyer', name: '窗戶',
+      examine(ctx) { ctx.say('窗外裝著粗鐵欄杆，玻璃後面是漆黑的山。看來只能走大門了。'); },
+    },
+    {
+      id: 'f_study_door', room: 'foyer', name: '書房門',
+      examine(ctx) { ctx.goto('study'); },
+    },
+    {
+      id: 'f_gh_door', room: 'foyer', name: '溫室門',
+      examine(ctx) {
+        if (ctx.flag('greenhouseOpen')) { ctx.goto('greenhouse'); return; }
+        ctx.say('通往溫室的玻璃門鎖著。鑰匙孔旁刻著一片小小的葉子。');
+      },
+      use: {
+        greenhouse_key(ctx) {
+          if (ctx.flag('greenhouseOpen')) return;
+          ctx.take('greenhouse_key');
+          ctx.set('greenhouseOpen');
+          ctx.say('葉子形狀的鑰匙正好插進鎖孔。「喀噠」——溫室門開了。', 'good');
+        },
+      },
+    },
+    {
+      id: 'f_gate', room: 'foyer', name: '樓梯鐵門',
+      examine(ctx) {
+        if (ctx.flag('gateOpen')) { ctx.goto('observatory'); return; }
+        ctx.say('通往天文台的樓梯被一道鐵柵門擋住，門上掛著一把黃銅掛鎖。');
+      },
+      use: {
+        brass_key(ctx) {
+          ctx.take('brass_key');
+          ctx.set('gateOpen');
+          ctx.say('黃銅鑰匙轉了半圈，掛鎖彈開。鐵柵門吱呀一聲打開了。', 'good');
+        },
+      },
+    },
+
+    /* ---------------- 書房 ---------------- */
+    {
+      id: 's_shelf', room: 'study', name: '書架',
+      examine(ctx) {
+        ctx.note('bookshelf');
+        ctx.open({ view: 'bookshelf' });
+      },
+    },
+    {
+      id: 's_drawer', room: 'study', name: '書桌抽屜',
+      examine(ctx) {
+        if (ctx.flag('drawerOpen')) { ctx.say('抽屜開著，裡面已經空了。'); return; }
+        ctx.note('drawer_note');
+        ctx.open({ view: 'lock', id: 'drawer' });
+      },
+    },
+    {
+      id: 's_desk', room: 'study', name: '書桌桌面',
+      examine(ctx) {
+        if (!ctx.flag('gridTaken')) {
+          ctx.set('gridTaken');
+          ctx.say('桌面的玻璃墊下壓著一張寫滿數字的方格紙。你把它抽了出來。');
+          ctx.give('grid_paper');
+        } else ctx.say('桌上攤著幾本星表，墨水早就乾了。');
+      },
+    },
+    {
+      id: 's_clipping', room: 'study', name: '牆上的剪報',
+      examine(ctx) { ctx.note('clipping'); ctx.open({ view: 'doc', id: 'clipping' }); },
+    },
+    {
+      id: 's_painting', room: 'study', name: '星空油畫',
+      examine(ctx) {
+        if (!ctx.flag('paintingMoved')) {
+          ctx.set('paintingMoved');
+          ctx.say('油畫裡是一片星空，右下角簽著「陸觀」。畫框有點歪——你把它取下來，後面的牆裡嵌著一個保險箱！', 'event');
+          ctx.say('畫框背面用鉛筆寫著一行字：「星星會告訴你數字。」');
+          ctx.note('painting_back');
+        } else ctx.say('取下的油畫靠在牆邊。畫框背面寫著：「星星會告訴你數字。」');
+      },
+    },
+    {
+      id: 's_safe', room: 'study', name: '保險箱',
+      visible: s => !!s.flags.paintingMoved,
+      examine(ctx) {
+        if (ctx.flag('safeOpen')) { ctx.say('保險箱的門開著，裡面空了。'); return; }
+        ctx.open({ view: 'lock', id: 'safe' });
+      },
+    },
+    {
+      id: 's_fireplace', room: 'study', name: '壁爐',
+      examine(ctx) {
+        if (ctx.flag('chimneySearched')) { ctx.say('壁爐裡只剩冷掉的灰燼。'); return; }
+        ctx.say('爐火早已熄滅。你探頭往煙囪裡看，磚縫間好像卡著什麼東西，可是裡面太黑，什麼也看不清。');
+      },
+      use: {
+        flashlight(ctx) {
+          if (ctx.flag('chimneySearched')) { ctx.say('煙囪裡只有煤灰。'); return; }
+          ctx.set('chimneySearched');
+          ctx.say('手電筒的光照進煙囪——磚縫裡夾著一張捲起來的紙。你小心地把它抽了出來。', 'good');
+          ctx.give('page2');
+        },
+        flashlight_dead(ctx) { ctx.say('手電筒沒電，按了也不會亮。'); },
+      },
+    },
+    {
+      id: 's_waste', room: 'study', name: '廢紙簍',
+      examine(ctx) {
+        if (!ctx.flag('wasteSearched')) {
+          ctx.set('wasteSearched');
+          ctx.say('廢紙簍裡大多是揉皺的草稿。最底下有半張被撕開的便條。');
+          ctx.give('note_left');
+        } else ctx.say('只剩一些揉皺的星表草稿。');
+      },
+    },
+    {
+      id: 's_window', room: 'study', name: '窗戶',
+      examine(ctx) { ctx.say('窗框被人從外面釘死了。窗外，雨後的星星一顆一顆亮了起來。'); },
+    },
+    {
+      id: 's_exit', room: 'study', name: '回到門廳',
+      examine(ctx) { ctx.goto('foyer'); },
+    },
+
+    /* ---------------- 溫室 ---------------- */
+    {
+      id: 'g_tools', room: 'greenhouse', name: '工具架',
+      examine(ctx) {
+        if (!ctx.flag('trowelTaken')) {
+          ctx.set('trowelTaken');
+          ctx.say('工具架上掛著水壺、剪刀和一把小鏟子。你取下了小鏟子。');
+          ctx.give('trowel');
+        } else ctx.say('工具架上掛著水壺和剪刀。');
+      },
+    },
+    {
+      id: 'g_pots', room: 'greenhouse', name: '花盆架',
+      examine(ctx) {
+        if (ctx.flag('keyDug')) { ctx.say('玫瑰盆的土被翻過了。其餘三盆安安靜靜地立著。'); return; }
+        ctx.note('pots_rule');
+        ctx.open({ view: 'pots' });
+      },
+    },
+    {
+      id: 'g_rules', room: 'greenhouse', name: '園丁守則',
+      examine(ctx) { ctx.note('garden_rules'); ctx.open({ view: 'doc', id: 'garden_rules' }); },
+    },
+    {
+      id: 'g_valves', room: 'greenhouse', name: '灌溉系統',
+      examine(ctx) {
+        if (ctx.flag('waterOk')) { ctx.say('雨水桶和肥料桶靜靜地立著。月光花、蕨類都喝足了水，仙人掌的土依然乾燥。'); return; }
+        ctx.note('garden_rules');
+        ctx.open({ view: 'valves' });
+      },
+      use: {
+        valve_wheel(ctx) {
+          ctx.take('valve_wheel');
+          ctx.set('wheelInstalled');
+          ctx.say('你把黃銅手輪套上總閘的閥桿，轉了轉，很順手。', 'good');
+        },
+      },
+    },
+    {
+      id: 'g_mirrors', room: 'greenhouse', name: '天窗反光鏡',
+      examine(ctx) {
+        if (ctx.flag('lightOk')) { ctx.say('月光經過一面面反光鏡，穩穩地落在月光花上。'); return; }
+        ctx.open({ view: 'mirrors' });
+      },
+    },
+    {
+      id: 'g_moonflower', room: 'greenhouse', name: '月光花',
+      examine(ctx) {
+        const water = ctx.flag('waterOk'), light = ctx.flag('lightOk');
+        if (ctx.flag('moonTaken')) { ctx.say('月光花在月光下靜靜開著，潔白如雪。'); return; }
+        if (water && light) {
+          ctx.set('moonTaken');
+          ctx.say('喝足了雨水、沐浴在月光裡，月光花一瓣一瓣地綻開——花心裡躺著一枚銀白色的徽章。', 'event');
+          ctx.give('emblem_moon');
+          return;
+        }
+        const need = [];
+        if (!water) need.push('土壤乾裂，它渴了');
+        if (!light) need.push('月光照不到這個角落');
+        ctx.say(`一株含苞的月光花，花苞緊緊閉著，裡面好像包著什麼發亮的東西。（${need.join('；')}。）`);
+      },
+    },
+    {
+      id: 'g_bench', room: 'greenhouse', name: '工作台',
+      examine(ctx) {
+        if (ctx.flag('trapdoorFound')) { ctx.say('工作台底下的地板上，露出一扇活板門。'); return; }
+        ctx.say('工作台上散落著種子袋和麻繩。台面底下黑漆漆的，什麼也看不見。');
+      },
+      use: {
+        flashlight(ctx) {
+          if (ctx.flag('trapdoorFound')) { ctx.say('活板門就在那裡。'); return; }
+          ctx.set('trapdoorFound');
+          ctx.say('你趴下來用手電筒往工作台底下照——地板上有一扇方形的活板門，門上掛著四位數字鎖。', 'event');
+        },
+        flashlight_dead(ctx) { ctx.say('手電筒沒電，照不亮任何東西。'); },
+      },
+    },
+    {
+      id: 'g_trapdoor', room: 'greenhouse', name: '活板門',
+      visible: s => !!s.flags.trapdoorFound,
+      examine(ctx) {
+        if (ctx.flag('trapdoorOpen')) { ctx.goto('darkroom'); return; }
+        ctx.open({ view: 'lock', id: 'trapdoor' });
+      },
+    },
+    {
+      id: 'g_exit', room: 'greenhouse', name: '回到門廳',
+      examine(ctx) { ctx.goto('foyer'); },
+    },
+
+    /* ---------------- 天文台 ---------------- */
+    {
+      id: 'o_telescope', room: 'observatory', name: '望遠鏡',
+      examine(ctx) {
+        ctx.note('telescope_note');
+        if (!ctx.flag('eyepieceInstalled')) {
+          ctx.say('黃銅鏡筒上貼著一張便條：「這支折射鏡看到的像是倒過來的——上下顛倒，左右也相反。」可是目鏡座是空的。');
+          ctx.say('一旁的目鏡盒也是空的，盒蓋內側寫著：「目鏡又滾到地圖櫃底下去了。那裡太暗，下次記得帶燈。」');
+          ctx.note('eyepiece_box');
+          return;
+        }
+        ctx.open({ view: 'eyepiece' });
+      },
+      use: {
+        eyepiece(ctx) {
+          ctx.take('eyepiece');
+          ctx.set('eyepieceInstalled');
+          ctx.say('你把目鏡旋進目鏡座。現在可以看望遠鏡了。', 'good');
+        },
+      },
+    },
+    {
+      id: 'o_dome', room: 'observatory', name: '穹頂轉輪',
+      examine(ctx) { ctx.open({ view: 'dome' }); },
+    },
+    {
+      id: 'o_dial', room: 'observatory', name: '星盤',
+      examine(ctx) {
+        ctx.note('dial_inscription');
+        if (ctx.flag('starDialSolved')) { ctx.say('星盤的中心敞開著，裡面空了。'); return; }
+        ctx.open({ view: 'dial' });
+      },
+    },
+    {
+      id: 'o_poster', room: 'observatory', name: '星座圖',
+      examine(ctx) { ctx.note('poster'); ctx.open({ view: 'poster' }); },
+    },
+    {
+      id: 'o_almanac', room: 'observatory', name: '月落時刻表',
+      examine(ctx) { ctx.note('almanac'); ctx.open({ view: 'doc', id: 'almanac' }); },
+    },
+    {
+      id: 'o_log', room: 'observatory', name: '觀測日誌',
+      examine(ctx) {
+        ctx.note('obs_log');
+        if (!ctx.flag('logBookmark')) {
+          ctx.set('logBookmark');
+          ctx.say('你翻開觀測日誌，一張撕開的半張便條從書頁間滑了出來。');
+          ctx.give('note_right');
+        }
+        ctx.open({ view: 'doc', id: 'obs_log' });
+      },
+    },
+    {
+      id: 'o_lamp', room: 'observatory', name: '紅光檯燈',
+      examine(ctx) {
+        if (!ctx.flag('bulbTaken')) {
+          ctx.set('bulbTaken');
+          ctx.say('觀測桌上的檯燈裝著紅色燈泡，發出微弱的紅光。你把燈泡轉了下來，房間又暗了一些。');
+          ctx.give('red_bulb');
+        } else ctx.say('檯燈的燈座空著。');
+      },
+    },
+    {
+      id: 'o_cabinet', room: 'observatory', name: '地圖櫃',
+      examine(ctx) {
+        if (!ctx.flag('transparencyTaken')) {
+          ctx.set('transparencyTaken');
+          ctx.say('地圖櫃的淺抽屜裡收著一疊星圖。最上面是一張透明膠片。');
+          ctx.give('transparency');
+        } else ctx.say('抽屜裡是一疊疊手繪星圖。');
+      },
+    },
+    {
+      id: 'o_under', room: 'observatory', name: '地圖櫃底下',
+      examine(ctx) {
+        if (ctx.flag('eyepieceFound')) { ctx.say('櫃子底下只剩灰塵。'); return; }
+        ctx.say('地圖櫃和地板之間有一道窄縫，裡面黑漆漆的，好像有什麼東西閃了一下。');
+      },
+      use: {
+        flashlight(ctx) {
+          if (ctx.flag('eyepieceFound')) { ctx.say('櫃子底下只剩灰塵。'); return; }
+          ctx.set('eyepieceFound');
+          ctx.say('手電筒一照，縫裡躺著一枚黃銅框的目鏡。你伸手把它撈了出來。', 'good');
+          ctx.give('eyepiece');
+        },
+        flashlight_dead(ctx) { ctx.say('手電筒沒電，照不亮任何東西。'); },
+      },
+    },
+    {
+      id: 'o_exit', room: 'observatory', name: '下樓回門廳',
+      examine(ctx) { ctx.goto('foyer'); },
+    },
+
+    /* ---------------- 暗房 ---------------- */
+    {
+      id: 'd_socket', room: 'darkroom', name: '牆上的燈座',
+      examine(ctx) {
+        if (ctx.flag('darkroomLit')) { ctx.say('紅色安全燈靜靜亮著。'); return; }
+        ctx.say('你在牆上摸到一個燈座，裡面沒有燈泡。');
+      },
+      use: {
+        red_bulb(ctx) {
+          ctx.take('red_bulb');
+          ctx.set('darkroomLit');
+          ctx.say('你把紅色燈泡旋進燈座。暗紅色的光亮起來，暗房的輪廓一點一點浮現。', 'event');
+        },
+      },
+    },
+    {
+      id: 'd_ladder', room: 'darkroom', name: '梯子（回溫室）',
+      examine(ctx) { ctx.goto('greenhouse'); },
+    },
+    {
+      id: 'd_shelf', room: 'darkroom', name: '藥瓶架',
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) { ctx.note('bottle_card'); ctx.open({ view: 'doc', id: 'bottle_card' }); },
+    },
+    {
+      id: 'd_tray', room: 'darkroom', name: '顯影台',
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) {
+        if (ctx.flag('plateDeveloped')) { ctx.say('顯影盤裡的藥水已經倒掉了。避光盒空著。'); return; }
+        ctx.open({ view: 'develop' });
+      },
+    },
+    {
+      id: 'd_line', room: 'darkroom', name: '晾片繩',
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) {
+        if (!ctx.flag('p4Taken')) {
+          ctx.set('p4Taken');
+          ctx.say('晾片繩上夾著幾張空白相紙，還有一頁從日記上撕下來的紙。');
+          ctx.give('page4');
+        } else ctx.say('晾片繩上夾著幾張空白相紙。');
+      },
+    },
+    {
+      id: 'd_vent', room: 'darkroom', name: '氣窗',
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) { ctx.say('牆角高處有一扇小氣窗，被黑布遮著，可是黑布有一角翹了起來。這盞紅燈，從外面看得見嗎？'); },
+    },
+  ];
+
+  /* ================================================================
+   * 六、線索組合（物品欄中兩兩組合）
+   * ================================================================ */
+  const isPagey = id => PAGES.includes(id) || id === 'diary';
+  const recipes = [
+    {
+      pair: ['flashlight_dead', 'battery'],
+      run(ctx) {
+        ctx.take('flashlight_dead'); ctx.take('battery');
+        ctx.say('你把電池塞進手電筒，按下開關——一道白光射了出去。', 'good');
+        ctx.give('flashlight');
+      },
+    },
+    {
+      pair: ['grid_paper', 'transparency'],
+      run(ctx) {
+        ctx.take('grid_paper'); ctx.take('transparency');
+        ctx.say('你把透明膠片疊在方格紙上，讓四個角的十字一一對齊。三個圈起來的星星，正好落在三個數字上。', 'good');
+        ctx.give('overlay');
+      },
+    },
+    {
+      pair: ['note_left', 'note_right'],
+      run(ctx) {
+        ctx.take('note_left'); ctx.take('note_right');
+        ctx.say('撕口的鋸齒完全吻合。兩半便條拼在一起，字句終於連貫了。', 'good');
+        ctx.give('note_full');
+      },
+    },
+    {
+      match: (a, b) => isPagey(a) && isPagey(b) && !(a === 'diary' && b === 'diary'),
+      run(ctx, a, b) {
+        const bound = new Set(ctx.get('diaryPages') || []);
+        for (const id of [a, b]) {
+          if (id !== 'diary') bound.add(id);
+          ctx.take(id);
+        }
+        const list = PAGES.filter(p => bound.has(p));
+        ctx.set('diaryPages', list);
+        ctx.give('diary', true);
+        ctx.say(`你按日期把殘頁裝訂在一起。日記現在有 ${list.length} / 4 頁。`, 'good');
+      },
+    },
+  ];
+
+  /* ================================================================
+   * 七、謎題的判定（UI 只負責輸入，對錯一律在這裡判定）
+   * ================================================================ */
+  const inRoom = room => s => s.room === room;
+  const lockPuzzle = (opts) => ({
+    available: opts.available,
+    check(ctx, answer) {
+      const code = String(answer == null ? '' : answer).replace(/\D/g, '');
+      if (code === opts.code) { opts.success(ctx); return true; }
+      ctx.wrong();
+      ctx.say(opts.wrongText ? opts.wrongText(code) : '鎖紋絲不動。', 'bad');
+      return false;
+    },
+  });
+
+  const puzzles = {
+    drawer: Object.assign(lockPuzzle({
+      code: DRAWER_CODE,
+      available: s => inRoom('study')(s) && !s.flags.drawerOpen,
+      success(ctx) {
+        ctx.set('drawerOpen');
+        ctx.say('「喀」——抽屜彈開了。', 'good');
+        ctx.say('裡面有一把葉子形狀的鑰匙、一捆電池，還有一頁撕下來的日記。');
+        ctx.give('greenhouse_key'); ctx.give('battery'); ctx.give('page1');
+      },
+      wrongText: code => code === DRAWER_TRAP
+        ? '鎖紋絲不動。你數的好像是書在架上的位置——便條問的是「第幾卷」。'
+        : '鎖紋絲不動。',
+    }), { digits: 4, title: '書桌抽屜', prompt: '四位數字鎖。鎖旁的便條寫著：「紅、黃、藍、綠——照這個順序，它們各是第幾卷？」' }),
+
+    safe: Object.assign(lockPuzzle({
+      code: SAFE_CODE,
+      available: s => inRoom('study')(s) && s.flags.paintingMoved && !s.flags.safeOpen,
+      success(ctx) {
+        ctx.set('safeOpen');
+        ctx.say('轉盤咬合，保險箱的門應聲而開。天鵝絨墊子上放著一枚太陽徽章。', 'good');
+        ctx.give('emblem_sun');
+      },
+    }), { digits: 3, title: '保險箱', prompt: '嵌在牆裡的保險箱，三位數字轉盤。畫框背面寫著：「星星會告訴你數字。」' }),
+
+    trapdoor: Object.assign(lockPuzzle({
+      code: TRAPDOOR_CODE,
+      available: s => inRoom('greenhouse')(s) && s.flags.trapdoorFound && !s.flags.trapdoorOpen,
+      success(ctx) {
+        ctx.set('trapdoorOpen');
+        ctx.say('數字鎖彈開了。你掀起活板門，一道窄梯通往漆黑的地下。', 'good');
+      },
+    }), { digits: 4, title: '活板門', prompt: '活板門上的四位數字鎖。鎖旁刻著一顆拖著尾巴的彗星。' }),
+
+    pots: {
+      available: s => inRoom('greenhouse')(s) && !s.flags.keyDug,
+      check(ctx, potId) {
+        const pot = POTS.find(p => p.id === potId);
+        if (!pot) return null;
+        if (!ctx.has('trowel')) { ctx.say('花盆裡的土壓得很實，徒手挖不動。得找把工具。', 'bad'); return false; }
+        if (potId === POT_ANSWER) {
+          ctx.set('keyDug');
+          ctx.say(`你用小鏟子挖開${pot.name}盆的土，鏟尖「叮」地碰到了金屬——一把黃銅鑰匙。`, 'good');
+          ctx.give('brass_key');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say(`你挖開${pot.name}盆的土，裡面除了根和泥什麼也沒有。你把土填了回去。`, 'bad');
+        return false;
+      },
+    },
+
+    clock: {
+      available: s => inRoom('foyer')(s) && !s.flags.clockSolved,
+      check(ctx, ans) {
+        const h = Number(ans && ans.h), m = Number(ans && ans.m);
+        if (h === CLOCK_ANSWER.h && m === CLOCK_ANSWER.m) {
+          ctx.set('clockSolved');
+          ctx.say('指針停在三點十五分的那一刻，鐘裡傳來「噹」的一聲，鐘擺箱的小門彈開了。', 'good');
+          ctx.say('裡面放著一個黃銅手輪，還有一頁折起來的日記。');
+          ctx.give('valve_wheel'); ctx.give('page3');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say('你撥好指針，等了一會兒。落地鐘毫無反應。', 'bad');
+        return false;
+      },
+    },
+
+    valves_set: { // 只記錄閥門的開關狀態（不判對錯）
+      available: inRoom('greenhouse'),
+      silent: true,
+      check(ctx, cfg) {
+        const clean = {};
+        for (const v of VALVES) clean[v.id] = !!(cfg && cfg[v.id]);
+        ctx.s.puz.valves = clean;
+        return true;
+      },
+    },
+    valves: {
+      available: s => inRoom('greenhouse')(s) && !s.flags.waterOk,
+      check(ctx, cfg) {
+        if (!ctx.flag('wheelInstalled')) { ctx.say('總閘上只剩一根光禿禿的閥桿——手輪不見了，轉不動。', 'bad'); return false; }
+        const clean = {};
+        for (const v of VALVES) clean[v.id] = !!(cfg && cfg[v.id]);
+        ctx.s.puz.valves = clean;
+        const r = evalValves(clean);
+        if (r.ok) {
+          ctx.set('waterOk');
+          ctx.say('你轉開總閘，水管裡響起汩汩的水聲。雨水流進月光花和蕨類的花床，肥料水只流向蕨類，仙人掌那一格滴水未沾。', 'good');
+          if (ctx.flag('lightOk')) ctx.say('月光花的花苞輕輕顫動了一下。', 'event');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say('你轉開總閘——', 'bad');
+        for (const p of r.problems) ctx.say(p, 'bad');
+        ctx.say('你趕緊關上總閘。幸好沒造成損害。', 'bad');
+        return false;
+      },
+    },
+
+    mirrors: {
+      available: s => inRoom('greenhouse')(s),
+      silent: true,
+      check(ctx, cfg) {
+        const clean = {};
+        for (const m of MIRROR_GRID.mirrors) clean[m.id] = (cfg && cfg[m.id] === '/') ? '/' : (cfg && cfg[m.id] === '\\') ? '\\' : MIRROR_GRID.initial[m.id];
+        ctx.s.puz.mirrors = clean;
+        if (ctx.flag('lightOk')) return true;
+        if (traceBeam(clean).hit) {
+          ctx.set('lightOk');
+          ctx.say('月光在鏡面間折了幾折，終於落在月光花上。花苞微微發亮。', 'good');
+          if (ctx.flag('waterOk')) ctx.say('月光花的花苞輕輕顫動了一下。', 'event');
+          return true;
+        }
+        return false;
+      },
+    },
+
+    dome: {
+      available: inRoom('observatory'),
+      silent: true,
+      check(ctx, dir) {
+        if (!DIRECTIONS.some(d => d.id === dir)) return null;
+        ctx.s.puz.dome = dir;
+        const name = DIRECTIONS.find(d => d.id === dir).name;
+        ctx.say(`你轉動轉輪，穹頂隆隆作響，觀測窗轉向了${name}方。`);
+        return true;
+      },
+    },
+
+    dial: {
+      available: s => inRoom('observatory')(s) && !s.flags.starDialSolved,
+      check(ctx, ans) {
+        const pick = Array.isArray(ans) ? ans.slice(0, 3) : [];
+        if (pick.join() === DIAL_ANSWER.join()) {
+          ctx.set('starDialSolved');
+          ctx.say('三個環同時「喀」地卡進定位，星盤中心像花瓣一樣向外翻開——裡面是一枚深藍色的星徽。', 'good');
+          ctx.give('emblem_star');
+          return true;
+        }
+        ctx.wrong();
+        const sameSet = pick.length === 3 && pick.slice().sort().join() === DIAL_ANSWER.slice().sort().join();
+        ctx.say(sameSet
+          ? '星盤卡了一下，又鬆開了。這三個星座似乎沒錯，但順序不對。'
+          : '星盤紋絲不動。', 'bad');
+        return false;
+      },
+    },
+
+    develop: {
+      available: s => inRoom('darkroom')(s) && s.flags.darkroomLit && !s.flags.plateDeveloped,
+      check(ctx, seq) {
+        const pick = Array.isArray(seq) ? seq.slice(0, 4) : [];
+        if (pick.join() === DEVELOP_ANSWER.join()) {
+          ctx.set('plateDeveloped');
+          ctx.say('你先用一張廢片試了一次——影像清清楚楚地浮現出來。順序對了。', 'good');
+          ctx.say('你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過四個藥盤。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。', 'event');
+          ctx.give('plate');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say('你先拿一張廢片試了試——片子上一片模糊。順序不對。幸好沒有直接用那張底片。', 'bad');
+        return false;
+      },
+    },
+
+    phone: {
+      available: s => inRoom('foyer')(s) && s.flags.phoneRinging,
+      check(ctx, choice) {
+        if (choice === 'accept' && ctx.has('plate')) {
+          ctx.take('plate');
+          ctx.set('phoneRinging', false);
+          ctx.set('phoneDone');
+          ctx.end('D');
+          return true;
+        }
+        if (choice === 'refuse') {
+          ctx.set('phoneRinging', false);
+          ctx.set('phoneDone');
+          ctx.say('「……你會後悔的。」電話被狠狠地掛斷了。過了一會兒，門外傳來汽車發動、駛遠的聲音。', 'event');
+          return true;
+        }
+        return null;
+      },
+    },
+
+    exit: {
+      available: s => inRoom('foyer')(s) && allInserted(s),
+      check(ctx, choice) {
+        const plate = ctx.has('plate');
+        if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
+        if (choice === 'publish' && plate) { ctx.end(countPages(ctx.s) === 4 ? 'B' : 'C'); return true; }
+        if (choice === 'leave_plate' && plate) { ctx.take('plate'); ctx.end('E'); return true; }
+        return null;
+      },
+    },
+  };
+
+  function countPages(s) {
+    const bound = (s.flags.diaryPages || []).length;
+    const loose = PAGES.filter(p => s.inv.includes(p)).length;
+    return bound + loose;
+  }
+
+  /* ================================================================
+   * 八、結局
+   * ================================================================ */
+  const endings = {
+    B: {
+      title: '陸觀彗星', rank: '真結局',
+      text: [
+        '你把底片和那本拼完整的日記一起帶出了大門。',
+        '三個月後，天文學會公布了調查結果：底片上彗星與群星的相對位置，精確對應 1999 年 12 月 8 日的夜空——比韓嶽宣稱的發現早了整整兩天；而韓嶽當年發表的坐標裡，那個抄錯後又被照抄的「7」，只可能來自陸觀的原始紀錄。',
+        '那顆彗星被正式更名為「陸觀彗星」。',
+        '公布的那天晚上，你回到老宅，在天文台架起望遠鏡，把穹頂轉向東南。目鏡裡的星空是倒過來的。你笑了——這一次，你知道該怎麼看。',
+      ],
+    },
+    A: {
+      title: '破曉', rank: '普通結局',
+      text: [
+        '三枚徽章各歸其位，門內傳來一連串齒輪咬合的聲音。大門緩緩向外打開，山間的晨霧湧了進來。',
+        '你回頭望了一眼。書房、溫室、天文台——你走遍了它們，卻沒有帶走那個「光照不到的地方」裡的東西。',
+        '許多年後，教科書上那顆彗星依然叫做「韓嶽彗星」。偶爾在失眠的夜裡，你會想起信上那句話，想知道那裡究竟藏著什麼。',
+        '你始終沒有回去。',
+      ],
+    },
+    C: {
+      title: '孤證', rank: '未竟結局',
+      text: [
+        '你把底片交給了天文學會。底片上的彗星清清楚楚，可韓嶽的律師一口咬定：一張來歷不明的舊底片，誰能證明它不是事後偽造的？',
+        '你說不出更多細節。陸觀的日記你只找到了一部分，缺掉的那幾頁裡，也許正寫著讓這張底片無可辯駁的關鍵。',
+        '爭論拖了兩年，最後不了了之。',
+        '（屋子裡還有你沒找到的日記殘頁。）',
+      ],
+    },
+    E: {
+      title: '沉睡的星', rank: '抉擇結局',
+      text: [
+        '你站在敞開的大門前，看了很久手裡的底片。',
+        '最後，你走回暗房，把它放回避光盒，鎖上活板門，獨自走出了大門。',
+        '真相還在那裡，只是從今以後，由你來守護。也許有一天你會回來帶走它，也許永遠不會。',
+        '陸觀說過：由你決定。',
+      ],
+    },
+    D: {
+      title: '交易', rank: '壞結局',
+      text: [
+        '你把底片塞出了信件口。',
+        '門外傳來一聲輕笑，接著是打火機「喀嚓」一響。幾分鐘後，門從外面被打開了。韓嶽把一張支票塞進你手裡；在他身後的石階上，一小團灰燼正被夜風吹散。',
+        '你得到了想要的一切。',
+        '只是從那以後，你再也沒有抬頭看過星空。',
+      ],
+    },
+  };
+  const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D'];
+
+  /* ================================================================
+   * 九、提示（每個目標三段：方向 → 線索位置 → 答案）
+   * ================================================================ */
+  function mirrorHint() {
+    const sol = MIRROR_SOLUTIONS[0];
+    const back = MIRROR_GRID.mirrors.filter(m => sol[m.id] === '\\').map(m => m.id);
+    const fwd = MIRROR_GRID.mirrors.filter(m => sol[m.id] === '/').map(m => m.id);
+    const order = [];
+    for (const p of traceBeam(sol).path) {
+      const m = MIRROR_GRID.mirrors.find(x => x.c === p.c && x.r === p.r);
+      if (m && !order.includes(m.id)) order.push(m.id);
+    }
+    return `${back.join('、')} 設成「\\」，${fwd.join('、')} 設成「/」。光線依序經過 ${order.join('→')}，從右側照進月光花。`;
+  }
+  const F = (s, k) => !!s.flags[k];
+  const has = (s, id) => s.inv.includes(id);
+  const hints = [
+    {
+      id: 'drawer', title: '書桌抽屜的鎖',
+      avail: () => true, done: s => F(s, 'drawerOpen'),
+      texts: [
+        '書房的書桌抽屜上了四位數字鎖，鎖旁的便條提到四種顏色。',
+        '仔細看書架：書脊上印著「第幾卷」。注意書並不是按卷數順序排的，問的是卷數，不是位置。',
+        `紅＝第 3 卷、黃＝第 7 卷、藍＝第 5 卷、綠＝第 1 卷。密碼是 ${DRAWER_CODE}。`,
+      ],
+    },
+    {
+      id: 'flashlight', title: '讓手電筒亮起來',
+      avail: s => F(s, 'drawerOpen') || F(s, 'coatSearched'), done: s => has(s, 'flashlight'),
+      texts: [
+        '屋裡有好幾個太暗、看不清的角落。你需要一支能亮的手電筒。',
+        '門廳衣帽架上的大衣口袋裡有一支沒電的手電筒；書桌抽屜裡有電池。',
+        '在物品欄選中手電筒，按「組合」，再點電池。',
+      ],
+    },
+    {
+      id: 'greenhouse', title: '打開溫室',
+      avail: s => F(s, 'drawerOpen'), done: s => F(s, 'greenhouseOpen'),
+      texts: [
+        '抽屜裡那把鑰匙的握柄是葉子形狀。',
+        '門廳右邊溫室門的鑰匙孔旁，也刻著一片葉子。',
+        '在物品欄選中溫室鑰匙，再點門廳的「溫室門」。',
+      ],
+    },
+    {
+      id: 'pots', title: '四個花盆',
+      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'keyDug'),
+      texts: [
+        '木牌說：四句話裡只有一句是真的。先從溫室的工具架拿小鏟子。',
+        '逐一假設鑰匙在每個盆裡，數數看那時有幾句話成立。只有一種假設恰好讓一句話成立。',
+        '答案是玫瑰盆：鑰匙在玫瑰盆時，只有薰衣草盆那句「鑰匙不在我這裡」是真的。',
+      ],
+    },
+    {
+      id: 'gate', title: '樓梯鐵門',
+      avail: s => F(s, 'keyDug'), done: s => F(s, 'gateOpen'),
+      texts: [
+        '黃銅鑰匙的匙柄刻著樓梯。',
+        '門廳的樓梯鐵門掛著一把黃銅掛鎖。',
+        '選中黃銅鑰匙，再點門廳的「樓梯鐵門」。',
+      ],
+    },
+    {
+      id: 'eyepiece', title: '望遠鏡的目鏡',
+      avail: s => F(s, 'gateOpen'), done: s => F(s, 'eyepieceInstalled'),
+      texts: [
+        '望遠鏡少了目鏡。看看目鏡盒蓋內側寫了什麼。',
+        '目鏡滾到地圖櫃底下了，那裡太暗，需要能亮的手電筒。',
+        '對「地圖櫃底下」使用手電筒拿到目鏡，再對望遠鏡使用目鏡。',
+      ],
+    },
+    {
+      id: 'dial', title: '星盤（星徽）',
+      avail: s => F(s, 'eyepieceInstalled'), done: s => F(s, 'starDialSolved'),
+      texts: [
+        '星盤要你對準「彗星初次現身的方位」上的三個星座。哪裡提到過彗星出現在哪個方向？',
+        '日記殘頁（一）和書房的剪報都寫著「東南方」。用穹頂轉輪把觀測窗轉向東南，再看望遠鏡。記住望遠鏡上的便條：成像上下顛倒。用星座圖上的星數辨認星座。',
+        '東南方目鏡裡由上而下是：鳥（4 星）、舟（5 星）、鑰（6 星）。倒回真實天空，由高到低是鑰、舟、鳥。外環＝鑰、中環＝舟、內環＝鳥。',
+      ],
+    },
+    {
+      id: 'safe', title: '油畫後的保險箱（日徽）',
+      avail: s => F(s, 'drawerOpen'), done: s => F(s, 'safeOpen'),
+      texts: [
+        '書房那幅星空油畫的畫框有點歪。畫背面寫著：「星星會告訴你數字。」',
+        '書桌上的數字方格紙和天文台地圖櫃裡的星圖膠片，四個角都有小十字——試著把它們組合。',
+        `疊合後，①②③ 依序落在 ${SAFE_CODE.split('').join('、')} 上。保險箱密碼是 ${SAFE_CODE}。`,
+      ],
+    },
+    {
+      id: 'clock', title: '落地鐘',
+      avail: () => true, done: s => F(s, 'clockSolved'),
+      texts: [
+        '鐘上刻著：「讓指針回到我最後一次觀測開始的那一刻。」觀測的紀錄應該在天文台。',
+        '天文台的觀測日誌寫了最後一次觀測的日期和規矩；牆上的月落時刻表列著那天月亮落下的時刻。',
+        '十月三日月落 02:15，再過整整一小時就是 3:15。把落地鐘撥到 3 點 15 分。',
+      ],
+    },
+    {
+      id: 'wheel', title: '溫室的總閘',
+      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'wheelInstalled'),
+      texts: [
+        '灌溉系統的總閘少了手輪，轉不動。',
+        '手輪被陸觀藏在某個機關裡——門廳的落地鐘還沒打開。',
+        '解開落地鐘拿到閥門手輪，再對溫室的「灌溉系統」使用它。',
+      ],
+    },
+    {
+      id: 'valves', title: '灌溉管線',
+      avail: s => F(s, 'wheelInstalled'), done: s => F(s, 'waterOk'),
+      texts: [
+        '牆上的園丁守則寫著三種植物各需要什麼水。',
+        '逐一看每個閥門通往哪些花床。仙人掌一滴水都不能有，月光花不能碰肥料，蕨類兩樣都要。',
+        '打開 V2、V4、V5，關閉 V1、V3，然後轉開總閘。',
+      ],
+    },
+    {
+      id: 'mirrors', title: '月光反光鏡',
+      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
+      texts: [
+        '守則說月光花只在月光照到時開花。天窗下的反光鏡可以轉動。',
+        '點擊鏡子會切換斜向，光線會即時顯示。從光線第一個碰到的鏡子開始，一面一面往花的方向修正。',
+        mirrorHint(),
+      ],
+    },
+    {
+      id: 'moon', title: '月光花（月徽）',
+      avail: s => F(s, 'waterOk') && F(s, 'lightOk'), done: s => F(s, 'moonTaken'),
+      texts: ['月光花有了雨水和月光。', '去看看月光花。', '點擊溫室裡的「月光花」。'],
+    },
+    {
+      id: 'door', title: '把徽章嵌回大門',
+      avail: s => EMBLEMS.some(e => has(s, e)), done: s => allInserted(s),
+      texts: [
+        '大門的黃銅面板上有日、月、星三個凹槽。',
+        '選中徽章，再點門廳的大門。',
+        '三枚都嵌好之後，再點一次大門就能離開。',
+      ],
+    },
+    {
+      id: 'exit', title: '離開之前',
+      avail: s => allInserted(s), done: () => false,
+      texts: [
+        s => `大門已經可以打開了。你目前有日記 ${countPages(s)} / 4 頁${s.inv.includes('plate') ? '，也帶著底片' : '，還沒找到信裡說的真相'}。`,
+        '信裡說，真相藏在「光照不到的地方」。完整的日記會讓真相更有分量。',
+        '離開前若想看到真結局：取得暗房裡的玻璃底片，並收齊四頁日記，然後選擇公開真相。',
+      ],
+    },
+    {
+      id: 'darkroom', title: '光照不到的地方（選擇性）',
+      avail: s => F(s, 'drawerOpen'), done: s => F(s, 'trapdoorOpen'),
+      texts: [
+        '信裡說真相藏在「光照不到的地方」。屋裡有一張被撕成兩半的便條。',
+        '書房的廢紙簍和天文台的觀測日誌裡各有半張便條，把它們組合起來。溫室工作台底下很暗，用手電筒照照看。',
+        `活板門在溫室工作台底下（用手電筒照工作台），密碼是 ${TRAPDOOR_CODE}。`,
+      ],
+    },
+    {
+      id: 'bulb', title: '暗房的燈（選擇性）',
+      avail: s => F(s, 'trapdoorOpen'), done: s => F(s, 'darkroomLit'),
+      texts: [
+        '暗房只准開紅燈，手電筒的白光不行。',
+        '天文台觀測桌上的檯燈，用的就是紅色燈泡。',
+        '拿走天文台的紅色燈泡，對暗房「牆上的燈座」使用它。',
+      ],
+    },
+    {
+      id: 'develop', title: '沖洗底片（選擇性）',
+      avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
+      texts: [
+        '拼好的便條寫了沖洗順序；藥瓶架上的卡片能推出每個瓶子裝的是什麼。',
+        '先用卡片第四條和第一條確定清水的位置，再用第二條和第三條排出其他三瓶。',
+        '紅＝清水、藍＝定影液、黃＝顯影液、白＝停影液。依序倒：黃 → 白 → 藍 → 紅。',
+      ],
+    },
+    {
+      id: 'diary', title: '陸觀的日記（選擇性）',
+      avail: s => countPages(s) > 0, done: s => countPages(s) >= 4,
+      texts: [
+        s => `日記一共四頁，你找到了 ${countPages(s)} 頁。`,
+        '四頁分別藏在：書桌抽屜、落地鐘、書房壁爐的煙囪、暗房的晾片繩。',
+        '煙囪那一頁要用能亮的手電筒照壁爐；暗房那一頁要先點亮紅燈。',
+      ],
+    },
+  ];
+
+  /* ================================================================
+   * 十、開場
+   * ================================================================ */
+  const intro = [
+    '十月的最後一個雨夜，你——沈遙——收到一封沒有郵戳的信。',
+    '寫信的人是你的老師，業餘天文學家陸觀。三週前，他在山上的老宅裡病逝了。信封裡只有一張卡片：「來宅邸吧，我留了東西給你。」',
+    '你推開老宅的大門。門在身後「喀」地一聲，自己鎖上了。',
+    '門內的地毯上，端端正正地放著第二封信。',
+  ];
+
+  return {
+    title: '觀星者之屋',
+    subtitle: '最後的觀測',
+    saveVersion: 1,
+    startRoom: 'foyer',
+    startItems: ['letter'],
+    roomOrder: ['foyer', 'study', 'greenhouse', 'observatory', 'darkroom'],
+    rooms, items, docs, hotspots, recipes, puzzles, endings, ENDING_ORDER, hints, intro,
+    // 共用謎題資料（UI 繪圖與測試用）
+    BOOKS, DRAWER_CODE, DRAWER_TRAP, GRID_DIGITS, TRANSPARENCY_STARS, SAFE_CODE, POTS, POT_ANSWER,
+    MOONSET, CLOCK_ANSWER, VALVES, BEDS, evalValves, MIRROR_GRID, traceBeam, MIRROR_SOLUTIONS,
+    CONSTELLATIONS, CONSTELLATION_ORDER, DIRECTIONS, SKY_FIELDS, COMET_DIRECTION, DIAL_ANSWER,
+    NOTE_LINES, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
+    EMBLEMS, PAGES, countPages, allInserted,
+  };
+}));
+</script>
+<script>
+/*
+ * 觀星者之屋 — 遊戲引擎
+ * 純邏輯、無 DOM、狀態完全可序列化（JSON），所以存檔與自動化測試都直接使用它。
+ * 每個動作都會先檢查合法性（物品是否在身上、熱點是否可見、謎題是否可作答），
+ * 介面再怎麼出錯也不會把遊戲帶進非法狀態。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.EscapeEngine = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  function create(G) {
+    const hotspotById = {};
+    for (const h of G.hotspots) {
+      if (hotspotById[h.id]) throw new Error('重複的熱點 id：' + h.id);
+      if (!G.rooms[h.room]) throw new Error('熱點指向不存在的房間：' + h.id);
+      hotspotById[h.id] = h;
+    }
+
+    function newState() {
+      return {
+        v: G.saveVersion,
+        room: G.startRoom,
+        inv: G.startItems.slice(),
+        flags: {},
+        notes: ['letter'],
+        puz: { dome: 'N', valves: {}, mirrors: Object.assign({}, G.MIRROR_GRID.initial) },
+        hints: {},
+        visited: { [G.startRoom]: true },
+        stats: { actions: 0, wrong: 0, hints: 0, playMs: 0 },
+        ending: null,
+      };
+    }
+
+    /* ---------- 結果與上下文 ---------- */
+    function result() { return { ok: true, messages: [], open: null, ending: null, moved: null }; }
+    function fail(text) { const r = result(); r.ok = false; r.messages.push({ text, kind: 'bad' }); return r; }
+
+    function makeCtx(s, out) {
+      const ctx = {
+        s,
+        flag: k => !!s.flags[k],
+        get: k => s.flags[k],
+        set(k, v) { s.flags[k] = v === undefined ? true : v; },
+        has: id => s.inv.includes(id),
+        give(id, quiet) {
+          if (!G.items[id]) throw new Error('不存在的物品：' + id);
+          if (!s.inv.includes(id)) s.inv.push(id);
+          if (!quiet) out.messages.push({ text: '獲得：' + itemName(s, id), kind: 'item', item: id });
+        },
+        take(id) { const i = s.inv.indexOf(id); if (i >= 0) s.inv.splice(i, 1); },
+        say(text, kind) { out.messages.push({ text, kind: kind || 'info' }); },
+        open(view) { out.open = view; },
+        note(id) {
+          if (!G.docs[id]) throw new Error('不存在的線索：' + id);
+          if (!s.notes.includes(id)) {
+            s.notes.push(id);
+            out.messages.push({ text: '線索已記入筆記：' + G.docs[id].title, kind: 'note' });
+          }
+        },
+        goto(room) { enterRoom(s, room, out, ctx); },
+        end(id) { s.ending = id; out.ending = id; },
+        wrong() { s.stats.wrong++; },
+      };
+      return ctx;
+    }
+
+    function enterRoom(s, room, out, ctx) {
+      const R = G.rooms[room];
+      if (!R) throw new Error('不存在的房間：' + room);
+      if (!R.accessible(s)) { out.messages.push({ text: R.name + '還進不去。', kind: 'bad' }); out.ok = false; return; }
+      s.room = room;
+      s.visited[room] = true;
+      out.moved = room;
+      out.messages.push({ text: R.enterText(s), kind: 'room' });
+      if (R.onEnter) R.onEnter(ctx || makeCtx(s, out));
+    }
+
+    /* ---------- 查詢 ---------- */
+    function isVisible(s, h) { return h.room === s.room && (!h.visible || !!h.visible(s)); }
+    function visibleHotspots(s) { return G.hotspots.filter(h => isVisible(s, h)); }
+    function canEnter(s, room) { return !!G.rooms[room] && G.rooms[room].accessible(s); }
+    function itemName(s, id) {
+      if (id === 'diary') return `${G.items.diary.name}（${(s.flags.diaryPages || []).length}/4）`;
+      return G.items[id] ? G.items[id].name : id;
+    }
+    function pageCount(s) { return G.countPages(s); }
+
+    function guard(s) {
+      if (!s || typeof s !== 'object') return '狀態無效。';
+      if (s.ending) return '遊戲已經結束。';
+      return null;
+    }
+    function done(s, out) { if (out.ok) s.stats.actions++; return out; }
+
+    /* ---------- 動作 ---------- */
+    function interact(s, hsId) {
+      const g = guard(s); if (g) return fail(g);
+      const h = hotspotById[hsId];
+      if (!h || !isVisible(s, h)) return fail('這裡沒有那樣東西。');
+      const out = result();
+      h.examine(makeCtx(s, out));
+      return done(s, out);
+    }
+
+    function useItem(s, itemId, hsId) {
+      const g = guard(s); if (g) return fail(g);
+      if (!s.inv.includes(itemId)) return fail('你身上沒有那樣東西。');
+      const h = hotspotById[hsId];
+      if (!h || !isVisible(s, h)) return fail('這裡沒有那樣東西。');
+      const out = result();
+      const ctx = makeCtx(s, out);
+      if (h.use && h.use[itemId]) h.use[itemId](ctx);
+      else if (s.room === 'darkroom' && itemId === 'flashlight') ctx.say('你想起活板門上的警告——白光會毀掉一切。你沒有打開手電筒。');
+      else if (h.useAny) h.useAny(ctx, itemId);
+      else if (itemId === 'flashlight') ctx.say(`手電筒照亮了${h.name}，沒有發現什麼特別的。`);
+      else ctx.say(`把${itemName(s, itemId)}用在${h.name}上，似乎沒什麼用。`);
+      return done(s, out);
+    }
+
+    function findRecipe(a, b) {
+      for (const r of G.recipes) {
+        if (r.pair && ((r.pair[0] === a && r.pair[1] === b) || (r.pair[0] === b && r.pair[1] === a))) return r;
+        if (r.match && r.match(a, b)) return r;
+      }
+      return null;
+    }
+
+    function combine(s, a, b) {
+      const g = guard(s); if (g) return fail(g);
+      if (a === b) return fail('同一樣東西沒辦法和自己組合。');
+      if (!s.inv.includes(a) || !s.inv.includes(b)) return fail('你身上沒有那樣東西。');
+      const r = findRecipe(a, b);
+      if (!r) {
+        const out = result();
+        out.ok = false;
+        out.messages.push({ text: `${itemName(s, a)}和${itemName(s, b)}組合不起來。`, kind: 'bad' });
+        return out;
+      }
+      const out = result();
+      r.run(makeCtx(s, out), a, b);
+      return done(s, out);
+    }
+
+    function move(s, room) {
+      const g = guard(s); if (g) return fail(g);
+      if (!G.rooms[room]) return fail('沒有那個地方。');
+      if (s.room === room) return fail('你已經在' + G.rooms[room].name + '了。');
+      const out = result();
+      enterRoom(s, room, out);
+      return done(s, out);
+    }
+
+    function submit(s, puzzleId, answer) {
+      const g = guard(s); if (g) return fail(g);
+      const p = G.puzzles[puzzleId];
+      if (!p) return fail('沒有那個機關。');
+      if (!p.available(s)) return fail('現在沒辦法操作那個機關。');
+      const out = result();
+      const solved = p.check(makeCtx(s, out), answer);
+      if (solved === null) return fail('這個選項現在不能用。'); // 不合法的輸入：不改變任何狀態
+      out.solved = !!solved;
+      if (p.silent && !out.messages.length) return out; // 純介面狀態（閥門開關、鏡子角度）不計入行動次數
+      return done(s, out);
+    }
+
+    /* ---------- 提示 ---------- */
+    function hintList(s) {
+      return G.hints.filter(h => h.avail(s) && !h.done(s)).map(h => {
+        const level = s.hints[h.id] || 0;
+        return {
+          id: h.id, title: h.title, level, max: h.texts.length,
+          texts: h.texts.slice(0, level).map(t => typeof t === 'function' ? t(s) : t),
+        };
+      });
+    }
+    function revealHint(s, id) {
+      const h = G.hints.find(x => x.id === id);
+      if (!h || !h.avail(s) || h.done(s)) return false;
+      const level = s.hints[id] || 0;
+      if (level >= h.texts.length) return false;
+      s.hints[id] = level + 1;
+      s.stats.hints++;
+      return true;
+    }
+
+    /* ---------- 進度摘要（狀態列用） ---------- */
+    function progress(s) {
+      const emblems = G.EMBLEMS.map(e => ({
+        id: e, glyph: G.items[e].glyph,
+        state: s.flags['inserted_' + e] ? 'inserted' : s.inv.includes(e) ? 'held' : 'missing',
+      }));
+      return {
+        emblems,
+        pages: pageCount(s),
+        plate: s.inv.includes('plate'),
+        truthKnown: !!s.flags.trapdoorFound || !!s.flags.trapdoorOpen,
+      };
+    }
+
+    /* ---------- 存檔驗證 ---------- */
+    function validate(s) {
+      const errs = [];
+      if (!s || typeof s !== 'object') return ['不是有效的存檔資料'];
+      if (s.v !== G.saveVersion) errs.push('存檔版本不符');
+      if (!G.rooms[s.room]) errs.push('房間無效');
+      if (!Array.isArray(s.inv) || s.inv.some(i => !G.items[i])) errs.push('物品無效');
+      if (!s.flags || typeof s.flags !== 'object') errs.push('旗標無效');
+      if (!Array.isArray(s.notes) || s.notes.some(n => !G.docs[n])) errs.push('筆記無效');
+      if (!s.puz || typeof s.puz !== 'object') errs.push('機關狀態無效');
+      if (!s.stats || typeof s.stats !== 'object') errs.push('統計無效');
+      if (s.ending && !G.endings[s.ending]) errs.push('結局無效');
+      if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push('所在房間尚未解鎖');
+      return errs;
+    }
+    function normalize(s) {
+      // 補上舊存檔可能缺少的欄位
+      s.hints = s.hints || {};
+      s.visited = s.visited || { [s.room]: true };
+      s.puz = Object.assign({ dome: 'N', valves: {}, mirrors: Object.assign({}, G.MIRROR_GRID.initial) }, s.puz || {});
+      s.stats = Object.assign({ actions: 0, wrong: 0, hints: 0, playMs: 0 }, s.stats || {});
+      return s;
+    }
+
+    return {
+      G, newState, interact, useItem, combine, move, submit,
+      hintList, revealHint, progress, visibleHotspots, canEnter, itemName, pageCount,
+      validate, normalize, findRecipe,
+      hotspot: id => hotspotById[id],
+      clone: s => JSON.parse(JSON.stringify(s)),
+    };
+  }
+
+  return { create };
+}));
+</script>
+<script>
+/*
+ * 觀星者之屋 — 存檔
+ * localStorage 可能被封鎖或清空（私密視窗、嵌入預覽），所以每次讀寫都包在 try/catch 裡，
+ * 失敗時退回記憶體存檔，並提供「存檔碼」讓玩家把進度帶走或帶回來。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SaveStore = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const PREFIX = 'stargazer.v1.';
+  const memory = {};
+
+  function probe() {
+    try {
+      const ls = (typeof localStorage !== 'undefined') ? localStorage : null;
+      if (!ls) return null;
+      const k = PREFIX + '__probe';
+      ls.setItem(k, '1');
+      ls.removeItem(k);
+      return ls;
+    } catch (e) { return null; }
+  }
+  let ls = probe();
+
+  function rawGet(key) {
+    if (ls) { try { const v = ls.getItem(PREFIX + key); if (v !== null) return v; } catch (e) { ls = null; } }
+    return Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
+  }
+  function rawSet(key, value) {
+    memory[key] = value;
+    if (ls) { try { ls.setItem(PREFIX + key, value); return true; } catch (e) { ls = null; } }
+    return false;
+  }
+  function rawDel(key) {
+    delete memory[key];
+    if (ls) { try { ls.removeItem(PREFIX + key); } catch (e) { ls = null; } }
+  }
+
+  function read(slot) {
+    const raw = rawGet('slot.' + slot);
+    if (!raw) return null;
+    try {
+      const rec = JSON.parse(raw);
+      return rec && rec.state ? rec : null;
+    } catch (e) { return { corrupt: true }; }
+  }
+  function write(slot, rec) { return rawSet('slot.' + slot, JSON.stringify(rec)); }
+  function remove(slot) { rawDel('slot.' + slot); }
+
+  function getEndings() {
+    try { const v = JSON.parse(rawGet('endings') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function addEnding(id) {
+    const list = getEndings();
+    if (!list.includes(id)) { list.push(id); rawSet('endings', JSON.stringify(list)); }
+    return list;
+  }
+
+  // 存檔碼：STAR1.<base64(UTF-8 JSON)>.<校驗碼>
+  function checksum(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36);
+  }
+  function toB64(str) {
+    if (typeof Buffer !== 'undefined') return Buffer.from(str, 'utf8').toString('base64');
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin);
+  }
+  function fromB64(b64) {
+    if (typeof Buffer !== 'undefined') return Buffer.from(b64, 'base64').toString('utf8');
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function encode(state) {
+    const json = JSON.stringify(state);
+    return 'STAR1.' + toB64(json) + '.' + checksum(json);
+  }
+  function decode(code) {
+    const clean = String(code || '').replace(/\s+/g, '');
+    const parts = clean.split('.');
+    if (parts.length !== 3 || parts[0] !== 'STAR1') throw new Error('這不是《觀星者之屋》的存檔碼。');
+    let json;
+    try { json = fromB64(parts[1]); } catch (e) { throw new Error('存檔碼內容損毀，無法解讀。'); }
+    if (checksum(json) !== parts[2]) throw new Error('存檔碼不完整或被改動過（校驗失敗）。請確認整段都有複製到。');
+    try { return JSON.parse(json); } catch (e) { throw new Error('存檔碼內容損毀，無法解讀。'); }
+  }
+
+  return {
+    get persistent() { return !!ls; },
+    read, write, remove, getEndings, addEnding, encode, decode,
+    _reset() { for (const k of Object.keys(memory)) delete memory[k]; },
+  };
+}));
+</script>
+<script>
+/*
+ * 觀星者之屋 — 美術（全部為內嵌 SVG，不依賴任何外部圖檔）
+ * 房間場景：Art.scene(roomId, view) → SVG 字串；熱點以 <g class="hs" data-hs="…"> 包起來。
+ * 謎題圖：書架、星座圖、目鏡、管線、反光鏡、時鐘、方格紙、膠片、便條、底片……
+ */
+(function (root) {
+  'use strict';
+  const G = root.GAME_DATA;
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // 確定性亂數（讓星空每次長得一樣）
+  function rng(seed) {
+    let x = seed >>> 0 || 1;
+    return () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+  }
+  function starfield(seed, n, x0, y0, w, h, opts = {}) {
+    const r = rng(seed);
+    let out = '';
+    for (let i = 0; i < n; i++) {
+      const x = x0 + r() * w, y = y0 + r() * h, rad = (opts.min || 0.6) + r() * (opts.var || 1.2);
+      out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(2)}" fill="${opts.color || '#f3ecd6'}" opacity="${(0.35 + r() * 0.6).toFixed(2)}"/>`;
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------
+   * 房間場景
+   * v = { s, vis(id), label(id) }
+   * ------------------------------------------------------------ */
+  function H(v, id, inner) {
+    if (!v.vis(id)) return '';
+    const name = esc(v.label(id));
+    return `<g class="hs" data-hs="${id}" tabindex="0" role="button" aria-label="${name}"><title>${name}</title>${inner}</g>`;
+  }
+  const hit = (x, y, w, h) => `<rect class="hit" x="${x}" y="${y}" width="${w}" height="${h}" fill="transparent"/>`;
+
+  function clockHands(cx, cy, r, h, m) {
+    const ha = ((h % 12) + m / 60) * 30 * Math.PI / 180, ma = m * 6 * Math.PI / 180;
+    return `<line x1="${cx}" y1="${cy}" x2="${(cx + Math.sin(ha) * r * 0.5).toFixed(1)}" y2="${(cy - Math.cos(ha) * r * 0.5).toFixed(1)}" stroke="#1b1408" stroke-width="2.6" stroke-linecap="round"/>
+      <line x1="${cx}" y1="${cy}" x2="${(cx + Math.sin(ma) * r * 0.8).toFixed(1)}" y2="${(cy - Math.cos(ma) * r * 0.8).toFixed(1)}" stroke="#1b1408" stroke-width="1.6" stroke-linecap="round"/>`;
+  }
+
+  function foyer(v) {
+    const f = v.s.flags;
+    const socket = (x, e, glyph) => f['inserted_' + e]
+      ? `<circle cx="${x}" cy="262" r="11" fill="url(#fy-brass)" stroke="#f3d68f" stroke-width="1.2"/><text x="${x}" y="266.5" text-anchor="middle" font-size="12" fill="#3b2a10" font-weight="700">${glyph}</text>`
+      : `<circle cx="${x}" cy="262" r="11" fill="#120c06" stroke="#8a6a32" stroke-width="1.5"/><text x="${x}" y="266" text-anchor="middle" font-size="10" fill="#8a6a32">${glyph}</text>`;
+    const open = G.allInserted(v.s);
+    return `
+    <defs>
+      <linearGradient id="fy-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121a2c"/><stop offset="1" stop-color="#1d2740"/></linearGradient>
+      <linearGradient id="fy-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241a12"/><stop offset="1" stop-color="#110c08"/></linearGradient>
+      <linearGradient id="fy-wood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3b2516"/><stop offset=".5" stop-color="#4a2f1c"/><stop offset="1" stop-color="#34200f"/></linearGradient>
+      <radialGradient id="fy-brass" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#f6dc95"/><stop offset="1" stop-color="#a87b2e"/></radialGradient>
+      <radialGradient id="fy-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e9c77a" stop-opacity=".35"/><stop offset="1" stop-color="#e9c77a" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="960" height="540" fill="url(#fy-wall)"/>
+    <rect y="300" width="960" height="120" fill="#1f2a44" opacity=".55"/>
+    ${[60, 180, 600, 720].map(x => `<rect x="${x}" y="315" width="100" height="90" fill="none" stroke="#2c3a5c" stroke-width="2"/>`).join('')}
+    <rect y="420" width="960" height="120" fill="url(#fy-floor)"/>
+    ${[440, 465, 495, 530].map(y => `<line x1="0" y1="${y}" x2="960" y2="${y}" stroke="#2e2218" stroke-width="1"/>`).join('')}
+    <ellipse cx="480" cy="478" rx="190" ry="40" fill="#4a1d22"/><ellipse cx="480" cy="478" rx="170" ry="32" fill="none" stroke="#a5783a" stroke-width="2" stroke-dasharray="6 5"/>
+    <!-- 吊燈 -->
+    <line x1="480" y1="0" x2="480" y2="40" stroke="#6b5530" stroke-width="2"/>
+    <path d="M430 60 Q480 90 530 60" fill="none" stroke="#8a6a32" stroke-width="3"/>
+    ${[430, 455, 480, 505, 530].map(x => `<rect x="${x - 3}" y="${x === 480 ? 46 : 50}" width="6" height="12" fill="#d8ccb0" opacity=".6"/>`).join('')}
+    <!-- 高窗 -->
+    ${H(v, 'f_window', `<rect x="595" y="80" width="60" height="90" fill="#0a1020" stroke="#4a3a24" stroke-width="5"/>
+      <circle cx="635" cy="104" r="9" fill="#e9e3cc" opacity=".85"/>${starfield(11, 6, 600, 85, 50, 80)}
+      ${[607, 619, 631, 643].map(x => `<line x1="${x}" y1="82" x2="${x}" y2="168" stroke="#2a2a2e" stroke-width="3"/>`).join('')}${hit(590, 75, 70, 100)}`)}
+    <!-- 衣帽架 -->
+    ${H(v, 'f_coat', `<line x1="85" y1="150" x2="85" y2="415" stroke="#4a2f1c" stroke-width="7"/>
+      <path d="M60 415 L85 395 L110 415" fill="none" stroke="#4a2f1c" stroke-width="6"/>
+      <path d="M68 160 L85 150 L102 160" fill="none" stroke="#8a6a32" stroke-width="3"/>
+      ${f.coatSearched ? '' : ''}<path d="M62 175 Q85 160 108 175 L114 330 Q85 342 56 330 Z" fill="#2f4334"/>
+      <path d="M85 172 L85 330" stroke="#22322a" stroke-width="2"/><rect x="92" y="250" width="16" height="22" rx="3" fill="#263a2c"/>${hit(50, 145, 70, 275)}`)}
+    ${H(v, 'f_umbrella', `<rect x="118" y="372" width="26" height="46" rx="4" fill="#3c4660"/><line x1="128" y1="372" x2="124" y2="320" stroke="#161616" stroke-width="3"/><path d="M118 336 Q124 300 134 336 Z" fill="#161616"/>${hit(112, 315, 38, 105)}`)}
+    <!-- 落地鐘 -->
+    ${H(v, 'f_clock', `<path d="M150 135 Q185 105 220 135 L220 205 L150 205 Z" fill="url(#fy-wood)"/>
+      <circle cx="185" cy="168" r="26" fill="#efe4c8" stroke="#a5783a" stroke-width="3"/>
+      ${[...Array(12)].map((_, i) => { const a = i * 30 * Math.PI / 180; return `<circle cx="${(185 + Math.sin(a) * 21).toFixed(1)}" cy="${(168 - Math.cos(a) * 21).toFixed(1)}" r="1.3" fill="#3b2a10"/>`; }).join('')}
+      ${f.clockSolved ? clockHands(185, 168, 26, 3, 15) : clockHands(185, 168, 26, 7, 40)}
+      <rect x="156" y="205" width="58" height="190" fill="url(#fy-wood)"/>
+      <rect x="168" y="225" width="34" height="120" rx="3" fill="${f.clockSolved ? '#0d0805' : '#1b120a'}" stroke="#a5783a" stroke-width="2"/>
+      ${f.clockSolved ? '' : `<line x1="185" y1="228" x2="185" y2="320" stroke="#a5783a" stroke-width="2"/><circle cx="185" cy="322" r="9" fill="url(#fy-brass)"/>`}
+      <rect x="150" y="395" width="70" height="22" fill="#2e1c10"/>${hit(145, 108, 80, 312)}`)}
+    <!-- 書房門 -->
+    ${H(v, 'f_study_door', `<rect x="250" y="180" width="92" height="240" fill="#2b1a0f" stroke="#5a3d22" stroke-width="5"/>
+      <polygon points="255,185 330,195 330,415 255,415" fill="url(#fy-wood)"/>
+      <rect x="335" y="185" width="4" height="230" fill="#e9c77a" opacity=".55"/>
+      <circle cx="318" cy="305" r="4.5" fill="url(#fy-brass)"/>
+      <rect x="270" y="200" width="44" height="16" rx="2" fill="#a5783a"/><text x="292" y="212.5" text-anchor="middle" font-size="11" fill="#2b1a0f">書房</text>${hit(245, 175, 102, 250)}`)}
+    <!-- 大門 -->
+    ${H(v, 'f_door', `<path d="M392 420 L392 190 Q480 100 568 190 L568 420 Z" fill="#20140b" stroke="#6b4b26" stroke-width="6"/>
+      <path d="M402 418 L402 194 Q480 116 558 194 L558 418 Z" fill="url(#fy-wood)"/>
+      <line x1="480" y1="140" x2="480" y2="418" stroke="#22140a" stroke-width="3"/>
+      ${[[412, 200, 58, 40], [490, 200, 58, 40], [412, 290, 58, 110], [490, 290, 58, 110]].map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#2a190c" stroke-width="3"/>`).join('')}
+      <circle cx="466" cy="320" r="5" fill="url(#fy-brass)"/><circle cx="494" cy="320" r="5" fill="url(#fy-brass)"/>
+      <rect x="432" y="244" width="96" height="36" rx="8" fill="#7a5a26" stroke="#e3c27a" stroke-width="1.5"/>
+      ${socket(452, 'emblem_sun', '日')}${socket(480, 'emblem_moon', '月')}${socket(508, 'emblem_star', '星')}
+      ${open ? `<path d="M402 418 L402 194 Q480 116 558 194 L558 418 Z" fill="url(#fy-glow)"/>` : ''}${hit(392, 120, 176, 300)}`)}
+    ${H(v, 'f_mailslot', `<rect x="452" y="358" width="56" height="12" rx="2" fill="#a87b2e" stroke="#f3d68f" stroke-width="1"/><rect x="458" y="362" width="44" height="4" fill="#1a1006"/>${hit(446, 350, 68, 26)}`)}
+    <!-- 電話 -->
+    <rect x="585" y="368" width="70" height="8" fill="#4a2f1c"/><line x1="592" y1="376" x2="592" y2="418" stroke="#4a2f1c" stroke-width="5"/><line x1="648" y1="376" x2="648" y2="418" stroke="#4a2f1c" stroke-width="5"/>
+    ${H(v, 'f_phone', `<path d="M596 368 L600 344 L640 344 L644 368 Z" fill="#141414"/><circle cx="620" cy="356" r="8" fill="#2a2a2a" stroke="#777" stroke-width="1"/>
+      <path d="M598 340 Q620 326 642 340" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/>
+      ${f.phoneRinging ? `<g class="ring"><path d="M584 334 q-8 -10 0 -20" fill="none" stroke="#e3c27a" stroke-width="2"/><path d="M656 334 q8 -10 0 -20" fill="none" stroke="#e3c27a" stroke-width="2"/></g>` : ''}${hit(580, 318, 80, 54)}`)}
+    <!-- 溫室門 -->
+    ${H(v, 'f_gh_door', `<rect x="670" y="180" width="86" height="240" fill="#1a2b22" stroke="#5a3d22" stroke-width="5"/>
+      <rect x="678" y="188" width="70" height="225" fill="${f.greenhouseOpen ? '#2f5a3f' : '#203a2c'}" opacity=".9"/>
+      ${[713].map(x => `<line x1="${x}" y1="188" x2="${x}" y2="413" stroke="#5a3d22" stroke-width="3"/>`).join('')}
+      ${[245, 300, 355].map(y => `<line x1="678" y1="${y}" x2="748" y2="${y}" stroke="#5a3d22" stroke-width="3"/>`).join('')}
+      <path d="M690 230 q10 -18 20 0 q-10 8 -20 0" fill="#6aa279" opacity=".7"/><path d="M724 330 q12 -20 22 2 q-12 8 -22 -2" fill="#6aa279" opacity=".6"/>
+      <circle cx="742" cy="305" r="4.5" fill="url(#fy-brass)"/>
+      ${f.greenhouseOpen ? '' : `<path d="M738 318 l4 -6 l4 6 z" fill="#a5783a"/>`}${hit(665, 175, 96, 250)}`)}
+    <!-- 樓梯與鐵門 -->
+    <polygon points="780,420 960,420 960,120 900,120" fill="#2a1d12"/>
+    ${[...Array(8)].map((_, i) => `<line x1="${790 + i * 21}" y1="${420 - i * 37}" x2="960" y2="${420 - i * 37}" stroke="#3d2a19" stroke-width="3"/>`).join('')}
+    <line x1="800" y1="260" x2="950" y2="80" stroke="#5a3d22" stroke-width="6"/>
+    ${H(v, 'f_gate', f.gateOpen
+      ? `<g opacity=".9">${[0, 1, 2, 3, 4].map(i => `<line x1="${788 + i * 6}" y1="${250 + i * 2}" x2="${788 + i * 6}" y2="${420 - i * 2}" stroke="#2a2a2e" stroke-width="4"/>`).join('')}</g><text x="870" y="300" font-size="15" fill="#c9a24f">↑ 天文台</text>${hit(780, 240, 140, 182)}`
+      : `<rect x="785" y="245" width="110" height="175" fill="none" stroke="#2a2a2e" stroke-width="5"/>
+        ${[...Array(9)].map((_, i) => `<line x1="${797 + i * 12}" y1="245" x2="${797 + i * 12}" y2="420" stroke="#34343a" stroke-width="4"/>`).join('')}
+        <rect x="826" y="318" width="26" height="22" rx="4" fill="url(#fy-brass)"/><path d="M831 318 v-8 a8 8 0 0 1 16 0 v8" fill="none" stroke="#c9a24f" stroke-width="3"/>${hit(780, 240, 120, 182)}`)}
+    `;
+  }
+
+  function study(v) {
+    const f = v.s.flags;
+    const shelfBooks = (y, seed, h0) => {
+      const r = rng(seed); let x = 52, out = '';
+      while (x < 285) {
+        const w = 12 + Math.floor(r() * 10), h = h0 - Math.floor(r() * 16);
+        const c = ['#5b3a2a', '#3e4a5e', '#5d5236', '#3f2c22', '#4e3b46', '#2f4136'][Math.floor(r() * 6)];
+        out += `<rect x="${x}" y="${y - h}" width="${w}" height="${h}" fill="${c}"/>`;
+        x += w + 2;
+      }
+      return out;
+    };
+    const colorOf = { yellow: '#d8b546', blue: '#3f6fb0', green: '#4f8a5b', red: '#b5473f', brown: '#6b4a32' };
+    const vols = G.BOOKS.map((b, i) => `<rect x="${54 + i * 26}" y="${206}" width="22" height="62" fill="${colorOf[b.color]}"/><rect x="${54 + i * 26}" y="${214}" width="22" height="3" fill="#e3c27a" opacity=".6"/>`).join('');
+    return `
+    <defs>
+      <linearGradient id="st-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14221f"/><stop offset="1" stop-color="#1c2e2a"/></linearGradient>
+      <linearGradient id="st-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1d14"/><stop offset="1" stop-color="#140d08"/></linearGradient>
+      <radialGradient id="st-lamp" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#f2d590" stop-opacity=".45"/><stop offset="1" stop-color="#f2d590" stop-opacity="0"/></radialGradient>
+      <linearGradient id="st-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f3320"/><stop offset="1" stop-color="#2f1d11"/></linearGradient>
+      <radialGradient id="st-sky" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#2a3d6e"/><stop offset="1" stop-color="#0b1226"/></radialGradient>
+    </defs>
+    <rect width="960" height="540" fill="url(#st-wall)"/>
+    ${[...Array(24)].map((_, i) => `<line x1="${i * 40}" y1="0" x2="${i * 40}" y2="430" stroke="#182824" stroke-width="10" opacity=".5"/>`).join('')}
+    <rect y="430" width="960" height="110" fill="url(#st-floor)"/>
+    <ellipse cx="600" cy="270" rx="200" ry="150" fill="url(#st-lamp)"/>
+    <!-- 書架 -->
+    ${H(v, 's_shelf', `<rect x="40" y="70" width="262" height="362" fill="#2d1b10"/>
+      <rect x="48" y="78" width="246" height="346" fill="#1a100a"/>
+      ${[118, 198, 272, 350, 424].map(y => `<rect x="44" y="${y}" width="254" height="8" fill="#4a2f1c"/>`).join('')}
+      ${shelfBooks(118, 3, 36)}${vols}${shelfBooks(350, 5, 70)}${shelfBooks(424, 9, 66)}
+      <circle cx="270" cy="105" r="10" fill="#6b8bb5" opacity=".6"/><rect x="262" y="104" width="16" height="14" fill="#4a2f1c"/>
+      ${hit(38, 68, 266, 366)}`)}
+    <!-- 剪報 -->
+    ${H(v, 's_clipping', `<rect x="330" y="104" width="54" height="68" fill="#d9ceb2" transform="rotate(-4 357 138)"/>
+      <g transform="rotate(-4 357 138)">${[116, 124, 132, 140, 148, 156].map(y => `<line x1="336" y1="${y}" x2="378" y2="${y}" stroke="#6b6250" stroke-width="2"/>`).join('')}<circle cx="370" cy="132" r="6" fill="none" stroke="#b5473f" stroke-width="1.8"/></g>
+      <circle cx="357" cy="104" r="3" fill="#b5473f"/>${hit(325, 96, 66, 82)}`)}
+    <!-- 油畫 / 保險箱 -->
+    ${f.paintingMoved
+      ? `${H(v, 's_safe', `<rect x="452" y="96" width="100" height="96" rx="4" fill="#4b5058" stroke="#2a2d32" stroke-width="4"/>
+          <rect x="462" y="106" width="80" height="76" fill="none" stroke="#6c727c" stroke-width="2"/>
+          <circle cx="502" cy="144" r="20" fill="#2d3036" stroke="#9aa1ab" stroke-width="2"/>${[...Array(10)].map((_, i) => { const a = i * 36 * Math.PI / 180; return `<line x1="${(502 + Math.sin(a) * 15).toFixed(1)}" y1="${(144 - Math.cos(a) * 15).toFixed(1)}" x2="${(502 + Math.sin(a) * 19).toFixed(1)}" y2="${(144 - Math.cos(a) * 19).toFixed(1)}" stroke="#c7ccd4" stroke-width="1.5"/>`; }).join('')}
+          ${f.safeOpen ? `<rect x="452" y="96" width="100" height="96" fill="#0d0e10" opacity=".85"/>` : ''}${hit(446, 90, 112, 108)}`)}
+        ${H(v, 's_painting', `<g transform="rotate(-12 650 380)"><rect x="600" y="320" width="120" height="86" fill="#7a5a26"/><rect x="608" y="328" width="104" height="70" fill="url(#st-sky)"/>${starfield(7, 10, 612, 332, 96, 62)}</g>${hit(596, 304, 130, 112)}`)}`
+      : H(v, 's_painting', `<rect x="420" y="78" width="170" height="130" fill="#8a6a32" stroke="#e3c27a" stroke-width="2"/>
+          <rect x="432" y="90" width="146" height="106" fill="url(#st-sky)"/>${starfield(7, 26, 434, 92, 142, 100)}
+          ${[[460, 120], [480, 128], [500, 124], [518, 134], [532, 158], [556, 152], [552, 128]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6" fill="#fff6d8"/>`).join('')}
+          <path d="M432 196 Q505 168 578 196 Z" fill="#141a14"/>${hit(415, 74, 180, 138)}`)}
+    <!-- 窗戶 -->
+    ${H(v, 's_window', `<rect x="618" y="70" width="64" height="104" fill="#0a1226" stroke="#3a2a1c" stroke-width="6"/>${starfield(21, 9, 622, 74, 56, 96)}<line x1="650" y1="70" x2="650" y2="174" stroke="#3a2a1c" stroke-width="4"/><line x1="618" y1="122" x2="682" y2="122" stroke="#3a2a1c" stroke-width="4"/>
+      <line x1="614" y1="90" x2="686" y2="110" stroke="#6b5530" stroke-width="3"/><line x1="614" y1="150" x2="686" y2="140" stroke="#6b5530" stroke-width="3"/>${hit(612, 64, 76, 116)}`)}
+    <!-- 壁爐 -->
+    <rect x="720" y="0" width="160" height="230" fill="#22201f"/>
+    ${H(v, 's_fireplace', `<rect x="696" y="222" width="208" height="20" fill="#5c534c"/>
+      <rect x="708" y="242" width="184" height="190" fill="#3d3733"/>
+      <path d="M740 432 L740 300 Q800 260 860 300 L860 432 Z" fill="#0b0908"/>
+      <path d="M760 432 q20 -20 40 -6 q20 -16 40 6 z" fill="#2a2420"/>${[[772, 424], [796, 420], [820, 426]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="#4a2a1a"/>`).join('')}
+      ${hit(692, 216, 216, 220)}`)}
+    <!-- 書桌 -->
+    <ellipse cx="500" cy="438" rx="170" ry="12" fill="#000" opacity=".35"/>
+    <rect x="370" y="316" width="16" height="116" fill="#2f1d11"/><rect x="614" y="316" width="16" height="116" fill="#2f1d11"/>
+    ${H(v, 's_desk', `<rect x="356" y="300" width="288" height="18" fill="url(#st-wood)"/>
+      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>`}
+      <rect x="500" y="288" width="40" height="12" fill="#c9bfa4" transform="skewX(-20)"/>
+      <rect x="600" y="262" width="6" height="38" fill="#a5783a"/><path d="M584 262 L622 262 L612 244 L594 244 Z" fill="#2f5a3f"/>${hit(352, 240, 296, 80)}`)}
+    ${H(v, 's_drawer', `<rect x="440" y="324" width="120" height="40" fill="#4a2f1c" stroke="#2a190c" stroke-width="2"/>
+      <rect x="486" y="334" width="28" height="18" rx="3" fill="${f.drawerOpen ? '#2a190c' : '#a87b2e'}"/>${f.drawerOpen ? '' : `<rect x="491" y="339" width="18" height="8" fill="#1a1006"/>`}${hit(436, 320, 128, 48)}`)}
+    <!-- 廢紙簍 -->
+    ${H(v, 's_waste', `<path d="M652 392 L690 392 L684 436 L658 436 Z" fill="#6b5536"/>${[0, 1, 2, 3].map(i => `<line x1="${658 + i * 8}" y1="394" x2="${660 + i * 7}" y2="434" stroke="#4a3a22" stroke-width="2"/>`).join('')}
+      <circle cx="664" cy="388" r="7" fill="#e5dcc4"/><circle cx="678" cy="386" r="6" fill="#d8ceb4"/>${hit(646, 374, 50, 66)}`)}
+    <!-- 出口 -->
+    ${H(v, 's_exit', `<rect x="910" y="210" width="44" height="222" fill="#2b1a0f" stroke="#5a3d22" stroke-width="4"/><text x="932" y="320" font-size="13" fill="#c9a24f" text-anchor="middle" writing-mode="tb">門廳</text>${hit(904, 204, 56, 232)}`)}
+    `;
+  }
+
+  function greenhouse(v) {
+    const f = v.s.flags;
+    const bloom = f.moonTaken || (f.waterOk && f.lightOk);
+    return `
+    <defs>
+      <linearGradient id="gh-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1730"/><stop offset="1" stop-color="#1b3346"/></linearGradient>
+      <linearGradient id="gh-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f2a1f"/><stop offset="1" stop-color="#0e140e"/></linearGradient>
+      <linearGradient id="gh-beam" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9efff" stop-opacity=".35"/><stop offset="1" stop-color="#e9efff" stop-opacity="0"/></linearGradient>
+      <radialGradient id="gh-bloom" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff" stop-opacity=".7"/><stop offset="1" stop-color="#cfe0ff" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="960" height="540" fill="url(#gh-sky)"/>
+    ${starfield(31, 60, 0, 0, 960, 260)}
+    <circle cx="96" cy="44" r="18" fill="#f2efe0"/>
+    ${[...Array(13)].map((_, i) => `<line x1="${i * 80}" y1="0" x2="${i * 80}" y2="440" stroke="#2c3a3a" stroke-width="3"/>`).join('')}
+    ${[120, 240].map(y => `<line x1="0" y1="${y}" x2="960" y2="${y}" stroke="#2c3a3a" stroke-width="3"/>`).join('')}
+    <polygon points="60,0 130,0 260,440 120,440" fill="url(#gh-beam)"/>
+    <rect y="430" width="960" height="110" fill="url(#gh-floor)"/>
+    ${H(v, 'g_mirrors', `<rect x="150" y="34" width="250" height="6" fill="#4b5560"/>
+      ${[170, 210, 250, 290, 330, 370].map((x, i) => `<line x1="${x}" y1="40" x2="${x}" y2="62" stroke="#4b5560" stroke-width="2"/><rect x="${x - 14}" y="62" width="28" height="36" rx="3" fill="#9fb6cc" stroke="#d7e4ef" stroke-width="1.5" transform="rotate(${i % 2 ? 30 : -30} ${x} 80)"/>`).join('')}
+      ${f.lightOk ? `<polyline points="96,60 170,80 330,80 300,330" fill="none" stroke="#f3f6ff" stroke-width="3" opacity=".7"/>` : ''}${hit(144, 28, 262, 82)}`)}
+    <!-- 桶與閥門 -->
+    ${H(v, 'g_valves', `<rect x="30" y="262" width="62" height="118" rx="8" fill="#2f5277"/><text x="61" y="318" text-anchor="middle" font-size="14" fill="#d9e6f2">雨水</text>
+      <rect x="100" y="262" width="62" height="118" rx="8" fill="#6b4a26"/><text x="131" y="318" text-anchor="middle" font-size="14" fill="#f0dcc0">肥料</text>
+      ${[276, 300, 340, 366].map(y => `<line x1="30" y1="${y}" x2="162" y2="${y}" stroke="#1a1a1a" stroke-width="2" opacity=".4"/>`).join('')}
+      <rect x="170" y="276" width="62" height="66" rx="4" fill="#3a3f45" stroke="#8a929b" stroke-width="2"/>
+      ${[0, 1, 2, 3, 4].map(i => `<circle cx="${182 + (i % 3) * 19}" cy="${292 + Math.floor(i / 3) * 20}" r="6" fill="${f.waterOk ? '#6fae7d' : '#b9a06a'}"/>`).join('')}
+      ${f.wheelInstalled ? `<circle cx="220" cy="328" r="9" fill="none" stroke="#e3c27a" stroke-width="3"/>` : `<line x1="220" y1="322" x2="220" y2="334" stroke="#8a929b" stroke-width="3"/>`}
+      <path d="M162 300 L170 300 M162 330 L170 330" stroke="#8a929b" stroke-width="4"/>
+      <path d="M232 320 L250 320 L250 410" fill="none" stroke="#5c6670" stroke-width="5"/>${hit(26, 256, 210, 128)}`)}
+    ${H(v, 'g_rules', `<rect x="196" y="176" width="2" height="90" fill="#4a3a22"/><rect x="176" y="168" width="44" height="54" fill="#e5dcc4" transform="rotate(3 198 195)"/>
+      ${[178, 186, 194, 202, 210].map(y => `<line x1="182" y1="${y}" x2="214" y2="${y}" stroke="#7a6f58" stroke-width="2"/>`).join('')}${hit(170, 160, 56, 70)}`)}
+    <!-- 花床 -->
+    <rect x="250" y="400" width="130" height="44" fill="#3a2a1a"/><rect x="398" y="400" width="112" height="44" fill="#3a2a1a"/><rect x="528" y="400" width="100" height="44" fill="#3a2a1a"/>
+    ${[[408, 390], [430, 380], [452, 388], [474, 382], [492, 392]].map(([x, y]) => `<path d="M${x} 402 q4 -26 ${-10} -40 M${x} 402 q6 -24 14 -36" fill="none" stroke="${f.waterOk ? '#5ea36b' : '#4a7a52'}" stroke-width="3"/>`).join('')}
+    <rect x="566" y="350" width="22" height="52" rx="10" fill="#4f7a4a"/><rect x="552" y="368" width="14" height="10" rx="5" fill="#4f7a4a"/><rect x="588" y="360" width="14" height="10" rx="5" fill="#4f7a4a"/>
+    <text x="315" y="460" text-anchor="middle" font-size="12" fill="#9fb59a">月光花</text><text x="454" y="460" text-anchor="middle" font-size="12" fill="#9fb59a">蕨類</text><text x="578" y="460" text-anchor="middle" font-size="12" fill="#9fb59a">仙人掌</text>
+    ${H(v, 'g_moonflower', `<path d="M315 402 C312 370 318 350 314 320" fill="none" stroke="#5e8f5e" stroke-width="4"/>
+      <path d="M314 372 q-26 -6 -34 -20 q22 0 34 14" fill="#4f8a5b"/><path d="M316 356 q24 -8 34 -22 q-22 2 -34 16" fill="#4f8a5b"/>
+      ${bloom
+        ? `<circle cx="314" cy="306" r="40" fill="url(#gh-bloom)"/>${[0, 60, 120, 180, 240, 300].map(a => `<ellipse cx="314" cy="290" rx="9" ry="18" fill="#f8f9ff" transform="rotate(${a} 314 306)"/>`).join('')}<circle cx="314" cy="306" r="7" fill="${f.moonTaken ? '#e8e2a8' : '#dfe6f5'}"/>`
+        : `<path d="M314 324 q-12 -14 0 -34 q12 20 0 34" fill="#d7e2cf"/><path d="M314 324 q-6 -12 0 -28" fill="none" stroke="#9ab090" stroke-width="1.5"/>`}
+      ${hit(270, 262, 90, 142)}`)}
+    <!-- 花盆架 -->
+    ${H(v, 'g_pots', `<rect x="652" y="318" width="250" height="10" fill="#5a3d22"/><rect x="660" y="328" width="8" height="34" fill="#4a2f1c"/><rect x="886" y="328" width="8" height="34" fill="#4a2f1c"/>
+      ${[['#c44f5c', 680], ['#8a7bc8', 740], ['#8aa89a', 800], ['#6fbf8a', 860]].map(([c, x], i) => `<path d="M${x - 22} 276 L${x + 22} 276 L${x + 16} 318 L${x - 16} 318 Z" fill="${f.keyDug && i === 0 ? '#7a4a2a' : '#a3613a'}"/>
+        <rect x="${x - 24}" y="270" width="48" height="8" fill="#8a4f2e"/>${[-10, 0, 10].map(d => `<circle cx="${x + d}" cy="${258 - Math.abs(d) / 2}" r="7" fill="${c}"/>`).join('')}<path d="M${x} 270 v-10" stroke="#4f7a4a" stroke-width="3"/>`).join('')}
+      ${hit(648, 236, 258, 128)}`)}
+    <!-- 工作台 -->
+    ${H(v, 'g_bench', `<rect x="652" y="380" width="250" height="14" fill="#6b4a2c"/><rect x="662" y="394" width="10" height="44" fill="#4a2f1c"/><rect x="882" y="394" width="10" height="44" fill="#4a2f1c"/>
+      <rect x="672" y="394" width="210" height="44" fill="#070a07" opacity=".85"/>
+      <rect x="700" y="366" width="26" height="16" fill="#c9b27a"/><rect x="734" y="370" width="22" height="12" fill="#b59a5e"/><circle cx="830" cy="374" r="7" fill="none" stroke="#c9b27a" stroke-width="3"/>${hit(648, 360, 258, 80)}`)}
+    ${H(v, 'g_trapdoor', `<rect x="716" y="448" width="124" height="54" fill="${f.trapdoorOpen ? '#050505' : '#4a3320'}" stroke="#2a1c10" stroke-width="3"/>
+      ${f.trapdoorOpen ? `<text x="778" y="481" text-anchor="middle" font-size="13" fill="#c9a24f">↓ 暗房</text>` : `<line x1="716" y1="475" x2="840" y2="475" stroke="#2a1c10" stroke-width="2"/><rect x="768" y="466" width="20" height="18" rx="3" fill="#8a929b"/>`}${hit(712, 444, 132, 62)}`)}
+    <!-- 工具架 -->
+    ${H(v, 'g_tools', `<rect x="770" y="96" width="120" height="104" fill="#5a4630"/>${[0, 1, 2, 3, 4].map(i => `<circle cx="${784 + i * 23}" cy="110" r="2" fill="#2a1c10"/>`).join('')}
+      <path d="M786 112 v40 M778 152 h16 v24 h-16 z" stroke="#9aa1ab" stroke-width="3" fill="#7a828c"/>
+      <path d="M832 114 l-8 40 m16 -40 l8 40" stroke="#9aa1ab" stroke-width="3"/>
+      ${f.trowelTaken ? '' : `<path d="M868 112 v34" stroke="#6b4a2c" stroke-width="5"/><path d="M860 146 h16 l-8 26 z" fill="#9aa1ab"/>`}${hit(764, 90, 132, 116)}`)}
+    ${H(v, 'g_exit', `<rect x="912" y="200" width="42" height="236" fill="#1a2b22" stroke="#5a3d22" stroke-width="4"/><text x="933" y="320" font-size="13" fill="#c9a24f" text-anchor="middle" writing-mode="tb">門廳</text>${hit(906, 194, 54, 246)}`)}
+    `;
+  }
+
+  function observatory(v) {
+    const f = v.s.flags;
+    const dir = G.DIRECTIONS.find(d => d.id === (v.s.puz.dome || 'N'));
+    return `
+    <defs>
+      <radialGradient id="ob-dome" cx=".5" cy="1" r="1"><stop offset="0" stop-color="#1d2440"/><stop offset="1" stop-color="#0b0f1e"/></radialGradient>
+      <linearGradient id="ob-brass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7c77e"/><stop offset="1" stop-color="#93692a"/></linearGradient>
+      <radialGradient id="ob-red" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ff4a3a" stop-opacity=".5"/><stop offset="1" stop-color="#ff4a3a" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="960" height="540" fill="#0a0d18"/>
+    <path d="M0 440 L0 260 Q480 -120 960 260 L960 440 Z" fill="url(#ob-dome)"/>
+    ${[160, 320, 640, 800].map(x => `<path d="M${x} 440 Q${(x + 480) / 2} ${x < 480 ? 60 : 60} 480 30" fill="none" stroke="#252c48" stroke-width="3"/>`).join('')}
+    <path d="M440 440 L440 60 Q480 20 520 60 L520 440" fill="#060812"/>
+    ${starfield(41, 30, 444, 50, 72, 260)}
+    <rect y="440" width="960" height="100" fill="#141522"/>
+    ${[460, 490, 520].map(y => `<line x1="0" y1="${y}" x2="960" y2="${y}" stroke="#1e2032" stroke-width="2"/>`).join('')}
+    <!-- 星座圖、月落表 -->
+    ${H(v, 'o_poster', `<rect x="40" y="96" width="150" height="150" fill="#e3d9bd"/>${G.CONSTELLATION_ORDER.map((id, i) => miniConst(id, 50 + (i % 4) * 35, 106 + Math.floor(i / 4) * 66, 28)).join('')}<text x="115" y="240" text-anchor="middle" font-size="11" fill="#5a4a30">星座圖</text>${hit(36, 92, 158, 158)}`)}
+    ${H(v, 'o_almanac', `<rect x="210" y="104" width="72" height="96" fill="#d9ceb2"/><text x="246" y="122" text-anchor="middle" font-size="10" fill="#4a3a22">月落表</text>${[134, 146, 158, 170, 182].map(y => `<line x1="218" y1="${y}" x2="274" y2="${y}" stroke="#7a6f58" stroke-width="2"/>`).join('')}${hit(206, 100, 80, 104)}`)}
+    <!-- 觀測桌 -->
+    <rect x="36" y="350" width="262" height="14" fill="#4a2f1c"/><rect x="48" y="364" width="10" height="76" fill="#3a2414"/><rect x="276" y="364" width="10" height="76" fill="#3a2414"/>
+    ${H(v, 'o_log', `<path d="M80 350 L84 330 L150 330 L156 350 Z" fill="#6b2a2a"/><path d="M118 332 L118 350" stroke="#3a1414" stroke-width="2"/>${f.logBookmark ? '' : `<rect x="132" y="322" width="8" height="12" fill="#e5dcc4"/>`}${hit(74, 316, 90, 38)}`)}
+    ${H(v, 'o_lamp', `${f.bulbTaken ? '' : `<circle cx="230" cy="300" r="46" fill="url(#ob-red)"/>`}<rect x="226" y="312" width="8" height="38" fill="#8a6a32"/><path d="M210 312 L250 312 L240 290 L220 290 Z" fill="#3a3a3a"/>
+      ${f.bulbTaken ? '' : `<circle cx="230" cy="316" r="6" fill="#ff5a48"/>`}<rect x="216" y="346" width="28" height="6" fill="#8a6a32"/>${hit(200, 270, 60, 84)}`)}
+    <!-- 穹頂轉輪 -->
+    ${H(v, 'o_dome', `<rect x="324" y="330" width="10" height="110" fill="#3a3f45"/><circle cx="329" cy="322" r="26" fill="none" stroke="url(#ob-brass)" stroke-width="5"/>
+      ${[0, 60, 120].map(a => `<line x1="329" y1="322" x2="${(329 + Math.cos(a * Math.PI / 180) * 26).toFixed(1)}" y2="${(322 + Math.sin(a * Math.PI / 180) * 26).toFixed(1)}" stroke="#c9a24f" stroke-width="3" transform="rotate(${a} 329 322)"/>`).join('')}
+      <circle cx="329" cy="322" r="5" fill="#e7c77e"/><circle cx="355" cy="322" r="4" fill="#e7c77e"/>
+      <rect x="296" y="268" width="66" height="20" rx="3" fill="#2a2d3d" stroke="#6b4a1e"/><text x="329" y="282.5" text-anchor="middle" font-size="12" fill="#e7c77e">窗朝${dir.name}</text>${hit(292, 264, 74, 178)}`)}
+    <!-- 望遠鏡 -->
+    ${H(v, 'o_telescope', `<path d="M470 440 L490 330 L510 440" fill="none" stroke="#5a5f66" stroke-width="8"/><path d="M455 440 L490 330" stroke="#4a4f56" stroke-width="7"/>
+      <circle cx="490" cy="328" r="12" fill="#3a3f45"/>
+      <g transform="rotate(-32 490 320)"><rect x="380" y="302" width="250" height="36" rx="6" fill="url(#ob-brass)"/><rect x="610" y="296" width="30" height="48" rx="4" fill="#b88e3e"/>
+        <rect x="360" y="310" width="22" height="20" rx="3" fill="${f.eyepieceInstalled ? '#c9a24f' : '#1a1a1a'}"/>${[430, 500, 570].map(x => `<rect x="${x}" y="300" width="6" height="40" fill="#8a6a32"/>`).join('')}</g>
+      <rect x="452" y="372" width="40" height="22" fill="#e9e3cc" transform="rotate(-8 472 383)"/>${hit(350, 170, 300, 272)}`)}
+    <!-- 星盤 -->
+    ${H(v, 'o_dial', `<rect x="672" y="370" width="56" height="70" fill="#2d2f3a"/><rect x="660" y="362" width="80" height="10" fill="#3a3d4a"/>
+      <ellipse cx="700" cy="342" rx="54" ry="26" fill="#6b4a1e"/><ellipse cx="700" cy="338" rx="50" ry="23" fill="url(#ob-brass)"/>
+      <ellipse cx="700" cy="338" rx="36" ry="16" fill="none" stroke="#6b4a1e" stroke-width="2"/><ellipse cx="700" cy="338" rx="22" ry="10" fill="none" stroke="#6b4a1e" stroke-width="2"/>
+      ${f.starDialSolved ? `<ellipse cx="700" cy="338" rx="10" ry="5" fill="#0b0f1e"/>` : `<circle cx="700" cy="338" r="4" fill="#3a2a10"/>`}<path d="M700 312 l-5 -9 h10 z" fill="#e7c77e"/>${hit(642, 300, 116, 142)}`)}
+    <!-- 地圖櫃 -->
+    ${H(v, 'o_cabinet', `<rect x="790" y="250" width="142" height="160" fill="#3a2414"/>${[270, 300, 330, 360, 390].map(y => `<rect x="798" y="${y - 14}" width="126" height="24" fill="#4f3320" stroke="#2a190c" stroke-width="2"/><rect x="852" y="${y - 6}" width="18" height="6" rx="2" fill="#c9a24f"/>`).join('')}${hit(786, 246, 150, 168)}`)}
+    ${H(v, 'o_under', `<rect x="796" y="410" width="130" height="26" fill="#030305"/>${f.eyepieceFound ? '' : `<circle cx="902" cy="424" r="2.4" fill="#e7c77e" class="glint"/>`}${hit(790, 408, 142, 32)}`)}
+    ${H(v, 'o_exit', `<path d="M600 458 L760 458 L740 520 L620 520 Z" fill="#05060a" stroke="#2a2d3d" stroke-width="3"/>${[474, 490, 506].map(y => `<line x1="${612 + (y - 458) / 3}" y1="${y}" x2="${748 - (y - 458) / 3}" y2="${y}" stroke="#2a2d3d" stroke-width="2"/>`).join('')}<text x="680" y="452" text-anchor="middle" font-size="12" fill="#c9a24f">↓ 下樓</text>${hit(596, 436, 168, 90)}`)}
+    `;
+  }
+
+  function darkroom(v) {
+    const f = v.s.flags;
+    if (!f.darkroomLit) {
+      return `
+      <rect width="960" height="540" fill="#030303"/>
+      <polygon points="40,0 150,0 170,540 20,540" fill="#1a1a14" opacity=".35"/>
+      ${H(v, 'd_ladder', `${[60, 120].map(x => `<line x1="${x}" y1="0" x2="${x + 6}" y2="520" stroke="#3a3326" stroke-width="6"/>`).join('')}${[...Array(10)].map((_, i) => `<line x1="60" y1="${30 + i * 50}" x2="126" y2="${30 + i * 50}" stroke="#3a3326" stroke-width="5"/>`).join('')}${hit(40, 0, 110, 530)}`)}
+      ${H(v, 'd_socket', `<circle cx="480" cy="92" r="16" fill="none" stroke="#2e2a24" stroke-width="3"/><line x1="480" y1="40" x2="480" y2="76" stroke="#2e2a24" stroke-width="3"/>${hit(450, 36, 60, 76)}`)}
+      <text x="480" y="300" text-anchor="middle" font-size="16" fill="#3b372f">伸手不見五指。</text>
+      `;
+    }
+    return `
+    <defs>
+      <radialGradient id="dk-light" cx=".5" cy=".15" r=".9"><stop offset="0" stop-color="#7a1712"/><stop offset="1" stop-color="#140303"/></radialGradient>
+    </defs>
+    <rect width="960" height="540" fill="url(#dk-light)"/>
+    <rect y="440" width="960" height="100" fill="#170404"/>
+    ${H(v, 'd_ladder', `${[60, 120].map(x => `<line x1="${x}" y1="0" x2="${x + 6}" y2="520" stroke="#4a1a14" stroke-width="6"/>`).join('')}${[...Array(10)].map((_, i) => `<line x1="60" y1="${30 + i * 50}" x2="126" y2="${30 + i * 50}" stroke="#4a1a14" stroke-width="5"/>`).join('')}${hit(40, 0, 110, 530)}`)}
+    ${H(v, 'd_socket', `<line x1="480" y1="30" x2="480" y2="76" stroke="#3a0d0a" stroke-width="3"/><path d="M460 76 L500 76 L494 100 L466 100 Z" fill="#2a0a08"/><circle cx="480" cy="104" r="12" fill="#ff3b2a"/><circle cx="480" cy="104" r="40" fill="#ff3b2a" opacity=".18"/>${hit(452, 28, 56, 120)}`)}
+    ${H(v, 'd_line', `<path d="M160 130 Q420 160 700 130" fill="none" stroke="#5a2a20" stroke-width="2"/>${[230, 330, 520, 620].map(x => `<rect x="${x - 4}" y="${136}" width="8" height="10" fill="#8a3a2a"/><rect x="${x - 22}" y="146" width="44" height="54" fill="#d9b5a5" opacity=".55"/>`).join('')}
+      ${f.p4Taken ? '' : `<rect x="398" y="146" width="40" height="56" fill="#f0d6c8" opacity=".85"/>${[156, 164, 172, 180, 188].map(y => `<line x1="404" y1="${y}" x2="432" y2="${y}" stroke="#7a3a2a" stroke-width="1.5"/>`).join('')}`}${hit(150, 120, 560, 90)}`)}
+    ${H(v, 'd_vent', `<rect x="820" y="40" width="90" height="50" fill="#050101"/><path d="M820 40 L910 40 L910 90 L850 90 Z" fill="#140404"/><path d="M850 90 L910 90 L895 70 Z" fill="#2a0806"/>${hit(814, 34, 102, 62)}`)}
+    ${H(v, 'd_shelf', `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/>
+      ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${({ red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0' })[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${b.name[0]}</text>`).join('')}
+      <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(736, 180, 198, 126)}`)}
+    ${H(v, 'd_tray', `<rect x="230" y="320" width="460" height="16" fill="#3a0d0a"/><rect x="250" y="336" width="12" height="104" fill="#2a0806"/><rect x="658" y="336" width="12" height="104" fill="#2a0806"/>
+      ${[270, 380, 490].map(x => `<rect x="${x}" y="302" width="90" height="18" rx="3" fill="#120303" stroke="#6a2018" stroke-width="2"/>`).join('')}
+      <rect x="600" y="280" width="70" height="40" rx="3" fill="#0a0a0a" stroke="#5a1a14" stroke-width="2"/><text x="635" y="305" text-anchor="middle" font-size="10" fill="#c88">避光盒</text>${hit(226, 270, 470, 172)}`)}
+    `;
+  }
+
+  const ROOM_ART = { foyer, study, greenhouse, observatory, darkroom };
+  function scene(room, v) {
+    return `<svg class="scene-svg" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="${esc(G.rooms[room].name)}" font-family="'Noto Serif TC','Songti TC','PMingLiU',serif">${ROOM_ART[room](v)}</svg>`;
+  }
+
+  /* ------------------------------------------------------------
+   * 謎題圖
+   * ------------------------------------------------------------ */
+  function miniConst(id, x, y, size) {
+    const c = G.CONSTELLATIONS[id], k = size / 100;
+    return `<g>${c.lines.map(([a, b]) => `<line x1="${x + c.stars[a][0] * k}" y1="${y + c.stars[a][1] * k}" x2="${x + c.stars[b][0] * k}" y2="${y + c.stars[b][1] * k}" stroke="#7a6a4a" stroke-width=".8"/>`).join('')}${c.stars.map(([sx, sy]) => `<circle cx="${x + sx * k}" cy="${y + sy * k}" r="1.3" fill="#2a2418"/>`).join('')}</g>`;
+  }
+
+  const NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  function poster() {
+    const cell = (id, i) => {
+      const c = G.CONSTELLATIONS[id];
+      const x = 20 + (i % 4) * 160, y = 20 + Math.floor(i / 4) * 190, k = 1.1;
+      return `<g><rect x="${x}" y="${y}" width="148" height="176" rx="4" fill="#efe6cf" stroke="#cbbd99"/>
+        ${c.lines.map(([a, b]) => `<line x1="${x + 19 + c.stars[a][0] * k}" y1="${y + 14 + c.stars[a][1] * k}" x2="${x + 19 + c.stars[b][0] * k}" y2="${y + 14 + c.stars[b][1] * k}" stroke="#a8946a" stroke-width="1.4" stroke-dasharray="3 2"/>`).join('')}
+        ${c.stars.map(([sx, sy]) => `<circle cx="${x + 19 + sx * k}" cy="${y + 14 + sy * k}" r="4" fill="#2b2418"/>`).join('')}
+        <text x="${x + 74}" y="${y + 160}" text-anchor="middle" font-size="18" fill="#2b2418" font-weight="700">${c.name}<tspan font-size="13" font-weight="400" fill="#6b5a3a">　${NUM[c.stars.length]}星</tspan></text></g>`;
+    };
+    return `<svg viewBox="0 0 660 400" class="art" role="img" aria-label="手繪星座圖：八個星座">${G.CONSTELLATION_ORDER.map(cell).join('')}</svg>`;
+  }
+
+  const EYE_CENTERS = [[165, 80], [240, 200], [160, 320]]; // 真實天空由高到低三個星座的位置（各相隔約 48px）
+  function eyepiece(dir) {
+    const field = G.SKY_FIELDS[dir];
+    const flip = ([x, y]) => [400 - x, 400 - y];
+    const boxes = [];
+    let stars = '';
+    field.forEach((id, i) => {
+      const c = G.CONSTELLATIONS[id];
+      const [cx, cy] = EYE_CENTERS[i];
+      boxes.push([cx - 44, cy - 44, cx + 44, cy + 44]);
+      for (const [sx, sy] of c.stars) {
+        const [px, py] = flip([cx - 36 + sx * 0.72, cy - 36 + sy * 0.72]);
+        stars += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="7" fill="#fff6d8" opacity=".18"/><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.4" fill="#fffaf0"/>`;
+      }
+    });
+    // 背景暗星：避開星座範圍
+    const r = rng(dir.split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7));
+    let faint = '';
+    for (let n = 0; n < 70; n++) {
+      const x = 20 + r() * 360, y = 20 + r() * 360;
+      const [fx, fy] = flip([x, y]);
+      if (boxes.some(([a, b, c, d]) => x > a && x < c && y > b && y < d)) continue;
+      faint += `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="${(0.5 + r() * 0.6).toFixed(2)}" fill="#c8cfe6" opacity="${(0.25 + r() * 0.3).toFixed(2)}"/>`;
+    }
+    return `<svg viewBox="0 0 400 400" class="art eyepiece" role="img" aria-label="望遠鏡目鏡中的星空">
+      <defs><clipPath id="eye-clip"><circle cx="200" cy="200" r="180"/></clipPath>
+      <radialGradient id="eye-bg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#0d1430"/><stop offset="1" stop-color="#03050c"/></radialGradient></defs>
+      <rect width="400" height="400" fill="#000"/>
+      <g clip-path="url(#eye-clip)"><rect width="400" height="400" fill="url(#eye-bg)"/>${faint}${stars}
+        <line x1="200" y1="20" x2="200" y2="380" stroke="#3a4a7a" stroke-width=".6" opacity=".5"/><line x1="20" y1="200" x2="380" y2="200" stroke="#3a4a7a" stroke-width=".6" opacity=".5"/></g>
+      <circle cx="200" cy="200" r="182" fill="none" stroke="#a5783a" stroke-width="8"/><circle cx="200" cy="200" r="190" fill="none" stroke="#5a3d16" stroke-width="6"/>
+    </svg>`;
+  }
+
+  function bookshelf() {
+    const colorOf = { yellow: '#d8b546', blue: '#3f6fb0', green: '#4f8a5b', red: '#b5473f', brown: '#6b4a32' };
+    const heights = [236, 224, 240, 230, 220, 238, 226, 234, 228];
+    const books = G.BOOKS.map((b, i) => {
+      const x = 24 + i * 66, h = heights[i], y = 270 - h, c = colorOf[b.color];
+      const ink = b.color === 'yellow' ? '#3b2a10' : '#f3ecd6';
+      return `<g><rect x="${x}" y="${y}" width="58" height="${h}" rx="3" fill="${c}"/>
+        <rect x="${x}" y="${y + 16}" width="58" height="4" fill="#e3c27a" opacity=".7"/><rect x="${x}" y="${y + h - 22}" width="58" height="4" fill="#e3c27a" opacity=".7"/>
+        <text x="${x + 29}" y="${y + 44}" text-anchor="middle" font-size="15" fill="${ink}" writing-mode="tb" letter-spacing="3">星空圖鑑</text>
+        ${b.color === 'brown' ? '' : `<circle cx="${x + 29}" cy="${y + h - 96}" r="12" fill="#f3ecd6" stroke="${ink}" stroke-width="1"/><text x="${x + 29}" y="${y + h - 91.5}" text-anchor="middle" font-size="13" fill="#3b2a10">${({ yellow: '黃', blue: '藍', green: '綠', red: '紅' })[b.color]}</text>`}
+        <rect x="${x + 6}" y="${y + h - 74}" width="46" height="44" rx="3" fill="#f3ecd6"/>
+        <text x="${x + 29}" y="${y + h - 56}" text-anchor="middle" font-size="12" fill="#3b2a10">第</text>
+        <text x="${x + 29}" y="${y + h - 36}" text-anchor="middle" font-size="19" font-weight="700" fill="#3b2a10">${b.vol}卷</text></g>`;
+    }).join('');
+    return `<svg viewBox="0 0 640 300" class="art" role="img" aria-label="書架上的九卷《星空圖鑑》，由左到右：${G.BOOKS.map(b => ({ yellow: '黃', blue: '藍', green: '綠', red: '紅', brown: '棕' })[b.color] + '色第' + b.vol + '卷').join('、')}">
+      <rect width="640" height="300" fill="#1a100a"/>${books}<rect x="0" y="270" width="640" height="30" fill="#4a2f1c"/></svg>`;
+  }
+
+  // 方格紙 / 膠片 / 疊合
+  function gridSvg({ digits = true, stars = false }) {
+    const cs = 64, ox = 40, oy = 40;
+    let out = '';
+    const cross = (x, y) => `<path d="M${x - 9} ${y} h18 M${x} ${y - 9} v18" stroke="#b5473f" stroke-width="2"/>`;
+    if (digits) {
+      out += `<rect x="${ox - 20}" y="${oy - 20}" width="${cs * 5 + 40}" height="${cs * 5 + 40}" fill="#f2ecdc"/>`;
+      for (let r = 0; r <= 5; r++) out += `<line x1="${ox}" y1="${oy + r * cs}" x2="${ox + cs * 5}" y2="${oy + r * cs}" stroke="#9fb0c8" stroke-width="1.2"/><line x1="${ox + r * cs}" y1="${oy}" x2="${ox + r * cs}" y2="${oy + cs * 5}" stroke="#9fb0c8" stroke-width="1.2"/>`;
+      G.GRID_DIGITS.forEach((row, r) => row.forEach((d, c) => {
+        out += `<text x="${ox + c * cs + cs / 2}" y="${oy + r * cs + cs / 2 + 9}" text-anchor="middle" font-size="27" fill="#2b2418" font-family="'JetBrains Mono',monospace">${d}</text>`;
+      }));
+    } else {
+      out += `<rect x="${ox - 20}" y="${oy - 20}" width="${cs * 5 + 40}" height="${cs * 5 + 40}" fill="#cfe0f0" opacity=".25" stroke="#9fb0c8" stroke-dasharray="4 4"/>`;
+    }
+    if (stars) {
+      for (const st of G.TRANSPARENCY_STARS) {
+        const x = ox + st.c * cs + cs / 2, y = oy + st.r * cs + cs / 2;
+        const sx = x - 19, sy = y - 19; // 星星畫在格子左上角，不遮住數字
+        out += `<path d="M${sx} ${sy - 8} L${sx + 2.5} ${sy - 2.5} L${sx + 8} ${sy} L${sx + 2.5} ${sy + 2.5} L${sx} ${sy + 8} L${sx - 2.5} ${sy + 2.5} L${sx - 8} ${sy} L${sx - 2.5} ${sy - 2.5} Z" fill="#2d4f8a" opacity=".9"/>`;
+        if (st.mark) {
+          out += `<circle cx="${x}" cy="${y}" r="26" fill="none" stroke="#2d4f8a" stroke-width="2.5"/>
+            <circle cx="${x + 22}" cy="${y - 22}" r="11" fill="#2d4f8a"/><text x="${x + 22}" y="${y - 17.5}" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">${st.mark}</text>`;
+        }
+      }
+    }
+    for (const [x, y] of [[ox - 8, oy - 8], [ox + cs * 5 + 8, oy - 8], [ox - 8, oy + cs * 5 + 8], [ox + cs * 5 + 8, oy + cs * 5 + 8]]) out += cross(x, y);
+    const label = digits && stars ? '疊合的星圖' : digits ? '數字方格紙' : '星圖膠片';
+    return `<svg viewBox="0 0 400 400" class="art" role="img" aria-label="${label}">${out}</svg>`;
+  }
+
+  // 撕開的便條：沿一道斜向的撕口分成左右兩半
+  function note(which) {
+    const lines = G.NOTE_LINES, n = lines.length;
+    const lh = 34, top = 24, W = 440, H = top + n * lh + 16;
+    const tearAt = i => 150 + i * 16;                                    // 第 i 行的撕口位置
+    const by = k => top + k * lh;                                        // 第 k 條行界
+    const tx = k => tearAt(k - 0.5) + (k % 2 ? 3 : -3);                  // 行界上的撕口（鋸齒）
+    const tear = [];
+    for (let k = 0; k <= n; k++) tear.push([tx(k), k === 0 ? 12 : k === n ? H - 8 : by(k)]);
+    const leftPoly = [[16, 12], ...tear, [16, H - 8]].map(p => p.join(',')).join(' ');
+    const rightPoly = [...tear, [W - 16, H - 8], [W - 16, 12]].map(p => p.join(',')).join(' ');
+    const font = `font-size="21" fill="#2b2418" font-family="'LXGW WenKai TC','Kaiti TC','Noto Serif TC',serif"`;
+    let out = '';
+    if (which !== 'right') {
+      out += `<polygon points="${leftPoly}" fill="#efe6cf"/>`;
+      lines.forEach(([l], i) => { if (l) out += `<text x="${tearAt(i) - 8}" y="${by(i) + 26}" text-anchor="end" ${font}>${esc(l)}</text>`; });
+    }
+    if (which !== 'left') {
+      out += `<g transform="translate(${which === 'full' ? 3 : 0} 0)"><polygon points="${rightPoly}" fill="#e9dfc4"/>`;
+      lines.forEach(([, r], i) => { if (r) out += `<text x="${tearAt(i) + 8}" y="${by(i) + 26}" ${font}>${esc(r)}</text>`; });
+      out += '</g>';
+    }
+    const maxTear = Math.max(...tear.map(p => p[0])), minTear = Math.min(...tear.map(p => p[0]));
+    const vb = which === 'left' ? `0 0 ${maxTear + 16} ${H}` : which === 'right' ? `${minTear - 16} 0 ${W - minTear + 16} ${H}` : `0 0 ${W + 4} ${H}`;
+    const label = { left: '便條左半：' + lines.map(l => l[0]).filter(Boolean).join('／'), right: '便條右半：' + lines.map(l => l[1]).filter(Boolean).join('／'), full: '拼好的便條' }[which];
+    return `<svg viewBox="${vb}" class="art note-art note-${which}" role="img" aria-label="${esc(label)}">${out}</svg>`;
+  }
+
+  function plate() {
+    return `<svg viewBox="0 0 400 300" class="art" role="img" aria-label="玻璃底片：群星之間一顆拖著短尾的彗星，片角刻著 1999.12.08 陸觀">
+      <defs><linearGradient id="pl-tail" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fffbe8" stop-opacity=".9"/><stop offset="1" stop-color="#fffbe8" stop-opacity="0"/></linearGradient></defs>
+      <rect x="10" y="10" width="380" height="280" rx="6" fill="#0c0f16" stroke="#9aa6b8" stroke-width="3"/>
+      ${starfield(77, 90, 20, 20, 360, 260)}
+      <path d="M150 150 Q240 130 330 100 L334 112 Q244 146 152 158 Z" fill="url(#pl-tail)"/>
+      <circle cx="150" cy="154" r="7" fill="#fffbe8"/><circle cx="150" cy="154" r="16" fill="#fffbe8" opacity=".25"/>
+      <text x="374" y="280" text-anchor="end" font-size="13" fill="#c9cfdb" font-family="'JetBrains Mono',monospace">1999.12.08　陸觀</text></svg>`;
+  }
+
+  // 灌溉管線圖
+  // 每個閥門的管線走向（座標已核對：任兩條管線只在 CROSSINGS 處「跨越」，只在 dots 處「分岔」）
+  const PIPE_ROUTES = {
+    V5: { color: 'rain', vx: 70, segs: [[[70, 92], [70, 330]]] },
+    V1: { color: 'rain', vx: 110, segs: [[[110, 92], [110, 230], [530, 230], [530, 330]], [[110, 230], [110, 330]]], dots: [[110, 230]] },
+    V2: { color: 'rain', vx: 150, segs: [[[150, 92], [150, 200], [290, 200], [290, 330]]] },
+    V3: { color: 'fert', vx: 500, segs: [[[500, 92], [500, 268], [170, 268], [170, 330]], [[320, 268], [320, 330]]], dots: [[320, 268]] },
+    V4: { color: 'fert', vx: 548, segs: [[[548, 92], [548, 178], [350, 178], [350, 330]]] },
+  };
+  const CROSSINGS = [[290, 230], [350, 230], [500, 230], [290, 268], [350, 268], [500, 178]];
+  function valvesSvg(open, water) {
+    const col = { rain: '#5b8fc9', fert: '#b07a3a' };
+    let pipes = '', valves = '';
+    for (const v of G.VALVES) {
+      const R = PIPE_ROUTES[v.id];
+      for (const seg of R.segs) pipes += `<polyline points="${seg.map(p => p.join(',')).join(' ')}" fill="none" stroke="${col[R.color]}" stroke-width="7" stroke-linejoin="round" opacity="${open[v.id] ? 1 : 0.55}"/>`;
+      for (const [x, y] of R.dots || []) pipes += `<circle cx="${x}" cy="${y}" r="7" fill="${col[R.color]}"/>`;
+      const on = !!open[v.id];
+      valves += `<g class="valve" data-valve="${v.id}" tabindex="0" role="switch" aria-checked="${on}" aria-label="閥門 ${v.id}：${on ? '開' : '關'}">
+        <circle cx="${R.vx}" cy="140" r="17" fill="#2a2f36" stroke="${on ? '#7fc28f' : '#c96a5a'}" stroke-width="3"/>
+        <rect x="${R.vx - 13}" y="137" width="26" height="6" rx="3" fill="${on ? '#7fc28f' : '#c96a5a'}" transform="rotate(${on ? 90 : 0} ${R.vx} 140)"/>
+        <text x="${R.vx}" y="112" text-anchor="middle" font-size="12" fill="#d8dee8" font-weight="700">${v.id}·${on ? '開' : '關'}</text></g>`;
+    }
+    // 交叉處（不相連）畫成「跨越」的小拱
+    const crossings = CROSSINGS;
+    let hops = '';
+    for (const [x, y] of crossings) hops += `<circle cx="${x}" cy="${y}" r="9" fill="#14181e"/>`;
+    // 重畫垂直管線穿過交叉點，形成「上方跨越」效果
+    let over = '';
+    for (const v of G.VALVES) {
+      const R = PIPE_ROUTES[v.id];
+      for (const seg of R.segs) {
+        for (let i = 0; i < seg.length - 1; i++) {
+          const [[x1, y1], [x2, y2]] = [seg[i], seg[i + 1]];
+          if (x1 === x2) for (const [cx, cy] of crossings) if (cx === x1 && cy > Math.min(y1, y2) && cy < Math.max(y1, y2)) {
+            over += `<line x1="${cx}" y1="${cy - 12}" x2="${cx}" y2="${cy + 12}" stroke="${col[R.color]}" stroke-width="7" opacity="${open[v.id] ? 1 : 0.55}"/>`;
+          }
+        }
+      }
+    }
+    const bed = (x, label, key) => `<rect x="${x}" y="330" width="140" height="44" rx="6" fill="#3a2a1a" stroke="${water ? '#6fae7d' : '#5a4630'}" stroke-width="2"/><text x="${x + 70}" y="358" text-anchor="middle" font-size="16" fill="#e6dcc4">${label}</text>`;
+    return `<svg viewBox="0 0 640 400" class="art valves-art" role="group" aria-label="灌溉管線圖">
+      <rect width="640" height="400" fill="#14181e"/>
+      <rect x="40" y="16" width="140" height="76" rx="10" fill="#2f5277"/><text x="110" y="60" text-anchor="middle" font-size="18" fill="#e6eef6">雨水桶</text>
+      <rect x="460" y="16" width="140" height="76" rx="10" fill="#6b4a26"/><text x="530" y="60" text-anchor="middle" font-size="18" fill="#f6e8d6">肥料桶</text>
+      ${pipes}${hops}${over}
+      ${bed(60, '月光花')}${bed(250, '蕨類')}${bed(460, '仙人掌')}
+      ${valves}
+      <g font-size="12" fill="#aab3c2"><rect x="232" y="20" width="14" height="6" fill="${col.rain}"/><text x="252" y="27">雨水管</text><rect x="232" y="38" width="14" height="6" fill="${col.fert}"/><text x="252" y="45">肥料水管</text>
+        <path d="M230 60 h18 M239 60 v8" stroke="#aab3c2" stroke-width="3"/><circle cx="239" cy="60" r="4" fill="#aab3c2"/><text x="252" y="64">分岔：圓點處相連</text>
+        <path d="M230 80 h5 M243 80 h5" stroke="#aab3c2" stroke-width="3"/><path d="M239 71 v18" stroke="#aab3c2" stroke-width="3"/><text x="252" y="84">跨越：斷開處不相連</text></g>
+    </svg>`;
+  }
+
+  // 月光反光鏡
+  function mirrorsSvg(cfg) {
+    const g = G.MIRROR_GRID, cs = 64, ox = 40, oy = 60;
+    const W = ox * 2 + g.cols * cs + 60, Hh = oy + g.rows * cs + 40;
+    const tr = G.traceBeam(cfg);
+    const center = ({ c, r }) => [ox + c * cs + cs / 2, oy + r * cs + cs / 2];
+    const pts = tr.path.map((p, i) => {
+      if (i === 0) return [ox + p.c * cs + cs / 2, oy - 40];
+      const inside = p.c >= 0 && p.c < g.cols && p.r >= 0 && p.r < g.rows;
+      if (inside) return center(p);
+      const [x, y] = center(p);
+      return [Math.max(ox - 20, Math.min(ox + g.cols * cs + (tr.hit ? 40 : 20), x)), Math.max(oy - 20, Math.min(oy + g.rows * cs + 20, y))];
+    });
+    let cells = '';
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) cells += `<rect x="${ox + c * cs}" y="${oy + r * cs}" width="${cs}" height="${cs}" fill="#101826" stroke="#1f2a3d"/>`;
+    const blocks = g.blocks.map(b => { const [x, y] = center(b); return `<g><rect x="${x - 22}" y="${y - 22}" width="44" height="44" rx="6" fill="#4a3a2a"/><path d="M${x - 12} ${y + 10} q12 -30 24 0" fill="#4f7a4a"/></g>`; }).join('');
+    const mirrors = g.mirrors.map(m => {
+      const [x, y] = center(m);
+      const d = (cfg && cfg[m.id]) || g.initial[m.id];
+      const [x1, y1, x2, y2] = d === '/' ? [x - 22, y + 22, x + 22, y - 22] : [x - 22, y - 22, x + 22, y + 22];
+      return `<g class="mirror" data-mirror="${m.id}" tabindex="0" role="button" aria-label="反光鏡 ${m.id}，目前「${d}」，點擊切換">
+        <rect x="${x - cs / 2 + 3}" y="${y - cs / 2 + 3}" width="${cs - 6}" height="${cs - 6}" rx="8" fill="#1a2436" stroke="#3a4a66"/>
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d7e4ef" stroke-width="6" stroke-linecap="round"/>
+        <text x="${x - cs / 2 + 9}" y="${y - cs / 2 + 17}" font-size="12" fill="#8fa3c2">${m.id}</text></g>`;
+    }).join('');
+    const fx = ox + g.cols * cs + 30, fy = oy + g.target.r * cs + cs / 2;
+    return `<svg viewBox="0 0 ${W} ${Hh}" class="art mirrors-art" role="group" aria-label="反光鏡格子">
+      <rect width="${W}" height="${Hh}" fill="#0a0f1a"/>
+      ${cells}
+      <rect x="${ox + g.entry.c * cs + 8}" y="${oy - 46}" width="${cs - 16}" height="20" rx="4" fill="#cfe0ff" opacity=".85"/><text x="${ox + g.entry.c * cs + cs / 2}" y="${oy - 50}" text-anchor="middle" font-size="12" fill="#cfe0ff">天窗</text>
+      ${blocks}
+      <polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f3f6ff" stroke-width="10" opacity=".18" stroke-linejoin="round"/>
+      <polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f3f6ff" stroke-width="3" stroke-linejoin="round"/>
+      ${mirrors}
+      <g>${tr.hit ? `<circle cx="${fx}" cy="${fy}" r="30" fill="#ffffff" opacity=".25"/>` : ''}${[0, 72, 144, 216, 288].map(a => `<ellipse cx="${fx}" cy="${fy - 12}" rx="6" ry="12" fill="${tr.hit ? '#ffffff' : '#c9d4c0'}" transform="rotate(${a} ${fx} ${fy})"/>`).join('')}<circle cx="${fx}" cy="${fy}" r="5" fill="#e8e2a8"/>
+        <text x="${fx}" y="${fy + 34}" text-anchor="middle" font-size="12" fill="#c9d4c0">月光花</text></g>
+    </svg>`;
+  }
+
+  function clockSvg(h, m) {
+    let ticks = '';
+    for (let i = 1; i <= 12; i++) {
+      const a = i * 30 * Math.PI / 180;
+      ticks += `<text x="${(150 + Math.sin(a) * 100).toFixed(1)}" y="${(150 - Math.cos(a) * 100 + 8).toFixed(1)}" text-anchor="middle" font-size="22" fill="#2b2418">${i}</text>`;
+    }
+    for (let i = 0; i < 60; i++) {
+      const a = i * 6 * Math.PI / 180, r1 = i % 5 ? 120 : 114;
+      ticks += `<line x1="${(150 + Math.sin(a) * r1).toFixed(1)}" y1="${(150 - Math.cos(a) * r1).toFixed(1)}" x2="${(150 + Math.sin(a) * 126).toFixed(1)}" y2="${(150 - Math.cos(a) * 126).toFixed(1)}" stroke="#2b2418" stroke-width="${i % 5 ? 1 : 2.5}"/>`;
+    }
+    const ha = ((h % 12) + m / 60) * 30 * Math.PI / 180, ma = m * 6 * Math.PI / 180;
+    return `<svg viewBox="0 0 300 300" class="art clock-art" role="img" aria-label="落地鐘鐘面：${h} 點 ${m} 分">
+      <circle cx="150" cy="150" r="140" fill="#8a6a32"/><circle cx="150" cy="150" r="130" fill="#efe4c8"/>${ticks}
+      <line x1="150" y1="150" x2="${(150 + Math.sin(ha) * 62).toFixed(1)}" y2="${(150 - Math.cos(ha) * 62).toFixed(1)}" stroke="#1b1408" stroke-width="7" stroke-linecap="round"/>
+      <line x1="150" y1="150" x2="${(150 + Math.sin(ma) * 98).toFixed(1)}" y2="${(150 - Math.cos(ma) * 98).toFixed(1)}" stroke="#1b1408" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="150" cy="150" r="7" fill="#1b1408"/></svg>`;
+  }
+
+  function dialSvg(sel) {
+    const ring = (r, id, label) => `<circle cx="150" cy="150" r="${r}" fill="none" stroke="#6b4a1e" stroke-width="30" opacity=".35"/>
+      <text x="150" y="${150 - r + 7}" text-anchor="middle" font-size="20" font-weight="700" fill="#2b1a08">${G.CONSTELLATIONS[id].name}</text>
+      <text x="${150 + r * 0.72}" y="${150 + r * 0.72}" text-anchor="middle" font-size="10" fill="#5a3d16">${label}</text>`;
+    return `<svg viewBox="0 0 300 300" class="art dial-art" role="img" aria-label="星盤：外環${G.CONSTELLATIONS[sel[0]].name}、中環${G.CONSTELLATIONS[sel[1]].name}、內環${G.CONSTELLATIONS[sel[2]].name}">
+      <circle cx="150" cy="150" r="146" fill="#c9a24f"/><circle cx="150" cy="150" r="140" fill="#dcbc72"/>
+      ${ring(118, sel[0], '外環')}${ring(80, sel[1], '中環')}${ring(42, sel[2], '內環')}
+      <circle cx="150" cy="150" r="14" fill="#6b4a1e"/><path d="M150 6 l-9 -2 h18 z M150 30 l-8 -16 h16 z" fill="#7a1c14"/></svg>`;
+  }
+
+  function bottleSvg(b) {
+    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6' }[b.id];
+    return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/></svg>`;
+  }
+
+  root.Art = { scene, poster, eyepiece, bookshelf, gridSvg, note, plate, valvesSvg, mirrorsSvg, clockSvg, dialSvg, bottleSvg, esc };
+}(typeof self !== 'undefined' ? self : this));
+</script>
+<script>
+/*
+ * 觀星者之屋 — 介面
+ * 只負責顯示與輸入；所有規則判定都交給 engine.js。
+ */
+(function () {
+  'use strict';
+  const G = window.GAME_DATA;
+  const E = window.EscapeEngine.create(G);
+  const Art = window.Art;
+  const Store = window.SaveStore;
+  const esc = Art.esc;
+  const $ = id => document.getElementById(id);
+
+  const app = {
+    s: null,
+    screen: 'title',
+    selected: null,
+    combining: false,
+    log: [],
+    latest: [],
+    stack: [],
+    lastFocus: null,
+    ui: freshUi(),
+    introStep: 0,
+  };
+  function freshUi() {
+    return { locks: {}, dial: ['lamp', 'lamp', 'lamp'], clock: { h: 12, m: 0 }, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: '' };
+  }
+
+  /* ================= 畫面切換 ================= */
+  function show(screen) {
+    for (const id of ['title', 'intro', 'game', 'ending']) $(id).hidden = id !== screen;
+    app.screen = screen;
+    if (screen === 'title') { refreshTitle(); startSky(); } else stopSky();
+    window.scrollTo(0, 0);
+  }
+
+  function refreshTitle() {
+    const auto = Store.read('auto');
+    $('btn-continue').disabled = !(auto && auto.state && !auto.state.ending);
+    const got = Store.getEndings().length;
+    $('title-foot').textContent = got
+      ? `已解鎖結局 ${got} / ${G.ENDING_ORDER.length}`
+      : '五個房間・十一道謎題・五種結局';
+  }
+
+  /* ================= 星空（標題背景） ================= */
+  let skyRaf = 0;
+  function startSky() {
+    const c = $('sky');
+    const ctx = c.getContext && c.getContext('2d');
+    if (!ctx) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let stars = [];
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      c.width = c.clientWidth * dpr; c.height = c.clientHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      let x = 12345;
+      const r = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+      stars = Array.from({ length: Math.round(c.clientWidth * c.clientHeight / 2600) }, () => ({ x: r() * c.clientWidth, y: r() * c.clientHeight, s: 0.4 + r() * 1.4, p: r() * 6.28, v: 0.4 + r() * 1.6 }));
+    }
+    function draw(t) {
+      const w = c.clientWidth, h = c.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#05070f'); g.addColorStop(1, '#141c38');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      for (const st of stars) {
+        const a = reduce ? 0.7 : 0.45 + 0.45 * Math.sin(st.p + t / 1000 * st.v);
+        ctx.globalAlpha = a; ctx.fillStyle = '#f3ecd6';
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.s, 0, 6.283); ctx.fill();
+      }
+      // 一顆緩慢移動的彗星
+      const cx = (w * 0.15 + (reduce ? 0 : (t / 90) % (w * 0.9))), cy = h * 0.22 + (cx - w * 0.15) * 0.18;
+      const tail = ctx.createLinearGradient(cx, cy, cx - 120, cy - 22);
+      tail.addColorStop(0, 'rgba(255,250,232,.8)'); tail.addColorStop(1, 'rgba(255,250,232,0)');
+      ctx.globalAlpha = 1; ctx.strokeStyle = tail; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - 120, cy - 22); ctx.stroke();
+      ctx.fillStyle = '#fffbe8'; ctx.beginPath(); ctx.arc(cx, cy, 2.2, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+      if (!reduce && app.screen === 'title') skyRaf = requestAnimationFrame(draw);
+    }
+    resize();
+    window.onresize = () => { if (app.screen === 'title') resize(); };
+    cancelAnimationFrame(skyRaf);
+    skyRaf = requestAnimationFrame(draw);
+  }
+  function stopSky() { cancelAnimationFrame(skyRaf); }
+
+  /* ================= 開場 ================= */
+  function newGame() {
+    app.s = E.newState();
+    app.selected = null; app.combining = false;
+    app.ui = freshUi();
+    app.log = []; app.latest = [];
+    app.stack = []; renderModal();
+    app.introStep = 0;
+    $('intro-text').innerHTML = '';
+    show('intro');
+    nextIntro();
+  }
+  function nextIntro() {
+    if (app.introStep >= G.intro.length) { beginGame(); return; }
+    $('intro-text').insertAdjacentHTML('beforeend', `<p>${esc(G.intro[app.introStep])}</p>`);
+    app.introStep++;
+    $('btn-intro-next').textContent = app.introStep >= G.intro.length ? '拾起那封信' : '繼續';
+    $('btn-intro-next').focus();
+  }
+  function beginGame() {
+    show('game');
+    say([{ text: G.rooms[app.s.room].enterText(app.s), kind: 'room' }, { text: '你拾起地毯上的信。（已記入線索筆記）', kind: 'note' }]);
+    autosave();
+    render();
+    openView({ view: 'item', id: 'letter' });
+  }
+
+  /* ================= 動作 ================= */
+  function say(msgs) {
+    if (!msgs || !msgs.length) return;
+    app.latest = msgs.slice();
+    for (const m of msgs) app.log.push(m);
+    if (app.log.length > 120) app.log.splice(0, app.log.length - 120);
+  }
+
+  function act(fn, opts = {}) {
+    if (!app.s || app.s.ending) return null;
+    let r;
+    try { r = fn(); } catch (e) {
+      console.error(e);
+      r = { ok: false, messages: [{ text: '出了點意外：' + e.message + '（遊戲狀態沒有改變）', kind: 'bad' }] };
+    }
+    say(r.messages);
+    if (r.ending) { finishGame(r.ending); return r; }
+    if (r.ok) autosave();
+    if (app.selected && !app.s.inv.includes(app.selected)) { app.selected = null; app.combining = false; }
+    if (r.open && !opts.noOpen) openView(r.open);
+    render();
+    return r;
+  }
+
+  function onHotspot(id) {
+    if (app.selected) {
+      const item = app.selected;
+      app.selected = null; app.combining = false;
+      act(() => E.useItem(app.s, item, id));
+    } else {
+      act(() => E.interact(app.s, id));
+    }
+  }
+
+  function onItem(id) {
+    if (app.combining && app.selected && app.selected !== id) {
+      const a = app.selected;
+      app.selected = null; app.combining = false;
+      act(() => E.combine(app.s, a, id));
+      return;
+    }
+    if (app.selected === id) { app.selected = null; app.combining = false; }
+    else { app.selected = id; app.combining = false; }
+    render();
+  }
+
+  function submit(pid, answer, { closeOnSolve = true } = {}) {
+    if (pid === 'exit' || (pid === 'phone' && answer === 'accept')) checkpoint();
+    const r = act(() => E.submit(app.s, pid, answer), { noOpen: true });
+    if (!r || r.ending) return r;
+    app.ui.confirm = null;
+    if (r.solved && closeOnSolve) closeAll();
+    else { app.ui.feedback = r.messages; renderModal(); }
+    return r;
+  }
+
+  /* ================= 主畫面繪製 ================= */
+  function fmtTime(ms) {
+    const t = Math.floor((ms || 0) / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+  }
+
+  function render() {
+    if (!app.s || app.screen !== 'game') return;
+    const s = app.s;
+    $('room-name').textContent = G.rooms[s.room].name;
+    const p = E.progress(s);
+    const stName = { missing: '尚未找到', held: '在身上', inserted: '已嵌回大門' };
+    $('progress').innerHTML = p.emblems.map(e => `<span class="emb ${e.state}" title="${esc(G.items[e.id].name)}：${stName[e.state]}" aria-label="${esc(G.items[e.id].name)}：${stName[e.state]}">${e.glyph}</span>`).join('');
+    $('chip-pages').textContent = `日記 ${p.pages}/4`;
+    $('chip-pages').classList.toggle('on', p.pages === 4);
+    $('chip-plate').hidden = !p.plate;
+    $('chip-plate').classList.toggle('on', p.plate);
+    $('chip-time').textContent = fmtTime(s.stats.playMs);
+    document.body.classList.toggle('holding', !!app.selected);
+    renderScene();
+    renderObjects();
+    renderNav();
+    renderInventory();
+    renderLog();
+    $('narration').innerHTML = app.latest.map(m => `<p class="m-${m.kind || 'info'}">${esc(m.text)}</p>`).join('');
+  }
+
+  function visible(id) {
+    const h = E.hotspot(id);
+    return !!h && h.room === app.s.room && (!h.visible || !!h.visible(app.s));
+  }
+  function renderScene() {
+    $('scene').innerHTML = Art.scene(app.s.room, { s: app.s, vis: visible, label: id => E.hotspot(id).name });
+    updateTip(null);
+  }
+  function updateTip(id) {
+    const tip = $('scene-tip');
+    if (app.selected) {
+      tip.hidden = false;
+      const item = E.itemName(app.s, app.selected);
+      tip.textContent = id ? `使用「${item}」→ ${E.hotspot(id).name}` : `拿著「${item}」：點擊要使用的地方`;
+    } else if (id) {
+      tip.hidden = false;
+      tip.textContent = E.hotspot(id).name;
+    } else tip.hidden = true;
+  }
+
+  function renderObjects() {
+    const hs = E.visibleHotspots(app.s);
+    $('objects').innerHTML = `<span class="label">${app.selected ? '用在：' : '查看：'}</span>` +
+      hs.map(h => `<button class="btn obj-btn" type="button" data-obj="${h.id}">${esc(h.name)}</button>`).join('');
+  }
+
+  function renderNav() {
+    const s = app.s;
+    $('nav').innerHTML = G.roomOrder.map(r => {
+      if (r === 'darkroom' && !s.flags.trapdoorFound) return '';
+      const open = E.canEnter(s, r), here = s.room === r;
+      return `<button class="btn ${here ? 'here' : ''}" type="button" data-room="${r}" ${!open || here ? 'disabled' : ''} ${here ? 'aria-current="true"' : ''}>${esc(G.rooms[r].name)}${open ? '' : '（鎖著）'}</button>`;
+    }).join('');
+  }
+
+  function renderInventory() {
+    const s = app.s;
+    $('inventory').innerHTML = s.inv.length ? s.inv.map(id => {
+      const it = G.items[id];
+      const cls = ['inv-tile', app.selected === id ? 'sel' : '', app.combining && app.selected !== id ? 'target' : ''].join(' ');
+      return `<button class="${cls}" type="button" data-item="${id}" aria-pressed="${app.selected === id}"><span class="seal k-${it.kind}" aria-hidden="true">${it.glyph}</span><span>${esc(E.itemName(s, id))}</span></button>`;
+    }).join('') : '<p class="inv-empty">身上什麼也沒有。</p>';
+    const d = $('item-detail');
+    if (!app.selected) { d.hidden = true; d.innerHTML = ''; return; }
+    const it = G.items[app.selected];
+    d.hidden = false;
+    d.innerHTML = `<h3>${esc(E.itemName(s, app.selected))}</h3><p>${esc(it.desc)}</p>
+      <p class="hold-tip">${app.combining ? '再點另一個物品，試著把它們組合起來。' : '點擊場景中的物件來使用它。'}</p>
+      <div class="row">
+        <button class="btn small" type="button" data-detail="view">查看</button>
+        <button class="btn small ${app.combining ? 'primary' : ''}" type="button" data-detail="combine">${app.combining ? '取消組合' : '組合…'}</button>
+        <button class="btn small ghost" type="button" data-detail="drop">放下</button>
+      </div>`;
+  }
+
+  function renderLog() {
+    const latest = new Set(app.latest);
+    const items = app.log.slice(-40).reverse();
+    $('log').innerHTML = items.map(m => `<p class="m-${m.kind || 'info'} ${latest.has(m) ? 'fresh' : 'old'}">${esc(m.text)}</p>`).join('');
+  }
+
+  /* ================= 對話框 ================= */
+  const fb = () => `<div class="feedback" aria-live="polite">${app.ui.feedback.map(m => `<p class="m-${m.kind || 'info'}">${esc(m.text)}</p>`).join('')}</div>`;
+  const paper = (d, extra = '') => `<div class="paper ${d.style || 'plain'}">${extra}${d.body.map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
+  const center = html => `<div class="row" style="justify-content:center">${html}</div>`;
+
+  function openView(view) {
+    if (!app.stack.length) app.lastFocus = document.activeElement;
+    app.stack.push(view);
+    app.ui.feedback = []; app.ui.confirm = null;
+    renderModal(true);
+  }
+  function closeView() {
+    app.stack.pop();
+    app.ui.feedback = []; app.ui.confirm = null;
+    renderModal(true);
+  }
+  function closeAll() {
+    app.stack = [];
+    app.ui.feedback = []; app.ui.confirm = null;
+    renderModal(true);
+  }
+
+  function focusKey(el) {
+    if (!el || !el.closest || !el.closest('#modal-body')) return null;
+    for (const a of el.attributes) if (a.name.startsWith('data-')) return `[${a.name}="${CSS.escape(a.value)}"]`;
+    return null;
+  }
+
+  function renderModal(fresh) {
+    const view = app.stack[app.stack.length - 1];
+    const back = $('modal-back');
+    if (!view) {
+      back.hidden = true;
+      $('modal-body').innerHTML = '';
+      if (app.lastFocus && document.contains(app.lastFocus)) app.lastFocus.focus();
+      return;
+    }
+    const keep = fresh ? null : focusKey(document.activeElement);
+    const V = VIEWS[view.view];
+    const out = V ? V(view) : { title: '？', html: '<p>這個畫面不存在。</p>' };
+    $('modal-title').textContent = out.title;
+    $('modal-body').innerHTML = out.html;
+    $('modal-back-btn').hidden = app.stack.length < 2;
+    back.hidden = false;
+    app.viewKeys = out.keys || null;
+    if (out.bind) out.bind($('modal-body'));
+    const target = (keep && $('modal-body').querySelector(keep)) || (fresh ? ($('modal-body').querySelector('[data-autofocus]') || $('modal-close')) : null);
+    if (target) target.focus();
+  }
+
+  function docView(id) {
+    const d = G.docs[id];
+    if (d.view) return VIEWS[d.view]({});
+    return { title: d.title, html: paper(d) };
+  }
+
+  function itemContent(id) {
+    const it = G.items[id];
+    if (it.doc) return paper(G.docs[it.doc]);
+    switch (it.view) {
+      case 'grid': return `<div class="art-box narrow">${Art.gridSvg({ digits: true })}</div>`;
+      case 'transparency': return `<div class="art-box narrow">${Art.gridSvg({ digits: false, stars: true })}</div>`;
+      case 'overlay': return `<div class="art-box narrow">${Art.gridSvg({ digits: true, stars: true })}</div><p class="lead">三個圈起來的星星底下，各有一個數字。</p>`;
+      case 'note_left': return `<div class="art-box narrow">${Art.note('left')}</div><p class="lead">只有左半邊，每一行都斷在撕口。</p>`;
+      case 'note_right': return `<div class="art-box narrow">${Art.note('right')}</div><p class="lead">只有右半邊，每一行都缺了開頭。</p>`;
+      case 'note_full': return `<div class="art-box">${Art.note('full')}</div>` + paper({ style: 'hand', body: [G.NOTE_LINES.map(l => l[0] + l[1]).filter(Boolean).join('')] }, '<h3>謄寫</h3>');
+      case 'diary': {
+        const pages = app.s.flags.diaryPages || [];
+        return pages.map(p => paper(G.docs[p], `<h3>${esc(G.docs[p].title)}</h3>`)).join('') +
+          (pages.length < 4 ? `<p class="lead">日記還缺 ${4 - pages.length} 頁。</p>` : '<p class="lead">四頁都齊了。</p>');
+      }
+      case 'plate': return `<div class="art-box">${Art.plate()}</div>`;
+      default: return '';
+    }
+  }
+
+  const VIEWS = {
+    doc: ({ id }) => docView(id),
+
+    item: ({ id }) => {
+      const it = G.items[id];
+      const held = app.s && app.s.inv.includes(id);
+      return {
+        title: E.itemName(app.s, id),
+        html: `<p class="lead">${esc(it.desc)}</p>${itemContent(id)}
+          ${held ? center(`<button class="btn" type="button" data-act="hold">拿在手上</button><button class="btn" type="button" data-act="combine">和其他物品組合…</button>`) : ''}`,
+        bind(root) {
+          const hold = root.querySelector('[data-act=hold]');
+          if (hold) hold.onclick = () => { app.selected = id; app.combining = false; closeAll(); render(); };
+          const comb = root.querySelector('[data-act=combine]');
+          if (comb) comb.onclick = () => { app.selected = id; app.combining = true; closeAll(); render(); };
+        },
+      };
+    },
+
+    bookshelf: () => ({
+      title: '書架',
+      html: `<p class="lead">中間那一層排著九卷《星空圖鑑》，書脊下方印著卷數。有幾卷的書脊是彩色的。</p><div class="art-box">${Art.bookshelf()}</div>`,
+    }),
+
+    poster: () => ({
+      title: '手繪星座圖',
+      html: `<p class="lead">陸觀自己命名的八個星座。每個星座旁都註明了它有幾顆星。</p><div class="art-box">${Art.poster()}</div>`,
+    }),
+
+    eyepiece: () => {
+      const dir = app.s.puz.dome || 'N';
+      const name = G.DIRECTIONS.find(d => d.id === dir).name;
+      return {
+        title: '望遠鏡目鏡',
+        html: `<p class="lead">觀測窗朝向：<strong>${name}方</strong>。你湊近目鏡，視野裡有三團明亮的星群。</p>
+          <div class="eyepiece">${Art.eyepiece(dir)}</div>
+          ${center('<button class="btn" type="button" data-act="dome">轉動穹頂…</button>')}`,
+        bind(root) { root.querySelector('[data-act=dome]').onclick = () => { app.stack.pop(); openView({ view: 'dome' }); }; },
+      };
+    },
+
+    dome: () => {
+      const cur = app.s.puz.dome || 'N';
+      const grid = ['NW', 'N', 'NE', 'W', null, 'E', 'SW', 'S', 'SE'];
+      const name = id => G.DIRECTIONS.find(d => d.id === id).name;
+      return {
+        title: '穹頂轉輪',
+        html: `<p class="lead">轉動轉輪，可以把穹頂的觀測窗轉向八個方位。</p>
+          <div class="compass" role="group" aria-label="選擇方位">${grid.map(id => id
+            ? `<button class="btn ${id === cur ? 'cur' : ''}" type="button" data-dir="${id}" aria-pressed="${id === cur}">${name(id)}</button>`
+            : `<div class="center">目前<br>${name(cur)}</div>`).join('')}</div>
+          ${center(app.s.flags.eyepieceInstalled ? '<button class="btn primary" type="button" data-act="look">看望遠鏡</button>' : '<span class="lead">（望遠鏡還沒有目鏡。）</span>')}${fb()}`,
+        bind(root) {
+          root.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => submit('dome', b.dataset.dir, { closeOnSolve: false }); });
+          const look = root.querySelector('[data-act=look]');
+          if (look) look.onclick = () => { app.stack.pop(); openView({ view: 'eyepiece' }); };
+        },
+      };
+    },
+
+    dial: () => {
+      const sel = app.ui.dial, rings = ['外環', '中環', '內環'], order = G.CONSTELLATION_ORDER;
+      return {
+        title: '星盤',
+        html: `<div class="art-box narrow">${Art.dialSvg(sel)}</div>
+          ${paper(G.docs.dial_inscription)}
+          <div class="picker">${sel.map((id, i) => `<div class="picker-row"><span class="lbl">${rings[i]}</span>
+            <button class="btn" type="button" data-prev="${i}" aria-label="${rings[i]}：上一個星座">◀</button>
+            <span class="name" aria-live="polite">${G.CONSTELLATIONS[id].name}</span>
+            <button class="btn" type="button" data-next="${i}" aria-label="${rings[i]}：下一個星座">▶</button></div>`).join('')}</div>
+          ${center('<button class="btn primary" type="button" data-act="turn">轉動到位</button>')}${fb()}`,
+        bind(root) {
+          const step = (i, d) => { sel[i] = order[(order.indexOf(sel[i]) + d + order.length) % order.length]; app.ui.feedback = []; renderModal(); };
+          root.querySelectorAll('[data-prev]').forEach(b => { b.onclick = () => step(+b.dataset.prev, -1); });
+          root.querySelectorAll('[data-next]').forEach(b => { b.onclick = () => step(+b.dataset.next, 1); });
+          root.querySelector('[data-act=turn]').onclick = () => submit('dial', sel.slice());
+        },
+      };
+    },
+
+    lock: ({ id }) => {
+      const P = G.puzzles[id];
+      const cur = app.ui.locks[id] || (app.ui.locks[id] = Array(P.digits).fill(0));
+      return {
+        title: P.title,
+        html: `<p class="lead">${esc(P.prompt)}</p>
+          <div class="lock" role="group" aria-label="${P.digits} 位數字鎖">${cur.map((d, i) => `<div class="wheel">
+            <button class="btn" type="button" data-up="${i}" aria-label="第 ${i + 1} 位加一">▲</button>
+            <div class="digit" aria-label="第 ${i + 1} 位：${d}">${d}</div>
+            <button class="btn" type="button" data-down="${i}" aria-label="第 ${i + 1} 位減一">▼</button></div>`).join('')}</div>
+          ${center('<button class="btn primary" type="button" data-act="open" data-autofocus>開鎖</button>')}${fb()}
+          <p class="lead" style="font-size:.85rem;text-align:center">也可以直接用鍵盤輸入數字，按 Enter 開鎖。</p>`,
+        bind(root) {
+          root.querySelectorAll('[data-up]').forEach(b => { b.onclick = () => { cur[+b.dataset.up] = (cur[+b.dataset.up] + 1) % 10; app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-down]').forEach(b => { b.onclick = () => { cur[+b.dataset.down] = (cur[+b.dataset.down] + 9) % 10; app.ui.feedback = []; renderModal(); }; });
+          root.querySelector('[data-act=open]').onclick = () => submit(id, cur.join(''));
+        },
+        keys(e) {
+          if (/^[0-9]$/.test(e.key)) { cur.shift(); cur.push(+e.key); app.ui.feedback = []; renderModal(); return true; }
+          if (e.key === 'Enter' && !(e.target && e.target.tagName === 'BUTTON')) { submit(id, cur.join('')); return true; }
+          return false;
+        },
+      };
+    },
+
+    pots: () => {
+      const trowel = app.s.inv.includes('trowel');
+      return {
+        title: '花盆架',
+        html: paper({ style: 'plain', body: G.docs.pots_rule.body.slice(0, 2) }) +
+          `<div class="pots">${G.POTS.map(p => `<div class="pot"><h3>${p.name}盆</h3><q>${esc(p.says)}</q>
+            <button class="btn small" type="button" data-pot="${p.id}">挖開這一盆</button></div>`).join('')}</div>
+          ${trowel ? '' : '<p class="notice">盆土壓得很實。也許該先找把工具。</p>'}${fb()}`,
+        bind(root) { root.querySelectorAll('[data-pot]').forEach(b => { b.onclick = () => submit('pots', b.dataset.pot); }); },
+      };
+    },
+
+    valves: () => {
+      const open = Object.assign({}, app.s.puz.valves);
+      const wheel = app.s.flags.wheelInstalled;
+      return {
+        title: '灌溉系統',
+        html: `<p class="lead">點擊閥門切換開關（閥門上方標示著「開」或「關」）。每條管線從哪個桶出發、流進哪一格花床，都畫在圖上。設好之後再轉開總閘。</p>
+          <div class="art-box">${Art.valvesSvg(open, app.s.flags.waterOk)}</div>
+          ${center(`<button class="btn primary" type="button" data-act="main">${wheel ? '轉開總閘' : '轉動總閘'}</button><button class="btn small" type="button" data-doc="garden_rules">看園丁守則</button>`)}
+          ${wheel ? '' : '<p class="notice">總閘上只剩一根光禿禿的閥桿，手輪不見了。</p>'}${fb()}`,
+        bind(root) {
+          root.querySelectorAll('[data-valve]').forEach(g => {
+            const flip = () => { open[g.dataset.valve] = !open[g.dataset.valve]; E.submit(app.s, 'valves_set', open); app.ui.feedback = []; autosave(); renderModal(); };
+            g.addEventListener('click', flip);
+            g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+          });
+          root.querySelector('[data-act=main]').onclick = () => submit('valves', open);
+          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: 'garden_rules' });
+        },
+      };
+    },
+
+    mirrors: () => {
+      const cfg = Object.assign({}, G.MIRROR_GRID.initial, app.s.puz.mirrors);
+      const hit = G.traceBeam(cfg).hit;
+      return {
+        title: '天窗反光鏡',
+        html: `<p class="lead">月光從天窗射下。點擊鏡子可以切換它的斜向（「/」或「\\」），讓光一路折射，照到右下角的月光花。</p>
+          <div class="art-box">${Art.mirrorsSvg(cfg)}</div>
+          ${hit ? '<p class="m-good" style="margin:0;text-align:center">月光照到了月光花。</p>' : ''}${fb()}`,
+        bind(root) {
+          root.querySelectorAll('[data-mirror]').forEach(g => {
+            const flip = () => {
+              cfg[g.dataset.mirror] = cfg[g.dataset.mirror] === '/' ? '\\' : '/';
+              const r = act(() => E.submit(app.s, 'mirrors', cfg), { noOpen: true });
+              app.ui.feedback = r && r.solved && r.messages.length ? r.messages : [];
+              renderModal();
+            };
+            g.addEventListener('click', flip);
+            g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+          });
+        },
+      };
+    },
+
+    clock: () => {
+      const c = app.ui.clock;
+      return {
+        title: '落地鐘',
+        html: `${paper(G.docs.clock_inscription)}
+          <div class="art-box narrow" style="max-width:280px">${Art.clockSvg(c.h, c.m)}</div>
+          <div class="picker">
+            <div class="picker-row"><span class="lbl">時針</span><button class="btn" type="button" data-h="-1" aria-label="時針往回">◀</button><span class="name" aria-live="polite">${c.h} 點</span><button class="btn" type="button" data-h="1" aria-label="時針往前">▶</button></div>
+            <div class="picker-row"><span class="lbl">分針</span><button class="btn" type="button" data-m="-5" aria-label="分針往回五分">◀</button><span class="name" aria-live="polite">${String(c.m).padStart(2, '0')} 分</span><button class="btn" type="button" data-m="5" aria-label="分針往前五分">▶</button></div>
+          </div>
+          ${center('<button class="btn primary" type="button" data-act="set">就是這一刻</button>')}${fb()}`,
+        bind(root) {
+          root.querySelectorAll('[data-h]').forEach(b => { b.onclick = () => { c.h = ((c.h - 1 + +b.dataset.h + 12) % 12) + 1; app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { c.m = (c.m + +b.dataset.m + 60) % 60; app.ui.feedback = []; renderModal(); }; });
+          root.querySelector('[data-act=set]').onclick = () => submit('clock', { h: c.h, m: c.m });
+        },
+      };
+    },
+
+    develop: () => {
+      const seq = app.ui.dev;
+      const name = id => G.BOTTLES.find(b => b.id === id).name;
+      const hasNote = app.s.inv.includes('note_full');
+      return {
+        title: '顯影台',
+        html: `<p class="lead">三個藥盤和一個清洗槽排成一列，旁邊是封存底片的避光盒。依序選出要倒的藥瓶（四步），再開始沖洗。陸觀留了幾張廢片，可以先試。</p>
+          <div class="bottles">${G.BOTTLES.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= 4 ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${b.name}</span></button>`).join('')}</div>
+          <div class="slots">${[0, 1, 2, 3].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">第 ${i + 1} 步<br>${seq[i] ? name(seq[i]) : '—'}</div>`).join('')}</div>
+          ${center(`<button class="btn" type="button" data-act="clear">清除</button><button class="btn primary" type="button" data-act="go" ${seq.length < 4 ? 'disabled' : ''}>開始沖洗</button>`)}${fb()}
+          ${center(`<button class="btn small" type="button" data-doc="bottle_card">看藥瓶卡片</button>${hasNote ? '<button class="btn small" type="button" data-note="1">看拼好的便條</button>' : ''}`)}`,
+        bind(root) {
+          root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < 4) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
+          root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
+          root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
+          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: 'bottle_card' });
+          const n = root.querySelector('[data-note]');
+          if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
+        },
+      };
+    },
+
+    phone: () => {
+      const confirming = app.ui.confirm === 'accept';
+      return {
+        title: '電話',
+        html: `<div class="dialogue">
+            <p class="speaker">聽筒裡傳來一個沙啞的男聲</p>
+            <p class="line">「……是阿遙吧？我是韓嶽。」</p>
+            <p class="line">「我就在門外的車裡。地下室那盞紅燈亮了很久，我都看見了。你找到那張底片了，對不對？」</p>
+            <p class="line">「聽著，你老師已經走了。一張舊底片能改變什麼？只會讓兩個老頭子的名聲一起爛掉，還有你的前途——你不是一直想進天文台工作嗎？」</p>
+            <p class="line">「把底片從大門的信件口塞出來。這扇門的機關，從外面也能用鑰匙打開——陸觀當年給過我一把。我會放你出去，再給你一張支票，數字隨你填。」</p>
+          </div>
+          ${confirming
+            ? `<div class="confirm"><p style="margin:0">真的要把底片交出去嗎？<strong>這會立刻結束遊戲。</strong></p>
+                <div class="row"><button class="btn danger" type="button" data-act="yes">確定，交出底片</button><button class="btn" type="button" data-act="no" data-autofocus>再想想</button></div></div>`
+            : `<div class="choices">
+                <button class="btn" type="button" data-act="accept">把底片塞出信件口，接受交易</button>
+                <button class="btn" type="button" data-act="refuse">「我不會交給你。」——掛斷電話</button>
+                <button class="btn ghost" type="button" data-act="later">先不回答，放下聽筒</button></div>`}${fb()}`,
+        bind(root) {
+          const on = (a, f) => { const b = root.querySelector(`[data-act=${a}]`); if (b) b.onclick = f; };
+          on('accept', () => { app.ui.confirm = 'accept'; renderModal(true); });
+          on('no', () => { app.ui.confirm = null; renderModal(true); });
+          on('yes', () => submit('phone', 'accept'));
+          on('refuse', () => submit('phone', 'refuse'));
+          on('later', () => { closeAll(); say([{ text: '你放下了聽筒。電話還在響。', kind: 'info' }]); render(); });
+        },
+      };
+    },
+
+    exit: () => {
+      const s = app.s, plate = s.inv.includes('plate'), pages = E.pageCount(s);
+      const opts = plate
+        ? [['publish', '帶著底片離開，把真相公諸於世'], ['leave_plate', '把底片留在屋裡，獨自離開']]
+        : [['leave', '推開大門，離開這棟屋子']];
+      const c = app.ui.confirm;
+      const label = c && opts.find(o => o[0] === c);
+      return {
+        title: '大門',
+        html: `<p class="lead">三枚徽章都已歸位。沉重的大門只要輕輕一推就會打開。門外，雨後的山路泛著月光。</p>
+          <p class="lead">你帶著：日記 ${pages} / 4 頁${plate ? '、玻璃底片' : ''}。</p>
+          ${label
+            ? `<div class="confirm"><p style="margin:0">「${label[1]}」——離開之後，故事就結束了。確定嗎？</p>
+                <div class="row"><button class="btn primary" type="button" data-yes="${c}">確定</button><button class="btn" type="button" data-act="no" data-autofocus>再想想</button></div></div>`
+            : `<div class="choices">${opts.map(([id, t]) => `<button class="btn" type="button" data-choice="${id}">${t}</button>`).join('')}
+                <button class="btn ghost" type="button" data-act="stay">先不走，我還想在屋裡看看</button></div>`}`,
+        bind(root) {
+          root.querySelectorAll('[data-choice]').forEach(b => { b.onclick = () => { app.ui.confirm = b.dataset.choice; renderModal(true); }; });
+          const yes = root.querySelector('[data-yes]');
+          if (yes) yes.onclick = () => submit('exit', yes.dataset.yes);
+          const no = root.querySelector('[data-act=no]');
+          if (no) no.onclick = () => { app.ui.confirm = null; renderModal(true); };
+          const stay = root.querySelector('[data-act=stay]');
+          if (stay) stay.onclick = () => closeAll();
+        },
+      };
+    },
+
+    notes: () => {
+      const notes = app.s.notes;
+      return {
+        title: '線索筆記',
+        html: `<p class="lead">你讀過、看過的線索都會自動記在這裡，隨時可以重讀。（物品本身請在物品欄「查看」。）</p>
+          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(G.docs[id].title)}</span><span aria-hidden="true">›</span></button>`).join('')}</div>`,
+        bind(root) {
+          root.querySelectorAll('[data-note]').forEach(b => { b.onclick = () => openView(b.dataset.note === 'letter' ? { view: 'item', id: 'letter' } : { view: 'doc', id: b.dataset.note }); });
+        },
+      };
+    },
+
+    hints: () => {
+      const list = E.hintList(app.s);
+      return {
+        title: '提示',
+        html: `<p class="lead">每個目標的提示分三段：先給方向，再指出線索在哪，最後才是答案。用過的提示次數會出現在結算畫面上。</p>
+          ${list.map(h => `<div class="hint"><h3>${esc(h.title)}</h3>
+            ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
+            <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? '給我一點提示' : h.level >= h.max ? '已經是答案了' : `再多一點（${h.level + 1}/${h.max}）`}</button></div></div>`).join('') || '<p>目前沒有可以提示的目標。</p>'}`,
+        bind(root) {
+          root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { if (E.revealHint(app.s, b.dataset.hint)) autosave(); renderModal(); }; });
+        },
+      };
+    },
+
+    save: () => saveView(true),
+    load: () => saveView(false),
+
+    menu: () => ({
+      title: '選單',
+      html: `<div class="list">
+          <button class="btn" type="button" data-go="save">存檔 / 讀檔</button>
+          <button class="btn" type="button" data-go="help">遊戲說明</button>
+          <button class="btn" type="button" data-go="gallery">結局圖鑑</button>
+          ${app.ui.confirm === 'title'
+            ? `<div class="confirm"><p style="margin:0">回到標題畫面？目前進度已自動存檔，可以用「繼續遊戲」回來。</p><div class="row"><button class="btn primary" type="button" data-act="title-yes">回到標題</button><button class="btn" type="button" data-act="title-no">取消</button></div></div>`
+            : '<button class="btn" type="button" data-act="title">回到標題畫面</button>'}
+        </div>`,
+      bind(root) {
+        root.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => openView({ view: b.dataset.go }); });
+        const on = (a, f) => { const b = root.querySelector(`[data-act=${a}]`); if (b) b.onclick = f; };
+        on('title', () => { app.ui.confirm = 'title'; renderModal(); });
+        on('title-no', () => { app.ui.confirm = null; renderModal(); });
+        on('title-yes', () => { autosave(); closeAll(); show('title'); });
+      },
+    }),
+
+    help: () => ({
+      title: '遊戲說明',
+      html: `<div class="paper plain">
+        <p><strong>目標</strong>：找回日、月、星三枚徽章，嵌回門廳的大門就能離開。屋裡還藏著另一個秘密，它決定你會看到哪一個結局。</p>
+        <p><strong>查看</strong>：點擊場景裡發亮的物件，或點場景下方的物件名稱。</p>
+        <p><strong>使用物品</strong>：在右邊的物品欄點一下物品（拿在手上），再點場景裡的物件。</p>
+        <p><strong>組合線索</strong>：點選物品後按「組合…」，再點另一個物品。撕開的紙、疊在一起的圖、裝電池……很多線索要合在一起才看得懂。</p>
+        <p><strong>線索筆記</strong>：讀過的文件會自動記下，隨時能重讀。</p>
+        <p><strong>提示</strong>：卡關時按「提示」，每個目標分三段，從方向到答案。</p>
+        <p><strong>存檔</strong>：每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。</p>
+        <p><strong>公平原則</strong>：所有謎題的答案都在屋子裡，不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死。</p>
+        <p><strong>鍵盤</strong>：Tab 移動、Enter 選擇、Esc 關閉視窗或放下手上的物品；數字鎖可以直接打數字。</p></div>`,
+    }),
+
+    gallery: () => {
+      const got = Store.getEndings();
+      return {
+        title: '結局圖鑑',
+        html: `<p class="lead">已解鎖 ${got.length} / ${G.ENDING_ORDER.length}</p>
+          <div class="gallery">${G.ENDING_ORDER.map(id => {
+            const e = G.endings[id], ok = got.includes(id);
+            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? e.rank : '？？？'}</span><span>${ok ? '「' + esc(e.title) + '」' + esc(e.text[0].slice(0, 26)) + '……' : '尚未解鎖'}</span></div>`;
+          }).join('')}</div>`,
+      };
+    },
+  };
+
+  /* ================= 存檔 ================= */
+  function record(state) {
+    const p = E.progress(state);
+    return { state, savedAt: new Date().toISOString(), room: state.room, emblems: p.emblems.filter(e => e.state !== 'missing').length, pages: p.pages };
+  }
+  function autosave() {
+    if (!app.s || app.s.ending) return;
+    Store.write('auto', record(app.s));
+  }
+  function checkpoint() { if (app.s && !app.s.ending) Store.write('preend', record(app.s)); }
+
+  function describe(rec) {
+    if (!rec) return '空的';
+    if (rec.corrupt) return '存檔損毀，無法讀取';
+    const d = new Date(rec.savedAt);
+    const when = isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${when}・${G.rooms[rec.room] ? G.rooms[rec.room].name : '？'}・徽章 ${rec.emblems}/3・日記 ${rec.pages}/4・${fmtTime(rec.state.stats && rec.state.stats.playMs)}`;
+  }
+
+  function loadState(state, label) {
+    let st;
+    try { st = E.normalize(JSON.parse(JSON.stringify(state))); } catch (e) { return '存檔內容無法解讀。'; }
+    const errs = E.validate(st);
+    if (errs.length) return '這份存檔無法使用：' + errs.join('、') + '。';
+    if (st.ending) return '這份存檔的故事已經結束了。';
+    app.s = st;
+    app.selected = null; app.combining = false;
+    app.ui = freshUi();
+    app.log = []; app.latest = [];
+    app.stack = [];
+    renderModal();
+    show('game');
+    say([{ text: `已讀取：${label}`, kind: 'note' }, { text: G.rooms[st.room].enterText(st), kind: 'room' }]);
+    autosave();
+    render();
+    return null;
+  }
+
+  function saveView(inGame) {
+    const canSave = inGame && app.s && !app.s.ending;
+    const slots = [['auto', '自動存檔'], ['1', '欄位一'], ['2', '欄位二'], ['3', '欄位三'], ['preend', '結局前的存檔']];
+    const c = app.ui.confirm;
+    return {
+      title: inGame ? '存檔 / 讀檔' : '讀取存檔',
+      html: `${Store.persistent ? '' : '<p class="notice warn">這個瀏覽器目前無法長期保存資料（例如私密視窗或被封鎖的網站資料）。存檔只會保留到關閉頁面為止——請用下方的存檔碼把進度帶走。</p>'}
+        ${app.ui.saveNote ? `<p class="notice">${esc(app.ui.saveNote)}</p>` : ''}
+        <div class="list">${slots.map(([id, name]) => {
+          const rec = Store.read(id);
+          const usable = rec && rec.state && !rec.state.ending;
+          const manual = /^[123]$/.test(id);
+          if (c === 'over:' + id || c === 'del:' + id) {
+            const over = c.startsWith('over');
+            return `<div class="slot-card"><strong>${name}</strong><p style="margin:0">${over ? '覆蓋這個欄位的存檔？' : '刪除這個欄位的存檔？'}</p>
+              <div class="row"><button class="btn ${over ? 'primary' : 'danger'}" type="button" data-yes="${c}">確定</button><button class="btn" type="button" data-act="cancel">取消</button></div></div>`;
+          }
+          if (!manual && !rec) return '';
+          return `<div class="slot-card"><strong>${name}</strong><span class="meta">${esc(describe(rec))}</span>
+            <div class="row">
+              ${canSave && manual ? `<button class="btn small" type="button" data-save="${id}">存到這裡</button>` : ''}
+              <button class="btn small" type="button" data-load="${id}" ${usable ? '' : 'disabled'}>讀取</button>
+              ${manual && rec ? `<button class="btn small danger" type="button" data-del="${id}">刪除</button>` : ''}
+            </div></div>`;
+        }).join('')}</div>
+        ${canSave ? `<div class="slot-card"><strong>匯出存檔碼</strong><span class="meta">複製這段文字保存起來，之後可以在任何瀏覽器貼回來繼續。</span>
+          <textarea class="code" id="code-out" readonly>${esc(Store.encode(app.s))}</textarea>
+          <div class="row"><button class="btn small" type="button" data-act="copy">複製</button></div></div>` : ''}
+        <div class="slot-card"><strong>匯入存檔碼</strong>
+          <textarea class="code" id="code-in" placeholder="把 STAR1. 開頭的存檔碼貼在這裡">${esc(app.ui.importText)}</textarea>
+          <div class="row"><button class="btn small" type="button" data-act="import">讀取存檔碼</button></div></div>
+        ${fb()}`,
+      bind(root) {
+        const note = msg => { app.ui.saveNote = msg; app.ui.confirm = null; renderModal(); };
+        root.querySelectorAll('[data-save]').forEach(b => {
+          b.onclick = () => {
+            const id = b.dataset.save;
+            if (Store.read(id) && app.ui.confirm !== 'over:' + id) { app.ui.confirm = 'over:' + id; renderModal(); return; }
+            Store.write(id, record(app.s)); note(`已存到欄位${'一二三'[id - 1]}。`);
+          };
+        });
+        root.querySelectorAll('[data-del]').forEach(b => { b.onclick = () => { app.ui.confirm = 'del:' + b.dataset.del; renderModal(); }; });
+        const yes = root.querySelector('[data-yes]');
+        if (yes) yes.onclick = () => {
+          const [kind, id] = yes.dataset.yes.split(':');
+          if (kind === 'over') { Store.write(id, record(app.s)); note(`已覆蓋欄位${'一二三'[id - 1]}。`); }
+          else { Store.remove(id); note('已刪除。'); }
+        };
+        const cancel = root.querySelector('[data-act=cancel]');
+        if (cancel) cancel.onclick = () => { app.ui.confirm = null; renderModal(); };
+        root.querySelectorAll('[data-load]').forEach(b => {
+          b.onclick = () => {
+            const rec = Store.read(b.dataset.load);
+            const err = rec && rec.state ? loadState(rec.state, slots.find(x => x[0] === b.dataset.load)[1]) : '這個欄位是空的。';
+            if (err) note(err);
+          };
+        });
+        const copy = root.querySelector('[data-act=copy]');
+        if (copy) copy.onclick = () => {
+          const ta = $('code-out');
+          const fallback = () => { ta.focus(); ta.select(); note('已選取存檔碼，請按 Ctrl+C（或長按）複製。'); };
+          try {
+            navigator.clipboard.writeText(ta.value).then(() => note('存檔碼已複製。'), fallback);
+          } catch (e) { fallback(); }
+        };
+        const imp = root.querySelector('[data-act=import]');
+        imp.onclick = () => {
+          app.ui.importText = $('code-in').value;
+          let state;
+          try { state = Store.decode(app.ui.importText); } catch (e) { note(e.message); return; }
+          const err = loadState(state, '存檔碼');
+          if (err) note(err); else app.ui.importText = '';
+        };
+      },
+    };
+  }
+
+  /* ================= 結局 ================= */
+  function finishGame(id) {
+    const e = G.endings[id];
+    const s = app.s;
+    const got = Store.addEnding(id);
+    Store.remove('auto');
+    app.stack = []; renderModal();
+    show('ending');
+    const stats = [
+      [fmtTime(s.stats.playMs), '遊戲時間'], [s.stats.actions, '行動次數'], [s.stats.wrong, '錯誤嘗試'],
+      [s.stats.hints, '使用提示'], [E.pageCount(s) + ' / 4', '日記頁數'],
+    ];
+    $('ending-card').innerHTML = `
+      <p class="ending-rank">${esc(e.rank)}</p>
+      <h1 class="ending-title">${esc(e.title)}</h1>
+      <div class="ending-text">${e.text.map(t => `<p>${esc(t)}</p>`).join('')}</div>
+      <div class="stats">${stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
+      <p class="lead">已解鎖結局 ${got.length} / ${G.ENDING_ORDER.length}${got.length < G.ENDING_ORDER.length ? '。換一個選擇，或多找一些東西，也許會看到不同的結局。' : '。你看過了這棟屋子的每一種結局。'}</p>
+      <div class="row">
+        ${Store.read('preend') ? '<button class="btn primary" type="button" id="btn-preend">回到做出選擇之前</button>' : ''}
+        <button class="btn" type="button" id="btn-end-gallery">結局圖鑑</button>
+        <button class="btn" type="button" id="btn-end-title">回到標題</button>
+      </div>`;
+    const pre = $('btn-preend');
+    if (pre) pre.onclick = () => { const rec = Store.read('preend'); if (rec && rec.state) loadState(rec.state, '結局前的存檔'); };
+    $('btn-end-gallery').onclick = () => openView({ view: 'gallery' });
+    $('btn-end-title').onclick = () => show('title');
+    ($('btn-preend') || $('btn-end-title')).focus();
+  }
+
+  /* ================= 事件繫結 ================= */
+  function bindStatic() {
+    $('btn-new').onclick = () => {
+      const auto = Store.read('auto');
+      if (auto && auto.state && !auto.state.ending && !app.confirmNew) {
+        app.confirmNew = true;
+        $('btn-new').textContent = '確定開始新遊戲？（自動存檔會被覆蓋）';
+        return;
+      }
+      app.confirmNew = false;
+      $('btn-new').textContent = '新遊戲';
+      newGame();
+    };
+    $('btn-continue').onclick = () => {
+      const rec = Store.read('auto');
+      const err = rec && rec.state ? loadState(rec.state, '自動存檔') : '沒有可以繼續的進度。';
+      if (err) { $('title-foot').textContent = err; refreshTitle(); }
+    };
+    $('btn-load').onclick = () => openView({ view: 'load' });
+    $('btn-gallery').onclick = () => openView({ view: 'gallery' });
+    $('btn-help').onclick = () => openView({ view: 'help' });
+    $('btn-intro-next').onclick = nextIntro;
+    $('btn-intro-skip').onclick = () => { app.introStep = G.intro.length; beginGame(); };
+
+    $('btn-hints').onclick = () => openView({ view: 'hints' });
+    $('btn-notes').onclick = () => openView({ view: 'notes' });
+    $('btn-save').onclick = () => { app.ui.saveNote = ''; openView({ view: 'save' }); };
+    $('btn-menu').onclick = () => openView({ view: 'menu' });
+    $('modal-close').onclick = closeAll;
+    $('modal-back-btn').onclick = closeView;
+    $('modal-back').addEventListener('click', e => { if (e.target === $('modal-back')) closeAll(); });
+
+    const scene = $('scene');
+    scene.addEventListener('click', e => { const g = e.target.closest('.hs'); if (g) onHotspot(g.dataset.hs); });
+    scene.addEventListener('keydown', e => {
+      const g = e.target.closest && e.target.closest('.hs');
+      if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onHotspot(g.dataset.hs); }
+    });
+    scene.addEventListener('mouseover', e => { const g = e.target.closest('.hs'); updateTip(g ? g.dataset.hs : null); });
+    scene.addEventListener('focusin', e => { const g = e.target.closest('.hs'); updateTip(g ? g.dataset.hs : null); });
+    scene.addEventListener('mouseleave', () => updateTip(null));
+
+    $('objects').addEventListener('click', e => { const b = e.target.closest('[data-obj]'); if (b) onHotspot(b.dataset.obj); });
+    $('objects').addEventListener('mouseover', e => {
+      const b = e.target.closest('[data-obj]');
+      document.querySelectorAll('.hs.flash').forEach(x => x.classList.remove('flash'));
+      if (b) { const g = $('scene').querySelector(`[data-hs="${b.dataset.obj}"]`); if (g) g.classList.add('flash'); }
+    });
+    $('nav').addEventListener('click', e => {
+      const b = e.target.closest('[data-room]');
+      if (b && !b.disabled) { app.selected = null; app.combining = false; act(() => E.move(app.s, b.dataset.room)); }
+    });
+    $('inventory').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (b) onItem(b.dataset.item); });
+    $('item-detail').addEventListener('click', e => {
+      const b = e.target.closest('[data-detail]');
+      if (!b || !app.selected) return;
+      if (b.dataset.detail === 'view') openView({ view: 'item', id: app.selected });
+      if (b.dataset.detail === 'combine') { app.combining = !app.combining; render(); }
+      if (b.dataset.detail === 'drop') { app.selected = null; app.combining = false; render(); }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (!$('modal-back').hidden) {
+        if (e.key === 'Escape') { e.preventDefault(); closeView(); return; }
+        if (app.viewKeys && app.viewKeys(e)) e.preventDefault();
+        return;
+      }
+      if (e.key === 'Escape' && app.selected) { app.selected = null; app.combining = false; render(); }
+    });
+
+    // 遊戲時間與定時存檔
+    let last = Date.now(), sinceSave = 0;
+    setInterval(() => {
+      const now = Date.now(), dt = Math.min(now - last, 5000);
+      last = now;
+      if (app.screen === 'game' && app.s && !app.s.ending && !document.hidden) {
+        app.s.stats.playMs += dt;
+        sinceSave += dt;
+        $('chip-time').textContent = fmtTime(app.s.stats.playMs);
+        if (sinceSave > 15000) { sinceSave = 0; autosave(); }
+      }
+    }, 1000);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
+    window.addEventListener('pagehide', autosave);
+  }
+
+  /* ================= 啟動 ================= */
+  function start(data) {
+    bindStatic();
+    show('title');
+    if (data && data.state) loadState(data.state, '更新前的進度');
+  }
+  const hot = window.claude && window.claude.hot;
+  if (hot && typeof hot.snapshot === 'function') {
+    try { hot.snapshot(() => ({ state: app.screen === 'game' ? app.s : null })); } catch (e) { /* 預覽環境以外沒有這個功能 */ }
+  }
+  if (hot && typeof hot.ready === 'function') hot.ready(start);
+  else start((hot && hot.data) || {});
+
+  // 提供給自動化測試的唯讀窺視口（不影響遊戲）
+  window.__stargazer = { get state() { return app.s; }, get screen() { return app.screen; } };
+}());
+</script>

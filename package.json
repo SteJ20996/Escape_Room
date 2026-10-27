@@ -1,0 +1,14 @@
+{
+  "name": "stargazers-house",
+  "version": "1.0.0",
+  "description": "觀星者之屋：瀏覽器密室逃脫遊戲（五個房間、十一道謎題、五種結局）",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node tools/build.js",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "node tools/build.js && node tests/e2e.js && node tests/e2e.js dist/stargazer.html",
+    "solve": "node tests/solver.js"
+  },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- build:head -->
+<title>觀星者之屋</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="瀏覽器密室逃脫：在亡師的老宅裡找回日、月、星三枚徽章，揭開一顆彗星的真名。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Serif+TC:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<!-- /build:head -->
+</head>
+<body>
+<!-- build:body -->
+<div id="title" class="screen">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="title-card">
+    <p class="title-eyebrow">密室逃脫</p>
+    <h1 class="title-main">觀星者之屋</h1>
+    <p class="title-sub">最後的觀測</p>
+    <div class="title-menu">
+      <button class="btn primary" id="btn-new" type="button">新遊戲</button>
+      <button class="btn" id="btn-continue" type="button">繼續遊戲</button>
+      <button class="btn" id="btn-load" type="button">讀取存檔</button>
+      <button class="btn" id="btn-gallery" type="button">結局圖鑑</button>
+      <button class="btn" id="btn-help" type="button">遊戲說明</button>
+    </div>
+    <p class="title-foot" id="title-foot">五個房間・十一道謎題・五種結局</p>
+  </div>
+</div>
+
+<div id="intro" class="screen" hidden>
+  <div class="intro-card">
+    <div class="intro-text" id="intro-text" aria-live="polite"></div>
+    <div class="row">
+      <button class="btn primary" id="btn-intro-next" type="button">繼續</button>
+      <button class="btn ghost small" id="btn-intro-skip" type="button">跳過開場</button>
+    </div>
+  </div>
+</div>
+
+<div id="game" class="screen" hidden>
+  <div class="app">
+    <header class="topbar">
+      <span class="brand">觀星者之屋</span>
+      <span class="room-name" id="room-name" aria-live="polite"></span>
+      <span class="progress" id="progress" aria-label="徽章進度"></span>
+      <span class="chip" id="chip-pages"></span>
+      <span class="chip" id="chip-plate" hidden>玻璃底片</span>
+      <span class="chip" id="chip-time" title="遊戲時間"></span>
+      <span class="spacer"></span>
+      <div class="row">
+        <button class="btn small" id="btn-hints" type="button">提示</button>
+        <button class="btn small" id="btn-notes" type="button">線索筆記</button>
+        <button class="btn small" id="btn-save" type="button">存檔</button>
+        <button class="btn small" id="btn-menu" type="button">選單</button>
+      </div>
+    </header>
+    <div class="stage">
+      <div class="main-col">
+        <div class="scene-wrap">
+          <div id="scene"></div>
+          <div class="scene-tip" id="scene-tip" hidden></div>
+        </div>
+        <div class="narration" id="narration" aria-live="polite"></div>
+        <div class="objects" id="objects" aria-label="這個房間裡可以互動的東西"></div>
+        <nav class="nav" id="nav" aria-label="前往其他房間"></nav>
+      </div>
+      <aside class="side-col">
+        <section class="panel" aria-labelledby="inv-h">
+          <h2 id="inv-h">物品</h2>
+          <div class="inv-grid" id="inventory"></div>
+          <div class="item-detail" id="item-detail" hidden></div>
+        </section>
+        <section class="panel" aria-labelledby="log-h">
+          <h2 id="log-h">紀錄</h2>
+          <div class="log" id="log"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div id="ending" class="screen" hidden>
+  <div class="ending-card" id="ending-card"></div>
+</div>
+
+<div class="modal-back" id="modal-back" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <button class="btn small ghost" id="modal-back-btn" type="button" hidden>← 返回</button>
+      <h2 id="modal-title"></h2>
+      <button class="btn small" id="modal-close" type="button" aria-label="關閉">關閉</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/art.js"></script>
+<script src="js/ui.js"></script>
+<!-- /build:body -->
+</body>
+</html>

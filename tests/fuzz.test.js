@@ -1,0 +1,150 @@
+'use strict';
+/*
+ * 不化簡的隨機遊走：在「完整」動作空間（所有物品 × 所有熱點、所有物品兩兩組合、所有房間、
+ * 所有謎題的對錯答案、日記裝訂、純顯示機關）裡亂走，然後交給「通關者」從當下狀態一路打到真結局。
+ * 這是對窮舉化簡的獨立交叉驗證：亂走到任何地方，都不應該卡住。
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { G, create, VALVE_SOLUTION } = require('./helpers');
+
+const E = create(G);
+
+// 可重現的亂數
+function rng(seed) {
+  let x = seed >>> 0 || 1;
+  return () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+}
+const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
+
+function allActions(s) {
+  const acts = [];
+  for (const h of E.visibleHotspots(s)) {
+    acts.push(() => E.interact(s, h.id));
+    for (const it of s.inv) acts.push(() => E.useItem(s, it, h.id));
+  }
+  for (const a of s.inv) for (const b of s.inv) acts.push(() => E.combine(s, a, b));
+  for (const r of G.roomOrder) acts.push(() => E.move(s, r));
+  const answers = {
+    drawer: [G.DRAWER_CODE, G.DRAWER_TRAP, '1234'], safe: [G.SAFE_CODE, '999'], trapdoor: [G.TRAPDOOR_CODE, '0000'],
+    pots: G.POTS.map(p => p.id), clock: [G.CLOCK_ANSWER, { h: 2, m: 15 }],
+    valves: [VALVE_SOLUTION, { V1: true }], valves_set: [{ V2: true }, {}],
+    mirrors: [G.MIRROR_SOLUTIONS[0], G.MIRROR_GRID.initial, { A: '\\' }],
+    dome: G.DIRECTIONS.map(d => d.id), dial: [G.DIAL_ANSWER, G.DIAL_ANSWER.slice().reverse()],
+    develop: [G.DEVELOP_ANSWER, ['red', 'blue', 'yellow', 'white']],
+    phone: ['refuse'], // 接受交易會直接結束遊戲，不在亂走範圍內
+    exit: [],          // 離開也會結束遊戲
+  };
+  for (const pid of Object.keys(G.puzzles)) for (const a of answers[pid]) acts.push(() => E.submit(s, pid, a));
+  return acts;
+}
+
+// 通關者：從任意狀態出發，依序完成尚未完成的步驟，直到真結局。
+const F = (s, k) => !!s.flags[k];
+const has = (s, id) => s.inv.includes(id);
+const STEPS = [
+  [s => !F(s, 'coatSearched'), 'foyer', s => E.interact(s, 'f_coat')],
+  [s => !F(s, 'drawerOpen'), 'study', s => E.submit(s, 'drawer', G.DRAWER_CODE)],
+  [s => has(s, 'flashlight_dead') && has(s, 'battery'), null, s => E.combine(s, 'flashlight_dead', 'battery')],
+  [s => !F(s, 'gridTaken'), 'study', s => E.interact(s, 's_desk')],
+  [s => !F(s, 'paintingMoved'), 'study', s => E.interact(s, 's_painting')],
+  [s => !F(s, 'wasteSearched'), 'study', s => E.interact(s, 's_waste')],
+  [s => !F(s, 'chimneySearched') && has(s, 'flashlight'), 'study', s => E.useItem(s, 'flashlight', 's_fireplace')],
+  [s => has(s, 'greenhouse_key'), 'foyer', s => E.useItem(s, 'greenhouse_key', 'f_gh_door')],
+  [s => !F(s, 'trowelTaken'), 'greenhouse', s => E.interact(s, 'g_tools')],
+  [s => !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.POT_ANSWER)],
+  [s => !F(s, 'lightOk'), 'greenhouse', s => E.submit(s, 'mirrors', G.MIRROR_SOLUTIONS[0])],
+  [s => !F(s, 'trapdoorFound') && has(s, 'flashlight'), 'greenhouse', s => E.useItem(s, 'flashlight', 'g_bench')],
+  [s => has(s, 'brass_key'), 'foyer', s => E.useItem(s, 'brass_key', 'f_gate')],
+  [s => !F(s, 'eyepieceFound') && has(s, 'flashlight'), 'observatory', s => E.useItem(s, 'flashlight', 'o_under')],
+  [s => has(s, 'eyepiece'), 'observatory', s => E.useItem(s, 'eyepiece', 'o_telescope')],
+  [s => F(s, 'eyepieceInstalled') && !F(s, 'starDialSolved'), 'observatory', s => E.submit(s, 'dial', G.DIAL_ANSWER)],
+  [s => !F(s, 'transparencyTaken'), 'observatory', s => E.interact(s, 'o_cabinet')],
+  [s => !F(s, 'logBookmark'), 'observatory', s => E.interact(s, 'o_log')],
+  [s => !F(s, 'bulbTaken'), 'observatory', s => E.interact(s, 'o_lamp')],
+  [s => has(s, 'grid_paper') && has(s, 'transparency'), null, s => E.combine(s, 'grid_paper', 'transparency')],
+  [s => has(s, 'note_left') && has(s, 'note_right'), null, s => E.combine(s, 'note_left', 'note_right')],
+  [s => !F(s, 'clockSolved'), 'foyer', s => E.submit(s, 'clock', G.CLOCK_ANSWER)],
+  [s => has(s, 'overlay') && !F(s, 'safeOpen'), 'study', s => E.submit(s, 'safe', G.SAFE_CODE)],
+  [s => has(s, 'valve_wheel'), 'greenhouse', s => E.useItem(s, 'valve_wheel', 'g_valves')],
+  [s => F(s, 'wheelInstalled') && !F(s, 'waterOk'), 'greenhouse', s => E.submit(s, 'valves', VALVE_SOLUTION)],
+  [s => F(s, 'waterOk') && F(s, 'lightOk') && !F(s, 'moonTaken'), 'greenhouse', s => E.interact(s, 'g_moonflower')],
+  [s => F(s, 'trapdoorFound') && !F(s, 'trapdoorOpen'), 'greenhouse', s => E.submit(s, 'trapdoor', G.TRAPDOOR_CODE)],
+  [s => has(s, 'red_bulb') && F(s, 'trapdoorOpen'), 'darkroom', s => E.useItem(s, 'red_bulb', 'd_socket')],
+  [s => F(s, 'darkroomLit') && !F(s, 'p4Taken'), 'darkroom', s => E.interact(s, 'd_line')],
+  [s => F(s, 'darkroomLit') && !F(s, 'plateDeveloped'), 'darkroom', s => E.submit(s, 'develop', G.DEVELOP_ANSWER)],
+  ...G.EMBLEMS.map(e => [s => has(s, e), 'foyer', s => E.useItem(s, e, 'f_door')]),
+  [s => F(s, 'phoneRinging'), 'foyer', s => E.submit(s, 'phone', 'refuse')],
+  [s => G.allInserted(s) && has(s, 'plate') && G.countPages(s) === 4, 'foyer', s => E.submit(s, 'exit', 'publish')],
+];
+
+function finish(s) {
+  for (let guard = 0; guard < 200 && !s.ending; guard++) {
+    const step = STEPS.find(([cond]) => cond(s));
+    if (!step) return { ok: false, why: '沒有可執行的下一步', s };
+    const [, room, act] = step;
+    if (room && s.room !== room) {
+      const m = E.move(s, room);
+      if (!m.ok) return { ok: false, why: '進不去 ' + room, s };
+      continue; // 進入門廳可能讓電話響起，重新評估
+    }
+    const r = act(s);
+    if (!r.ok) return { ok: false, why: r.messages.map(m => m.text).join(' / '), s };
+  }
+  return { ok: s.ending === 'B', why: '結局：' + s.ending, s };
+}
+
+test('從新遊戲直接交給通關者，會走到真結局 B', () => {
+  const r = finish(E.newState());
+  assert.ok(r.ok, r.why);
+});
+
+test('隨機亂走 400 次（每次最多 250 步）後，通關者都能打到真結局 B，且過程沒有任何例外', () => {
+  let totalSteps = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    const r = rng(seed * 7919);
+    const s = E.newState();
+    const len = 1 + Math.floor(r() * 250);
+    for (let i = 0; i < len; i++) {
+      const acts = allActions(s);
+      let res;
+      try { res = pick(r, acts)(); } catch (e) { assert.fail(`種子 ${seed} 第 ${i} 步拋出例外：${e.stack}`); }
+      assert.ok(res && Array.isArray(res.messages), '回傳格式錯誤');
+      const errs = E.validate(s);
+      assert.deepEqual(errs, [], `種子 ${seed} 第 ${i} 步後狀態不合法`);
+      totalSteps++;
+    }
+    const done = finish(s);
+    assert.ok(done.ok, `種子 ${seed}：亂走 ${len} 步後無法通關（${done.why}）\n物品：${s.inv}\n旗標：${JSON.stringify(s.flags)}`);
+  }
+  assert.ok(totalSteps > 20000);
+});
+
+test('日記裝訂：任何殘頁組合、任何裝訂順序都不會遺失頁面', () => {
+  const pages = G.PAGES;
+  for (let mask = 1; mask < 16; mask++) {
+    const held = pages.filter((_, i) => mask & (1 << i));
+    // 嘗試所有裝訂順序（排列）
+    const perms = held.length <= 1 ? [held] : permute(held);
+    for (const order of perms) {
+      const s = E.newState();
+      s.inv.push(...held);
+      for (let i = 1; i < order.length; i++) {
+        const a = i === 1 ? order[0] : 'diary';
+        const r = E.combine(s, a, order[i]);
+        assert.ok(r.ok, r.messages.map(m => m.text).join());
+      }
+      assert.equal(G.countPages(s), held.length);
+      if (held.length >= 2) {
+        assert.deepEqual(s.flags.diaryPages, pages.filter(p => held.includes(p)), '裝訂後應按日期排序');
+        assert.ok(s.inv.includes('diary'));
+        assert.equal(E.itemName(s, 'diary'), `陸觀的日記（${held.length}/4）`);
+      }
+    }
+  }
+});
+
+function permute(arr) {
+  if (arr.length <= 1) return [arr];
+  return arr.flatMap((x, i) => permute(arr.filter((_, j) => j !== i)).map(p => [x, ...p]));
+}

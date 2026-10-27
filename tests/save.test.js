@@ -125,3 +125,20 @@ test('不存在的難度、或新手存檔裡出現資深房間，都會被拒�
   assert.deepEqual(Object.keys(c.puz.mirrors).length, 16);
   assert.deepEqual(E.validate(c), []);
 });
+
+test('資深模式的花盆紀錄：挖錯一、兩盆可以存讀；失敗只能伴隨三盆；新手存檔不會有花盆紀錄', () => {
+  const v = () => E.newState('veteran');
+  const a = v(); a.flags.potsDug = ['mint', 'rose'];
+  assert.deepEqual(load(a).errs, [], '挖錯兩盆的資深存檔是合法的');
+  const bad = [
+    Object.assign(v(), { flags: { potsDug: ['mint', 'rose', 'basil'] } }),        // 三盆卻沒有失敗
+    Object.assign(v(), { ending: 'F' }),                                          // 失敗卻沒有挖錯紀錄
+    Object.assign(v(), { flags: { potsDug: ['mint', 'mint'] } }),                // 重複
+    Object.assign(v(), { flags: { potsDug: [G.POT_ANSWER_V] } }),                // 答案那一盆不可能「挖錯」
+    Object.assign(v(), { flags: { potsDug: 'mint' } }),                           // 型別錯誤
+    Object.assign(E.newState('novice'), { flags: { potsDug: ['mint'] } }),        // 新手沒有次數限制
+  ];
+  for (const st of bad) assert.ok(load(st).errs.length > 0, JSON.stringify(st.flags) + ' ' + st.ending);
+  const f = Object.assign(v(), { ending: 'F', flags: { potsDug: ['mint', 'rose', 'basil'] } });
+  assert.deepEqual(load(f).errs, []);
+});

@@ -186,6 +186,20 @@ test('資深・八盆證詞：周伯說「兩句為真」時答案唯一；不�
   assert.deepEqual(G.POTS_V.map(p => p.n), [1, 2, 3, 4, 5, 6, 7, 8]);
 });
 
+test('資深・花盆木牌：事先寫明三次限制與排列方向；容易有兩種讀法的句子改成編號相差', () => {
+  const sign = G.docs.pots_rule_v.body;
+  // 介面在花盆旁顯示木牌的前三行：排列方向、只有周伯知道句數、挖錯三盆就失敗
+  assert.ok(/排成一排/.test(sign.zh[0]) && /由左到右/.test(sign.zh[0]) && /single row/.test(sign.en[0]) && /left to right/.test(sign.en[0]));
+  assert.ok(/挖錯三盆/.test(sign.zh[2]) && /three wrong pots/i.test(sign.en[2]));
+  assert.equal(G.POT_MISS_LIMIT, 3);
+  // 「至少隔著兩盆」可以讀成相差 2 或相差 3；改成直接比編號，兩種語言都一樣
+  const thyme = G.POTS_V.find(p => p.id === 'thyme');
+  assert.ok(/相差 3 以上/.test(thyme.says.zh) && /differs from mine by 3 or more/.test(thyme.says.en));
+  for (let k = 1; k <= 8; k++) assert.equal(thyme.truth(k), Math.abs(k - 5) >= 3);
+  // 每一句都不再出現「隔著」這種要數中間幾盆的說法
+  assert.ok(G.POTS_V.every(p => !/隔著/.test(p.says.zh) && !/between/.test(p.says.en)));
+});
+
 test('資深・燈號：每個燈號只代表一個字；周伯的回覆解讀為「盆、真、2、句」，與花盆的真話句數一致', () => {
   const codes = Object.keys(G.SIGNAL_CODE);
   assert.equal(new Set(Object.values(G.SIGNAL_CODE)).size, codes.length);

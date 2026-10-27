@@ -347,6 +347,8 @@ textarea.code {
 #ending { display: grid; place-items: center; min-height: 100%; padding-block: 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .ending-card { max-width: 40rem; display: grid; gap: 16px; }
 .ending-rank { color: var(--dim); letter-spacing: .4em; margin: 0; }
+.ending-card.fail .ending-rank { color: var(--bad); }
+.ending-card.fail .ending-title { color: var(--bad); }
 .ending-title { font-size: clamp(2rem, 7vw, 3.2rem); margin: 0; color: var(--brass-hi); letter-spacing: .15em; text-wrap: balance; }
 .ending-text p { margin: 0 0 1em; font-size: 1.08rem; line-height: 2; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
@@ -463,6 +465,10 @@ textarea.code {
 
 /* 八個花盆、八個藥瓶 */
 .pots.eight { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.pot-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 8px 10px 10px; border-bottom: 6px solid #5a3e22; border-radius: 4px; color: var(--dim); font-size: .85rem; }
+.pot-row b { display: grid; place-items: center; width: 30px; height: 26px; border-radius: 0 0 9px 9px; background: #8a5a36; color: #f6ead2; font-size: .9rem; }
+.pot-row b.dug { background: #4a3a2c; color: #9d8e7a; }
+.pot-row span { margin: 0 4px; white-space: nowrap; }
 .pots.eight .pot q { font-size: 1rem; }
 .bottles.eight { grid-template-columns: repeat(8, minmax(44px, 72px)); gap: 6px; }
 .bottles.eight .bottle-btn span { font-size: .78rem; }
@@ -853,13 +859,15 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     { id: 'lavender', n: 2, name: L('薰衣草', 'lavender'), says: L('鑰匙不在鼠尾草盆裡。', 'The key is not in the sage pot.'), truth: k => k !== 3 },
     { id: 'sage', n: 3, name: L('鼠尾草', 'sage'), says: L('鑰匙不在我這裡。', 'The key is not in me.'), truth: k => k !== 3 },
     { id: 'mint', n: 4, name: L('薄荷', 'mint'), says: L('鑰匙在我右邊的某一盆。', 'The key is in one of the pots to my right.'), truth: k => k > 4 },
-    { id: 'thyme', n: 5, name: L('百里香', 'thyme'), says: L('鑰匙和我之間，至少隔著兩盆。', 'There are at least two pots between the key and me.'), truth: k => Math.abs(k - 5) >= 3 },
+    { id: 'thyme', n: 5, name: L('百里香', 'thyme'), says: L('鑰匙那一盆的編號，和我的編號相差 3 以上。', 'The number of the key\'s pot differs from mine by 3 or more.'), truth: k => Math.abs(k - 5) >= 3 },
     { id: 'rosemary', n: 6, name: L('迷迭香', 'rosemary'), says: L('鑰匙在架子最左或最右的那一盆。', 'The key is in the pot at the far left or far right of the shelf.'), truth: k => k === 1 || k === 8 },
     { id: 'basil', n: 7, name: L('羅勒', 'basil'), says: L('鑰匙在我左邊的某一盆。', 'The key is in one of the pots to my left.'), truth: k => k < 7 },
     { id: 'chamomile', n: 8, name: L('洋甘菊', 'chamomile'), says: L('鑰匙在左邊四盆之中。', 'The key is in one of the four pots on the left.'), truth: k => k <= 4 },
   ];
   const POT_TRUE_COUNT_V = 2;
   const POT_ANSWER_V = 'sage';
+  // 資深模式：挖錯三盆就失敗（整局作廢）。木牌上事先寫明。
+  const POT_MISS_LIMIT = 3;
 
   // 資深・月光折射：16 面鏡子。只有一條光路照得到月光花（經過其中 13 面），另外 3 面（A、D、G）是干擾。
   const MIRROR_GRID_V = {
@@ -1234,12 +1242,14 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     pots_rule_v: {
       title: L('花盆架上的木牌', 'Wooden Sign on the Pot Shelf'), style: 'plain',
       body: L([
-        '八個花盆裡，只有一個埋著東西。盆身依序漆著編號 1～8。',
+        '八個花盆在架上排成一排，只有一個埋著東西。盆身由左到右漆著編號 1～8。',
         '盆上的八句話是周伯刻的——其中有幾句是真的，只有他知道。',
+        '木牌最下面用紅漆寫著：「挖錯三盆，機關就會把鑰匙沉進水管，再也拿不回來。」',
         ...POTS_V.map(p => `${p.n} 號・${p.name.zh}盆：「${p.says.zh}」`),
       ], [
-        'Only one of these eight pots has something buried in it. The pots are painted with the numbers 1 to 8.',
+        'The eight pots stand in a single row on the shelf, and only one has something buried in it. They are numbered 1 to 8 from left to right.',
         'Old Zhou carved the eight sayings on the pots — and only he knows how many of them are true.',
+        'At the bottom of the sign, in red paint: "Dig up three wrong pots and the mechanism will sink the key into the drain, never to be recovered."',
         ...POTS_V.map(p => `No. ${p.n}, ${p.name.en} pot: "${p.says.en}"`),
       ]),
     },
@@ -2209,8 +2219,24 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
           ctx.give('brass_key');
           return true;
         }
+        // 資深模式記下挖過哪幾盆：挖過的盆再挖一次只是確認，不算新的一次
+        const dug = VET(ctx.s) ? (ctx.get('potsDug') || []) : [];
+        if (dug.includes(potId)) { ctx.say(L(`${pot.name.zh}盆你已經挖過了，裡面什麼也沒有。`, `You've already dug up the ${pot.name.en} pot. There's nothing in it.`)); return false; }
         ctx.wrong();
         ctx.say(L(`你挖開${pot.name.zh}盆的土，裡面除了根和泥什麼也沒有。你把土填了回去。`, `You dig through the ${pot.name.en} pot. Nothing but roots and soil. You put the soil back.`), 'bad');
+        if (VET(ctx.s)) {
+          ctx.set('potsDug', dug.concat([potId]));
+          const miss = dug.length + 1;
+          if (miss >= POT_MISS_LIMIT) {
+            ctx.say(L('花架底下「喀啦」一響，接著是一陣水流沖過管子的聲音。', 'Something clacks beneath the shelf, followed by the rush of water through a pipe.'), 'bad');
+            ctx.end('F');
+            return false;
+          }
+          const left = POT_MISS_LIMIT - miss;
+          ctx.say(left === 1
+            ? L('木牌上的紅字在燈下格外刺眼。只剩最後一次機會了。', 'The red letters on the sign glare in the light. You have one chance left.')
+            : L(`木牌上的紅字在燈下格外刺眼。還剩 ${left} 次機會。`, `The red letters on the sign glare in the light. You have ${left} chances left.`), 'bad');
+        }
         return false;
       },
     },
@@ -2580,6 +2606,20 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         'You just never looked up at the stars again.',
       ]),
     },
+    // 失敗（只在資深模式）：挖錯三盆。不算五種結局之一，不記入結局圖鑑，自動存檔清除。
+    F: {
+      fail: true,
+      title: L('沉進水管的鑰匙', 'The Key Down the Drain'), rank: L('失敗', 'Failed'),
+      text: L([
+        '第三盆也是空的。花架底下「喀啦」一響，水流沖過管子，帶走一聲細細的、金屬碰撞的叮噹，愈來愈遠。',
+        '你把剩下的花盆一個個翻過來，什麼也沒有。通往天文台的那把黃銅鑰匙，被陸觀的機關沉進了水管深處。',
+        '天亮時，周伯開門進來，看見滿地翻開的土，嘆了一口氣：「老爺說過，這排花盆只給肯先想清楚的人。」',
+      ], [
+        'The third pot is empty too. Something clacks beneath the shelf; water rushes through a pipe and carries off a faint metallic clink, fainter and fainter.',
+        'You turn the remaining pots over one by one. Nothing. The brass key to the observatory has been sunk deep into the drain by Lu Guan\'s mechanism.',
+        'At dawn, Old Zhou opens the door, sees the soil scattered across the floor, and sighs. "The master always said these pots were only for people who think it through first."',
+      ]),
+    },
   };
   const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D'];
 
@@ -2768,7 +2808,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       id: 'pots_v', mode: 'veteran', stage: 'gate', title: L('八個花盆', 'The Eight Pots'),
       avail: s => seen(s, 'pots_rule_v'), done: s => F(s, 'keyDug'),
       texts: [
-        L('八句話裡有幾句是真的，周伯知道——先想辦法問他。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first. You\'ll need a tool to dig.'),
+        L('八句話裡有幾句是真的，周伯知道——先想辦法問他，別急著挖：挖錯三盆就失敗了。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first, and don\'t dig on a hunch: three wrong pots and it\'s over. You\'ll need a tool to dig.'),
         L('知道真話的句數之後，逐一假設鑰匙在 1～8 號盆，數數每種假設下有幾句成立。', 'Once you know how many are true, suppose the key is in pot 1, 2, … 8 in turn and count how many sayings hold each time.'),
         L('周伯說有兩句是真的。只有鑰匙在 3 號鼠尾草盆時恰好兩句成立（羅勒和洋甘菊那兩句）。挖開鼠尾草盆。', 'Zhou says two are true. Only with the key in pot 3, the sage, are exactly two true (the basil\'s and the chamomile\'s). Dig up the sage pot.'),
       ],
@@ -3011,7 +3051,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
-    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
     BOTTLES_V, BOTTLE_RULES_V, PROCESS_RULES_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
@@ -3275,6 +3315,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const dp = s.flags && s.flags.diaryPages;
       if (dp !== undefined && (!Array.isArray(dp) || dp.some(p => !G.PAGES.includes(p)) || new Set(dp).size !== dp.length)) errs.push(L('日記頁面無效', 'invalid diary pages'));
       if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push(L('物品重複', 'duplicate items'));
+      // 資深模式的花盆：挖錯過的盆（不重複、都不是答案）；挖錯第三盆就是失敗結局 F
+      const pd = s.flags && s.flags.potsDug;
+      if (pd !== undefined && (s.mode !== 'veteran' || !Array.isArray(pd) || !pd.length || pd.length > G.POT_MISS_LIMIT || new Set(pd).size !== pd.length
+        || pd.some(id => id === G.POT_ANSWER_V || !G.POTS_V.some(p => p.id === id)) || (pd.length === G.POT_MISS_LIMIT) !== (s.ending === 'F'))) errs.push(L('花盆紀錄無效', 'invalid pot record'));
+      if (s.ending === 'F' && !(Array.isArray(pd) && pd.length === G.POT_MISS_LIMIT)) errs.push(L('結局無效', 'invalid ending'));
       if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push(L('所在房間尚未解鎖', 'current room is not unlocked yet'));
       return errs;
     }
@@ -3471,7 +3516,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     modeNovice: L('新手', 'Novice'),
     modeVeteran: L('資深', 'Veteran'),
     modeNoviceDesc: L('五個房間、十一道謎題。答錯時會告訴你哪裡不對，提示隨時可用。第一次來建議選這個。', 'Five rooms and eleven puzzles. Wrong answers tell you what went wrong, and hints are always there. Recommended for a first visit.'),
-    modeVeteranDesc: L('七個房間、十五道謎題：多了閣樓、儲物間和兩位新角色；花盆與藥瓶各八個，反光鏡十六面。答錯只會說「不對」，看不到光路，提示從第二階段起才開放。', 'Seven rooms and fifteen puzzles: an attic, a storeroom and two more characters; eight pots, eight bottles and sixteen mirrors. Wrong answers only say "not right", you can\'t watch the light, and hints only open from the second stage.'),
+    modeVeteranDesc: L('七個房間、十五道謎題：多了閣樓、儲物間和兩位新角色；花盆與藥瓶各八個，反光鏡十六面。答錯只會說「不對」，看不到光路，提示從第二階段起才開放。八個花盆挖錯三盆就失敗，整局作廢。', 'Seven rooms and fifteen puzzles: an attic, a storeroom and two more characters; eight pots, eight bottles and sixteen mirrors. Wrong answers only say "not right", you can\'t watch the light, and hints only open from the second stage. Dig up three wrong pots and the game is lost.'),
     modeStart: L('以「{mode}」開始', 'Start as {mode}'),
     tutorialToggle: L('顯示操作教學（隨時可以跳過）', 'Show the tutorial (you can skip it any time)'),
     modeChip: L('難度：{mode}', 'Difficulty: {mode}'),
@@ -3597,6 +3642,15 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     openCabinet: L('看種子櫃的鎖', 'Look at the cabinet lock'),
     readWeightBox: L('看砝碼盒', 'Look at the weight box'),
     balanceEmpty: L('全部拿下來', 'Clear both pans'),
+    potsChances: L('剩下的機會：{n}／{total}。挖錯三盆就失敗，整局作廢。', 'Chances left: {n} of {total}. Three wrong pots and the game is lost.'),
+    potsLastChance: L('只剩最後一次機會。再挖錯一盆，這一局就失敗了。', 'This is your last chance. One more wrong pot and the game is lost.'),
+    potConfirm: L('這是最後一次機會。確定要挖{pot}盆嗎？', 'This is your last chance. Dig up the {pot} pot?'),
+    potConfirmYes: L('確定，挖', 'Yes, dig'),
+    potDug: L('挖過了，是空的', 'Dug — empty'),
+    potsLeftEnd: L('← 左', '← Left'),
+    potsRightEnd: L('右 →', 'Right →'),
+    potsRowLabel: L('花架上的八盆由左到右是 1 到 8 號，排成一排', 'The eight pots stand in one row on the shelf, numbered 1 to 8 from left to right'),
+    failLead: L('這一局失敗了，自動存檔已經清除。開一局新遊戲，或從你的手動存檔再試一次。', 'This game is lost, and the autosave has been cleared. Start a new game, or try again from one of your manual saves.'),
     balanceReadNone: L('兩個盤子都是空的。', 'Both pans are empty.'),
     balanceReadL: L('左盤沉了下去。', 'The left pan sinks.'),
     balanceReadR: L('右盤沉了下去。', 'The right pan sinks.'),
@@ -3735,7 +3789,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ['使用物品', '在右邊的物品欄點一下物品（拿在手上），再點場景裡的物件。'],
       ['組合線索', '點選物品後按「組合…」，再點另一個物品。撕開的紙、疊在一起的圖、裝電池……很多線索要合在一起才看得懂。'],
       ['線索筆記', '讀過的文件會自動記下，隨時能重讀。'],
-      ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示。'],
+      ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗，整局作廢（手動存檔不受影響）。'],
       ['提示', '右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來。每個目標分三段，從方向到答案。'],
       ['存檔', '每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。'],
       ['公平原則', '所有謎題的答案都在屋子裡，不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死。'],
@@ -3747,7 +3801,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ['Use items', 'Click an item in your inventory to hold it, then click something in the scene.'],
       ['Combine clues', 'Select an item, press "Combine…", then click another item. Torn paper, overlapping charts, batteries… many clues only make sense together.'],
       ['Notebook', 'Every document you read is recorded automatically so you can reread it.'],
-      ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", and there are no hints in the first stage.'],
+      ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game (your manual saves are kept).'],
       ['Hints', 'Hints, at the top right, shows your current stage goal and lights up whenever you finish a stage. Each goal has three steps, from a nudge to the answer.'],
       ['Saving', 'The game autosaves after every action. You can also save to three slots, or copy a save code to carry your progress elsewhere.'],
       ['Fair play', 'Every answer is inside the house — no outside knowledge needed. Wrong answers are never punished and can never leave you stuck.'],
@@ -5138,7 +5192,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     modeTut: null,
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null };
   }
 
   /* ================= 畫面切換 ================= */
@@ -5757,13 +5811,34 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const trowel = app.s.inv.includes('trowel');
       const vet = app.s.mode === 'veteran';
       const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'];
+      const head = vet ? 3 : 2; // 資深模式多一行：挖錯三盆就失敗
+      // 資深模式：剩下幾次機會；最後一次要再確認一次，避免手滑
+      const dug = app.s.flags.potsDug || [];
+      const left = G.POT_MISS_LIMIT - dug.length;
+      const confirm = vet && app.ui.potConfirm;
+      const potName = id => cap(tr(G.variant(app.s).pots.find(p => p.id === id).name));
       return {
         title: T('potsTitle'),
-        html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, 2), en: rule.body.en.slice(0, 2) } }) +
+        html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, head), en: rule.body.en.slice(0, head) } }) +
+          (vet ? `<p class="notice ${left === 1 ? 'warn' : ''}" role="status">${tx(left === 1 ? 'potsLastChance' : 'potsChances', { n: left, total: G.POT_MISS_LIMIT })}</p>` : '') +
+          (confirm ? `<div class="confirm"><p style="margin:0">${tx('potConfirm', { pot: potName(confirm) })}</p>
+            <div class="row"><button class="btn danger" type="button" data-act="dig-yes">${tx('potConfirmYes')}</button><button class="btn" type="button" data-act="dig-no" data-autofocus>${tx('thinkAgain')}</button></div></div>` : '') +
+          // 花架示意：八盆其實排成一排，下面的卡片只是換行排列
+          (vet ? `<div class="pot-row" role="img" aria-label="${esc(T('potsRowLabel'))}"><span>${tx('potsLeftEnd')}</span>${G.POTS_V.map(p => `<b class="${dug.includes(p.id) ? 'dug' : ''}">${p.n}</b>`).join('')}<span>${tx('potsRightEnd')}</span></div>` : '') +
           `<div class="pots ${vet ? 'eight' : ''}">${G.variant(app.s).pots.map(p => `<div class="pot pot-${p.id}"><h3>${vet ? tx('potNum', { n: p.n, name: cap(tr(p.name)) }) : tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
-            <button class="btn small" type="button" data-pot="${p.id}">${tx('digHere')}</button></div>`).join('')}</div>
+            <button class="btn small" type="button" data-pot="${p.id}" ${confirm || dug.includes(p.id) ? 'disabled' : ''}>${tx(dug.includes(p.id) ? 'potDug' : 'digHere')}</button></div>`).join('')}</div>
           ${trowel ? '' : `<p class="notice">${tx('needTool')}</p>`}${fb()}`,
-        bind(root) { root.querySelectorAll('[data-pot]').forEach(b => { b.onclick = () => submit('pots', b.dataset.pot); }); },
+        bind(root) {
+          root.querySelectorAll('[data-pot]').forEach(b => {
+            b.onclick = () => {
+              if (vet && trowel && left === 1) { app.ui.potConfirm = b.dataset.pot; app.ui.feedback = []; renderModal(); return; }
+              submit('pots', b.dataset.pot);
+            };
+          });
+          const yes = root.querySelector('[data-act=dig-yes]'), no = root.querySelector('[data-act=dig-no]');
+          if (yes) yes.onclick = () => { const id = app.ui.potConfirm; app.ui.potConfirm = null; submit('pots', id); };
+          if (no) no.onclick = () => { app.ui.potConfirm = null; renderModal(); };
+        },
       };
     },
 
@@ -6268,7 +6343,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
   /* ================= 結局 ================= */
   function finishGame(id) {
-    Store.addEnding(id, app.s.mode);
+    // 失敗不算結局、不進圖鑑；整局作廢（自動存檔與結局前存檔一併清除）
+    if (G.endings[id].fail) Store.remove('preend'); else Store.addEnding(id, app.s.mode);
     app.tut = null; $('tutorial').hidden = true;
     Store.remove('auto');
     app.stack = []; renderModal();
@@ -6285,14 +6361,15 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       [fmtTime(s.stats.playMs), 'statTime'], [s.stats.actions, 'statActions'], [s.stats.wrong, 'statWrong'],
       [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice'), 'statMode'],
     ];
+    $('ending-card').classList.toggle('fail', !!e.fail);
     $('ending-card').innerHTML = `
       <p class="ending-rank">${esc(tr(e.rank))}</p>
       <h1 class="ending-title">${esc(tr(e.title))}</h1>
       <div class="ending-text">${tr(G.endingText(e, s.mode)).map(t => `<p>${esc(t)}</p>`).join('')}</div>
       <div class="stats">${stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${tx(l)}</span></div>`).join('')}</div>
-      <p class="lead">${tx('endUnlocked', { n: got.length, total: G.ENDING_ORDER.length })}${tx(got.length < G.ENDING_ORDER.length ? 'endMore' : 'endAll')}</p>
+      <p class="lead">${e.fail ? tx('failLead') : tx('endUnlocked', { n: got.length, total: G.ENDING_ORDER.length }) + tx(got.length < G.ENDING_ORDER.length ? 'endMore' : 'endAll')}</p>
       <div class="row">
-        ${Store.read('preend') ? `<button class="btn primary" type="button" id="btn-preend">${tx('backBefore')}</button>` : ''}
+        ${!e.fail && Store.read('preend') ? `<button class="btn primary" type="button" id="btn-preend">${tx('backBefore')}</button>` : ''}
         <button class="btn" type="button" id="btn-end-gallery">${tx('galleryTitle')}</button>
         <button class="btn" type="button" id="btn-end-title">${tx('titleScreen')}</button>
         ${langSwitch()}

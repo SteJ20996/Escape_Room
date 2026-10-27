@@ -240,13 +240,15 @@
     { id: 'lavender', n: 2, name: L('薰衣草', 'lavender'), says: L('鑰匙不在鼠尾草盆裡。', 'The key is not in the sage pot.'), truth: k => k !== 3 },
     { id: 'sage', n: 3, name: L('鼠尾草', 'sage'), says: L('鑰匙不在我這裡。', 'The key is not in me.'), truth: k => k !== 3 },
     { id: 'mint', n: 4, name: L('薄荷', 'mint'), says: L('鑰匙在我右邊的某一盆。', 'The key is in one of the pots to my right.'), truth: k => k > 4 },
-    { id: 'thyme', n: 5, name: L('百里香', 'thyme'), says: L('鑰匙和我之間，至少隔著兩盆。', 'There are at least two pots between the key and me.'), truth: k => Math.abs(k - 5) >= 3 },
+    { id: 'thyme', n: 5, name: L('百里香', 'thyme'), says: L('鑰匙那一盆的編號，和我的編號相差 3 以上。', 'The number of the key\'s pot differs from mine by 3 or more.'), truth: k => Math.abs(k - 5) >= 3 },
     { id: 'rosemary', n: 6, name: L('迷迭香', 'rosemary'), says: L('鑰匙在架子最左或最右的那一盆。', 'The key is in the pot at the far left or far right of the shelf.'), truth: k => k === 1 || k === 8 },
     { id: 'basil', n: 7, name: L('羅勒', 'basil'), says: L('鑰匙在我左邊的某一盆。', 'The key is in one of the pots to my left.'), truth: k => k < 7 },
     { id: 'chamomile', n: 8, name: L('洋甘菊', 'chamomile'), says: L('鑰匙在左邊四盆之中。', 'The key is in one of the four pots on the left.'), truth: k => k <= 4 },
   ];
   const POT_TRUE_COUNT_V = 2;
   const POT_ANSWER_V = 'sage';
+  // 資深模式：挖錯三盆就失敗（整局作廢）。木牌上事先寫明。
+  const POT_MISS_LIMIT = 3;
 
   // 資深・月光折射：16 面鏡子。只有一條光路照得到月光花（經過其中 13 面），另外 3 面（A、D、G）是干擾。
   const MIRROR_GRID_V = {
@@ -621,12 +623,14 @@
     pots_rule_v: {
       title: L('花盆架上的木牌', 'Wooden Sign on the Pot Shelf'), style: 'plain',
       body: L([
-        '八個花盆裡，只有一個埋著東西。盆身依序漆著編號 1～8。',
+        '八個花盆在架上排成一排，只有一個埋著東西。盆身由左到右漆著編號 1～8。',
         '盆上的八句話是周伯刻的——其中有幾句是真的，只有他知道。',
+        '木牌最下面用紅漆寫著：「挖錯三盆，機關就會把鑰匙沉進水管，再也拿不回來。」',
         ...POTS_V.map(p => `${p.n} 號・${p.name.zh}盆：「${p.says.zh}」`),
       ], [
-        'Only one of these eight pots has something buried in it. The pots are painted with the numbers 1 to 8.',
+        'The eight pots stand in a single row on the shelf, and only one has something buried in it. They are numbered 1 to 8 from left to right.',
         'Old Zhou carved the eight sayings on the pots — and only he knows how many of them are true.',
+        'At the bottom of the sign, in red paint: "Dig up three wrong pots and the mechanism will sink the key into the drain, never to be recovered."',
         ...POTS_V.map(p => `No. ${p.n}, ${p.name.en} pot: "${p.says.en}"`),
       ]),
     },
@@ -1596,8 +1600,24 @@
           ctx.give('brass_key');
           return true;
         }
+        // 資深模式記下挖過哪幾盆：挖過的盆再挖一次只是確認，不算新的一次
+        const dug = VET(ctx.s) ? (ctx.get('potsDug') || []) : [];
+        if (dug.includes(potId)) { ctx.say(L(`${pot.name.zh}盆你已經挖過了，裡面什麼也沒有。`, `You've already dug up the ${pot.name.en} pot. There's nothing in it.`)); return false; }
         ctx.wrong();
         ctx.say(L(`你挖開${pot.name.zh}盆的土，裡面除了根和泥什麼也沒有。你把土填了回去。`, `You dig through the ${pot.name.en} pot. Nothing but roots and soil. You put the soil back.`), 'bad');
+        if (VET(ctx.s)) {
+          ctx.set('potsDug', dug.concat([potId]));
+          const miss = dug.length + 1;
+          if (miss >= POT_MISS_LIMIT) {
+            ctx.say(L('花架底下「喀啦」一響，接著是一陣水流沖過管子的聲音。', 'Something clacks beneath the shelf, followed by the rush of water through a pipe.'), 'bad');
+            ctx.end('F');
+            return false;
+          }
+          const left = POT_MISS_LIMIT - miss;
+          ctx.say(left === 1
+            ? L('木牌上的紅字在燈下格外刺眼。只剩最後一次機會了。', 'The red letters on the sign glare in the light. You have one chance left.')
+            : L(`木牌上的紅字在燈下格外刺眼。還剩 ${left} 次機會。`, `The red letters on the sign glare in the light. You have ${left} chances left.`), 'bad');
+        }
         return false;
       },
     },
@@ -1967,6 +1987,20 @@
         'You just never looked up at the stars again.',
       ]),
     },
+    // 失敗（只在資深模式）：挖錯三盆。不算五種結局之一，不記入結局圖鑑，自動存檔清除。
+    F: {
+      fail: true,
+      title: L('沉進水管的鑰匙', 'The Key Down the Drain'), rank: L('失敗', 'Failed'),
+      text: L([
+        '第三盆也是空的。花架底下「喀啦」一響，水流沖過管子，帶走一聲細細的、金屬碰撞的叮噹，愈來愈遠。',
+        '你把剩下的花盆一個個翻過來，什麼也沒有。通往天文台的那把黃銅鑰匙，被陸觀的機關沉進了水管深處。',
+        '天亮時，周伯開門進來，看見滿地翻開的土，嘆了一口氣：「老爺說過，這排花盆只給肯先想清楚的人。」',
+      ], [
+        'The third pot is empty too. Something clacks beneath the shelf; water rushes through a pipe and carries off a faint metallic clink, fainter and fainter.',
+        'You turn the remaining pots over one by one. Nothing. The brass key to the observatory has been sunk deep into the drain by Lu Guan\'s mechanism.',
+        'At dawn, Old Zhou opens the door, sees the soil scattered across the floor, and sighs. "The master always said these pots were only for people who think it through first."',
+      ]),
+    },
   };
   const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D'];
 
@@ -2155,7 +2189,7 @@
       id: 'pots_v', mode: 'veteran', stage: 'gate', title: L('八個花盆', 'The Eight Pots'),
       avail: s => seen(s, 'pots_rule_v'), done: s => F(s, 'keyDug'),
       texts: [
-        L('八句話裡有幾句是真的，周伯知道——先想辦法問他。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first. You\'ll need a tool to dig.'),
+        L('八句話裡有幾句是真的，周伯知道——先想辦法問他，別急著挖：挖錯三盆就失敗了。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first, and don\'t dig on a hunch: three wrong pots and it\'s over. You\'ll need a tool to dig.'),
         L('知道真話的句數之後，逐一假設鑰匙在 1～8 號盆，數數每種假設下有幾句成立。', 'Once you know how many are true, suppose the key is in pot 1, 2, … 8 in turn and count how many sayings hold each time.'),
         L('周伯說有兩句是真的。只有鑰匙在 3 號鼠尾草盆時恰好兩句成立（羅勒和洋甘菊那兩句）。挖開鼠尾草盆。', 'Zhou says two are true. Only with the key in pot 3, the sage, are exactly two true (the basil\'s and the chamomile\'s). Dig up the sage pot.'),
       ],
@@ -2398,7 +2432,7 @@
     NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
-    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
     BOTTLES_V, BOTTLE_RULES_V, PROCESS_RULES_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,

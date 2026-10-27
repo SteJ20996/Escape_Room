@@ -298,3 +298,53 @@ test('［資深］反光鏡：調整角度本身不會解開；要拉開天窗�
   assert.equal(P.solve('skylight', G.MIRROR_SOLUTION_V).solved, true);
   assert.ok(P.s.flags.lightOk);
 });
+
+test('［資深］花盆：挖錯一、兩盆仍可挖對；挖錯第三盆就失敗（F），之後所有動作都被拒絕', () => {
+  const setup = () => {
+    const P = vet();
+    P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+    P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_pots');
+    return P;
+  };
+  const misses = P => (P.s.flags.potsDug || []).length;
+  // 挖錯兩盆之後挖對：照常拿到鑰匙
+  let P = setup();
+  P.E.submit(P.s, 'pots', 'mint'); P.E.submit(P.s, 'pots', 'rose');
+  assert.equal(misses(P), 2);
+  const ok = P.solve('pots', G.POT_ANSWER_V);
+  assert.ok(ok.solved && P.has('brass_key'));
+  assert.deepEqual(P.E.validate(P.s), []);
+  // 挖錯第三盆：失敗
+  P = setup();
+  const msgs = ['mint', 'rose', 'basil'].map(pot => P.E.submit(P.s, 'pots', pot));
+  assert.ok(/還剩 2 次機會/.test(msgs[0].messages.map(txt).join()), '挖錯第一盆：還剩 2 次');
+  assert.ok(/最後一次機會/.test(msgs[1].messages.map(txt).join()), '挖錯第二盆：最後一次');
+  assert.equal(msgs[0].ending, null); assert.equal(msgs[1].ending, null);
+  assert.equal(msgs[2].ending, 'F');
+  assert.equal(P.s.ending, 'F');
+  assert.ok(G.endings.F.fail && !G.ENDING_ORDER.includes('F'), '失敗不算五種結局之一');
+  assert.deepEqual(P.E.validate(P.s), []);
+  for (const r of [P.E.submit(P.s, 'pots', G.POT_ANSWER_V), P.E.interact(P.s, 'g_tools'), P.E.move(P.s, 'foyer')]) assert.equal(r.ok, false);
+  // 同一盆再挖一次只是確認是空的，不算新的一盆，也不算錯誤嘗試
+  P = setup();
+  P.E.submit(P.s, 'pots', 'mint');
+  const wrong = P.s.stats.wrong;
+  for (let i = 0; i < 5; i++) assert.equal(P.E.submit(P.s, 'pots', 'mint').ending, null);
+  assert.equal(misses(P), 1);
+  assert.equal(P.s.stats.wrong, wrong);
+  // 沒有鏟子時挖不動，不算挖錯
+  const Q = vet();
+  Q.look('f_coat'); Q.go('study'); Q.solve('drawer', G.DRAWER_CODE); Q.go('foyer'); Q.use('greenhouse_key', 'f_gh_door'); Q.look('f_gh_door');
+  for (let i = 0; i < 5; i++) Q.E.submit(Q.s, 'pots', 'mint');
+  assert.equal(Q.s.flags.potsDug, undefined);
+  assert.equal(Q.s.ending, null);
+});
+
+test('［新手］花盆沒有次數限制，也不會失敗', () => {
+  const P = makeGame('novice');
+  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE);
+  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_pots');
+  for (const pot of ['mint', 'lavender', 'sage', 'mint']) assert.equal(P.E.submit(P.s, 'pots', pot).ending, null);
+  assert.equal(P.s.flags.potsDug, undefined);
+  assert.ok(P.solve('pots', G.POT_ANSWER).solved);
+});

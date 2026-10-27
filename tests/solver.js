@@ -26,8 +26,9 @@ function fastClone(s) {
 }
 
 function canonical(s) {
-  // 邏輯狀態＝物品（不計順序）＋為真的旗標＋結局；房間、機關角度、統計都不算
-  const keys = Object.keys(s.flags).filter(k => s.flags[k]).sort();
+  // 邏輯狀態＝物品（不計順序）＋為真的旗標＋結局；房間、機關角度、統計都不算。
+  // 挖錯過哪幾盆（potsDug）只有花盆謎題會讀；挖到鑰匙之後花盆就關閉了，這項紀錄不再影響任何事，所以不計入
+  const keys = Object.keys(s.flags).filter(k => s.flags[k] && !(k === 'potsDug' && s.flags.keyDug)).sort();
   let f = '';
   for (const k of keys) { const v = s.flags[k]; f += k + (v === true ? '' : '=' + (Array.isArray(v) ? v.join('+') : v)) + ','; }
   return s.inv.slice().sort().join(',') + '|' + f + '|' + (s.ending || '');
@@ -65,8 +66,9 @@ function wrongAnswers(pid, mode = 'novice') {
     case 'drawer': return [G.DRAWER_TRAP, '0000', '', null, '37519'];
     case 'safe': return ['274', '000', 'abc'];
     case 'trapdoor': return ['0812', '9999'];
+    // 資深模式挖錯會累積次數（第三次失敗），屬於有效果的動作，另外在 stateActions 裡窮舉；這裡只留不存在的花盆
     case 'pots': return mode === 'veteran'
-      ? G.POTS_V.map(p => p.id).filter(id => id !== G.POT_ANSWER_V).concat(['rose', 'nope'])
+      ? ['nope', 'lotus']
       : G.POTS.map(p => p.id).filter(id => id !== G.POT_ANSWER).concat(['nope']);
     case 'clock': return [{ h: 2, m: 15 }, { h: 15, m: 15 }, { h: 3, m: 0 }, null];
     case 'valves': return [{ V1: true, V2: true, V3: true, V4: true, V5: true }, {}, null];
@@ -155,6 +157,12 @@ function stateActions(s) {
     if (isCosmetic(pid, s.mode) || !G.puzzles[pid].available(s)) continue;
     for (const a of correctAnswers(pid, s.mode)) acts.push({ t: 'submit', p: pid, a });
   }
+  // 資深模式挖錯一盆：哪一盆錯的效果都一樣（挖錯的盆 +1，第三盆失敗），取還沒挖過的第一盆當代表
+  if (s.mode === 'veteran' && G.puzzles.pots.available(s) && s.inv.includes('trowel')) {
+    const dug = s.flags.potsDug || [];
+    const next = G.POTS_V.find(p => p.id !== G.POT_ANSWER_V && !dug.includes(p.id));
+    if (next) acts.push({ t: 'submit', p: 'pots', a: next.id, miss: true });
+  }
   return acts;
 }
 
@@ -228,7 +236,7 @@ function explore(opts = {}) {
         }
         const j = addClosed(n);
         // 邊上標記「解開了哪個謎題」，公平性檢查會用到
-        if (j !== i) edges[i].push([j, a.t === 'submit' ? a.p : null]);
+        if (j !== i) edges[i].push([j, a.t === 'submit' && !a.miss ? a.p : null]);
       }
     }
   }

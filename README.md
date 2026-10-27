@@ -4,7 +4,7 @@
 
 - **兩種難度**：
   - **新手**：5 個相互關聯的房間（門廳、書房、溫室、天文台，以及一間隱藏的暗房）、11 道類型各異的謎題（主線必經 8 道）；答錯時會告訴你哪裡不對
-  - **資深**：再加上閣樓與屋子邊緣的儲物間、兩位新角色（園丁周伯、陸觀的女兒陸晴）、4 道新謎題（天平、對山谷打燈號、相框牆、音樂盒），花盆與藥瓶各升級為八個、反光鏡升級為十六面且平常看不見光路；答錯只說「不對」，第一階段沒有提示
+  - **資深**：再加上閣樓與屋子邊緣的儲物間、兩位新角色（園丁周伯、陸觀的女兒陸晴）、4 道新謎題（天平、對山谷打燈號、相框牆、音樂盒），花盆與藥瓶各升級為八個、反光鏡升級為十六面且平常看不見光路；答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗、整局作廢
 - 全部謎題只靠遊戲內線索就能推理
 - **物品收集與線索組合**：撕開的便條、疊合的星圖、裝上電池的手電筒、裝訂成冊的日記
 - **5 種結局**，取決於你找到了什麼、又做了什麼選擇
@@ -55,7 +55,7 @@ docs/TEST_REPORT.md 測試報告
 需要 Node.js 18 以上。
 
 ```bash
-npm test            # 邏輯測試 109 項：兩種難度各自的謎題唯一解、五個結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示、雙語完整性（約 4 分鐘）
+npm test            # 邏輯測試 114 項：兩種難度各自的謎題唯一解、五個結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示、雙語完整性（約 4 分鐘）
 npm run test:e2e    # 打包後用 Playwright 只透過點擊介面，中文、英文 × 新手、資深，各玩完五個結局（開發版與單檔版各一次，約 10 分鐘）
 npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 ```
@@ -66,7 +66,7 @@ npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 
 *The Stargazer's House* is a complete browser escape room, playable in Chinese or English. Your late teacher, the astronomer Lu Guan, has locked you inside his house on a rainy mountain night: recover the Sun, Moon and Star emblems to open the door — and decide what to do with the twenty-year-old secret of a comet.
 
-- Two difficulties. **Novice**: 5 connected rooms, 11 puzzles (8 on the main path), wrong answers explain what went wrong. **Veteran**: adds the attic and the storeroom on the edge of the house, two new characters (Old Zhou the gardener and Lu Guan's daughter Qing), 4 new puzzles (a balance scale, signalling across the valley, a wall of photo frames, a music box), eight pots, eight bottles and sixteen mirrors whose light you can't see until you open the skylight; wrong answers only say "not right", and there are no hints in the first stage.
+- Two difficulties. **Novice**: 5 connected rooms, 11 puzzles (8 on the main path), wrong answers explain what went wrong. **Veteran**: adds the attic and the storeroom on the edge of the house, two new characters (Old Zhou the gardener and Lu Guan's daughter Qing), 4 new puzzles (a balance scale, signalling across the valley, a wall of photo frames, a music box), eight pots, eight bottles and sixteen mirrors whose light you can't see until you open the skylight; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game.
 - Item combination, 5 endings, autosave + 3 slots + portable save codes, a skippable tutorial, and stage-aware hints that light up when you finish a stage.
 - Every puzzle is solvable from in-game clues alone. Switch language at any time from the title screen, the Menu, or the button at the top right; your progress is kept. Add `?lang=en` to the URL to start in English.
 - Open `index.html` or the single-file `dist/stargazer.html` in any modern browser. No install needed.

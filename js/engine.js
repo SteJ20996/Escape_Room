@@ -254,6 +254,11 @@
       const dp = s.flags && s.flags.diaryPages;
       if (dp !== undefined && (!Array.isArray(dp) || dp.some(p => !G.PAGES.includes(p)) || new Set(dp).size !== dp.length)) errs.push(L('日記頁面無效', 'invalid diary pages'));
       if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push(L('物品重複', 'duplicate items'));
+      // 資深模式的花盆：挖錯過的盆（不重複、都不是答案）；挖錯第三盆就是失敗結局 F
+      const pd = s.flags && s.flags.potsDug;
+      if (pd !== undefined && (s.mode !== 'veteran' || !Array.isArray(pd) || !pd.length || pd.length > G.POT_MISS_LIMIT || new Set(pd).size !== pd.length
+        || pd.some(id => id === G.POT_ANSWER_V || !G.POTS_V.some(p => p.id === id)) || (pd.length === G.POT_MISS_LIMIT) !== (s.ending === 'F'))) errs.push(L('花盆紀錄無效', 'invalid pot record'));
+      if (s.ending === 'F' && !(Array.isArray(pd) && pd.length === G.POT_MISS_LIMIT)) errs.push(L('結局無效', 'invalid ending'));
       if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push(L('所在房間尚未解鎖', 'current room is not unlocked yet'));
       return errs;
     }

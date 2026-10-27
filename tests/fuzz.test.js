@@ -28,7 +28,9 @@ function allActions(s) {
   for (const r of G.roomOrder) acts.push(() => E.move(s, r));
   const answers = {
     drawer: [G.DRAWER_CODE, G.DRAWER_TRAP, '1234'], safe: [G.SAFE_CODE, '999'], trapdoor: [G.TRAPDOOR_CODE, '0000'],
-    pots: (vet ? G.POTS_V : G.POTS).map(p => p.id), clock: [G.CLOCK_ANSWER, { h: 2, m: 15 }],
+    // 資深模式挖錯第三盆會直接失敗（另有測試）；亂走時挖錯兩盆之後只會挖對的那一盆，好讓亂走繼續下去
+    pots: vet && (s.flags.potsDug || []).length >= G.POT_MISS_LIMIT - 1 ? [G.POT_ANSWER_V] : (vet ? G.POTS_V : G.POTS).map(p => p.id),
+    clock: [G.CLOCK_ANSWER, { h: 2, m: 15 }],
     valves: [VALVE_SOLUTION, { V1: true }], valves_set: [{ V2: true }, {}],
     mirrors: vet ? [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial] : [G.MIRROR_SOLUTIONS[0], G.MIRROR_GRID.initial, { A: '\\' }],
     skylight: [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial, null],
@@ -129,7 +131,7 @@ for (const mode of ['novice', 'veteran']) {
   });
 
   test(`${tag}隨機亂走 400 次（每次最多 300 步）後，通關者都能打到真結局 B，且過程沒有任何例外`, () => {
-    let totalSteps = 0;
+    let totalSteps = 0, nearMiss = 0;
     for (let seed = 1; seed <= 400; seed++) {
       const r = rng(seed * 7919 + (mode === 'veteran' ? 13 : 0));
       const s = E.newState(mode);
@@ -143,10 +145,12 @@ for (const mode of ['novice', 'veteran']) {
         assert.deepEqual(errs, [], `種子 ${seed} 第 ${i} 步後狀態不合法`);
         totalSteps++;
       }
+      if ((s.flags.potsDug || []).length === G.POT_MISS_LIMIT - 1) nearMiss++;
       const done = finish(s);
       assert.ok(done.ok, `種子 ${seed}：亂走 ${len} 步後無法通關（${done.why}）\n物品：${s.inv}\n旗標：${JSON.stringify(s.flags)}`);
     }
     assert.ok(totalSteps > 20000);
+    if (mode === 'veteran') assert.ok(nearMiss > 0, '應該有亂走到「挖錯兩次」再交給通關者的情況');
   });
 }
 

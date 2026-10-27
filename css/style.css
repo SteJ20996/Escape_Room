@@ -340,6 +340,8 @@ textarea.code {
 #ending { display: grid; place-items: center; min-height: 100%; padding-block: 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .ending-card { max-width: 40rem; display: grid; gap: 16px; }
 .ending-rank { color: var(--dim); letter-spacing: .4em; margin: 0; }
+.ending-card.fail .ending-rank { color: var(--bad); }
+.ending-card.fail .ending-title { color: var(--bad); }
 .ending-title { font-size: clamp(2rem, 7vw, 3.2rem); margin: 0; color: var(--brass-hi); letter-spacing: .15em; text-wrap: balance; }
 .ending-text p { margin: 0 0 1em; font-size: 1.08rem; line-height: 2; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
@@ -456,6 +458,10 @@ textarea.code {
 
 /* 八個花盆、八個藥瓶 */
 .pots.eight { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.pot-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 8px 10px 10px; border-bottom: 6px solid #5a3e22; border-radius: 4px; color: var(--dim); font-size: .85rem; }
+.pot-row b { display: grid; place-items: center; width: 30px; height: 26px; border-radius: 0 0 9px 9px; background: #8a5a36; color: #f6ead2; font-size: .9rem; }
+.pot-row b.dug { background: #4a3a2c; color: #9d8e7a; }
+.pot-row span { margin: 0 4px; white-space: nowrap; }
 .pots.eight .pot q { font-size: 1rem; }
 .bottles.eight { grid-template-columns: repeat(8, minmax(44px, 72px)); gap: 6px; }
 .bottles.eight .bottle-btn span { font-size: .78rem; }

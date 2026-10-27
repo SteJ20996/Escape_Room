@@ -56,10 +56,26 @@ for (const mode of ['novice', 'veteran']) {
     assert.deepEqual(graph.errors.slice(0, 3), []);
   });
 
-  test(`${tag}五個結局全部可達`, () => {
+  test(`${tag}五個結局全部可達${mode === 'veteran' ? '，失敗（F）也可達' : '，而且不會失敗'}`, () => {
     const seen = new Set(graph.states.filter(s => s.ending).map(s => s.ending));
-    assert.deepEqual([...seen].sort(), Object.keys(G.endings).sort());
+    const want = G.ENDING_ORDER.concat(mode === 'veteran' ? ['F'] : []);
+    assert.deepEqual([...seen].sort(), want.sort());
   });
+
+  if (mode === 'veteran') {
+    test(`${tag}失敗只有一種來源：挖錯第三盆；挖錯一、兩次的狀態仍然都能走到真結局`, () => {
+      const fails = graph.states.filter(s => s.ending === 'F');
+      assert.ok(fails.length > 0);
+      assert.ok(fails.every(s => (s.flags.potsDug || []).length === G.POT_MISS_LIMIT && !s.flags.keyDug), '失敗狀態都是挖錯三盆、還沒挖到鑰匙');
+      const okB = canReach(graph, s => s.ending === 'B');
+      const missed = graph.states.map((s, i) => [s, i]).filter(([s]) => !s.ending && s.flags.potsDug);
+      assert.ok(missed.some(([s]) => s.flags.potsDug.length === 2), '有挖錯兩次的狀態');
+      assert.ok(missed.every(([, i]) => okB[i]), '挖錯一、兩次之後仍然能走到真結局');
+      // 挖到鑰匙之後就再也不會失敗
+      const failIdx = new Set(fails.map(s => graph.states.indexOf(s)));
+      graph.states.forEach((s, i) => { if (s.flags.keyDug) for (const [j] of graph.edges[i]) assert.ok(!failIdx.has(j)); });
+    });
+  }
 
   test(`${tag}無死局：任何尚未結束的狀態都還能走到真結局 B`, () => {
     const okB = canReach(graph, s => s.ending === 'B');
@@ -68,7 +84,7 @@ for (const mode of ['novice', 'veteran']) {
   });
 
   test(`${tag}無死局：任何尚未結束的狀態都至少能走到某個結局`, () => {
-    const okAny = canReach(graph, s => !!s.ending);
+    const okAny = canReach(graph, s => !!s.ending && s.ending !== 'F');
     assert.ok(graph.states.every((s, i) => !live[i] || okAny[i]));
   });
 

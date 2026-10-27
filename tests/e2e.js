@@ -40,6 +40,15 @@ const VET_ATTIC_CODE = (() => {
   P.go('foyer'); P.use('hook_pole', 'f_hatch'); P.look('f_hatch'); P.look('a_chest'); P.look('a_photobox');
   return Store.encode(P.s);
 })();
+// 資深模式「剛進溫室、拿了鏟子、還沒問周伯」的存檔碼（用來測挖錯三盆的失敗）
+const VET_POTS_CODE = (() => {
+  const { makeGame } = require('./helpers');
+  const Store = require('../js/storage.js');
+  const P = makeGame('veteran');
+  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools');
+  return Store.encode(P.s);
+})();
 // 資深模式「三枚徽章到手、暗房紅燈已亮」的存檔碼
 const VET_DARKROOM_CODE = (() => {
   const { makeGame, vetMainPath } = require('./helpers');
@@ -986,6 +995,56 @@ async function switchRun(browser) {
   await page.context().close();
 }
 
+// 資深模式的花盆：挖錯三盆就失敗、整局作廢（自動存檔清除，手動存檔保留，不算結局圖鑑）
+async function potsFailRun(browser, lang) {
+  const page = await setup(browser, lang);
+  const P = player(page, lang);
+  await page.click('#btn-load');
+  await page.fill('#code-in', VET_POTS_CODE);
+  await page.click('#modal-body [data-act=import]');
+  ok((await page.locator('#room-name').innerText()).trim() === G.rooms.greenhouse.name[lang], '存檔碼的進度停在溫室');
+  await page.click('#btn-save'); await page.click('#modal-body [data-save="1"]'); await P.close();   // 手動存檔：失敗後應該還在
+  const notice = () => page.locator('#modal-body .notice').first().innerText();
+  await P.obj('g_pots');
+  await P.modalHas(X(/挖錯三盆/, /three wrong pots/i), '木牌事先寫明三次限制');
+  ok((await notice()) === ui('potsChances', lang, { n: 3, total: 3 }), '一開始有三次機會');
+  await P.shot('pots-chances');
+  await page.click('#modal-body [data-pot="mint"]');
+  await P.feedback(X(/還剩 2 次機會/, /2 chances left/));
+  ok((await notice()) === ui('potsChances', lang, { n: 2, total: 3 }), '挖錯一盆：剩兩次');
+  ok(await page.locator('#modal-body [data-pot="mint"]').isDisabled(), '挖過的盆不能再挖');
+  ok((await page.locator('#modal-body [data-pot="mint"]').innerText()).trim() === ui('potDug', lang), '挖過的盆標示「挖過了」');
+  await page.click('#modal-body [data-pot="rose"]');
+  await P.feedback(X(/最後一次機會/, /one chance left/));
+  ok((await notice()) === ui('potsLastChance', lang), '挖錯兩盆：最後一次');
+  // 最後一次要再確認；「再想想」不會挖
+  await page.click('#modal-body [data-pot="basil"]');
+  await P.modalHas(X(/最後一次機會。確定要挖羅勒盆嗎/, /last chance\. Dig up the Basil pot\?/), '最後一次要確認');
+  ok(await page.locator('#modal-body [data-pot="sage"]').isDisabled(), '確認時其他盆不能點');
+  await P.shot('pots-confirm');
+  await page.click('#modal-body [data-act=dig-no]');
+  ok(await page.locator('#modal-body [data-act=dig-yes]').count() === 0 && await page.locator('#game').isVisible(), '再想想：沒有挖');
+  await page.click('#modal-body [data-pot="basil"]');
+  await page.click('#modal-body [data-act=dig-yes]');
+  await page.waitForSelector('#ending:not([hidden])');
+  ok((await page.locator('.ending-rank').innerText()).trim().toLowerCase() === G.endings.F.rank[lang].toLowerCase(), '失敗畫面');
+  ok((await page.locator('.ending-title').innerText()) === G.endings.F.title[lang], '失敗的標題');
+  ok(await page.locator('#btn-preend').count() === 0, '失敗不能回到之前');
+  await P.modalHasEnding(X(/失敗/, /lost/), '說明這一局失敗、自動存檔已清除');
+  await P.shot('pots-failed');
+  await page.click('#btn-end-gallery');
+  ok(!(await page.locator('#modal-body').innerText()).includes(G.endings.F.title[lang]), '失敗不進結局圖鑑');
+  await P.close();
+  await page.click('#btn-end-title');
+  ok(await page.locator('#btn-continue').isDisabled(), '整局作廢：沒有「繼續遊戲」');
+  // 手動存檔仍在：讀回來是還沒挖的時候
+  await page.click('#btn-load');
+  await page.click('#modal-body [data-load="1"]');
+  await P.obj('g_pots');
+  ok((await notice()) === ui('potsChances', lang, { n: 3, total: 3 }), '手動存檔讀回來：三次機會');
+  await page.context().close();
+}
+
 // 撕開的便條：兩種語言 × 兩種難度 × 左半／右半／拼好，每一行字都要落在紙上（字寬只有在瀏覽器裡才量得到）
 async function noteLayoutRun(browser) {
   for (const lang of ['zh', 'en']) {
@@ -1024,6 +1083,7 @@ async function noteLayoutRun(browser) {
     summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}`);
   }
   if (LANGS.length > 1) await switchRun(browser);
+  for (const lang of LANGS) await potsFailRun(browser, lang);
   await noteLayoutRun(browser);
   await browser.close();
   console.log(`走完的結局 ${summary.join('；')}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);

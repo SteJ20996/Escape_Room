@@ -109,7 +109,7 @@
     modeTut: null,
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null };
   }
 
   /* ================= 畫面切換 ================= */
@@ -728,13 +728,34 @@
       const trowel = app.s.inv.includes('trowel');
       const vet = app.s.mode === 'veteran';
       const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'];
+      const head = vet ? 3 : 2; // 資深模式多一行：挖錯三盆就失敗
+      // 資深模式：剩下幾次機會；最後一次要再確認一次，避免手滑
+      const dug = app.s.flags.potsDug || [];
+      const left = G.POT_MISS_LIMIT - dug.length;
+      const confirm = vet && app.ui.potConfirm;
+      const potName = id => cap(tr(G.variant(app.s).pots.find(p => p.id === id).name));
       return {
         title: T('potsTitle'),
-        html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, 2), en: rule.body.en.slice(0, 2) } }) +
+        html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, head), en: rule.body.en.slice(0, head) } }) +
+          (vet ? `<p class="notice ${left === 1 ? 'warn' : ''}" role="status">${tx(left === 1 ? 'potsLastChance' : 'potsChances', { n: left, total: G.POT_MISS_LIMIT })}</p>` : '') +
+          (confirm ? `<div class="confirm"><p style="margin:0">${tx('potConfirm', { pot: potName(confirm) })}</p>
+            <div class="row"><button class="btn danger" type="button" data-act="dig-yes">${tx('potConfirmYes')}</button><button class="btn" type="button" data-act="dig-no" data-autofocus>${tx('thinkAgain')}</button></div></div>` : '') +
+          // 花架示意：八盆其實排成一排，下面的卡片只是換行排列
+          (vet ? `<div class="pot-row" role="img" aria-label="${esc(T('potsRowLabel'))}"><span>${tx('potsLeftEnd')}</span>${G.POTS_V.map(p => `<b class="${dug.includes(p.id) ? 'dug' : ''}">${p.n}</b>`).join('')}<span>${tx('potsRightEnd')}</span></div>` : '') +
           `<div class="pots ${vet ? 'eight' : ''}">${G.variant(app.s).pots.map(p => `<div class="pot pot-${p.id}"><h3>${vet ? tx('potNum', { n: p.n, name: cap(tr(p.name)) }) : tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
-            <button class="btn small" type="button" data-pot="${p.id}">${tx('digHere')}</button></div>`).join('')}</div>
+            <button class="btn small" type="button" data-pot="${p.id}" ${confirm || dug.includes(p.id) ? 'disabled' : ''}>${tx(dug.includes(p.id) ? 'potDug' : 'digHere')}</button></div>`).join('')}</div>
           ${trowel ? '' : `<p class="notice">${tx('needTool')}</p>`}${fb()}`,
-        bind(root) { root.querySelectorAll('[data-pot]').forEach(b => { b.onclick = () => submit('pots', b.dataset.pot); }); },
+        bind(root) {
+          root.querySelectorAll('[data-pot]').forEach(b => {
+            b.onclick = () => {
+              if (vet && trowel && left === 1) { app.ui.potConfirm = b.dataset.pot; app.ui.feedback = []; renderModal(); return; }
+              submit('pots', b.dataset.pot);
+            };
+          });
+          const yes = root.querySelector('[data-act=dig-yes]'), no = root.querySelector('[data-act=dig-no]');
+          if (yes) yes.onclick = () => { const id = app.ui.potConfirm; app.ui.potConfirm = null; submit('pots', id); };
+          if (no) no.onclick = () => { app.ui.potConfirm = null; renderModal(); };
+        },
       };
     },
 
@@ -1239,7 +1260,8 @@
 
   /* ================= 結局 ================= */
   function finishGame(id) {
-    Store.addEnding(id, app.s.mode);
+    // 失敗不算結局、不進圖鑑；整局作廢（自動存檔與結局前存檔一併清除）
+    if (G.endings[id].fail) Store.remove('preend'); else Store.addEnding(id, app.s.mode);
     app.tut = null; $('tutorial').hidden = true;
     Store.remove('auto');
     app.stack = []; renderModal();
@@ -1256,14 +1278,15 @@
       [fmtTime(s.stats.playMs), 'statTime'], [s.stats.actions, 'statActions'], [s.stats.wrong, 'statWrong'],
       [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice'), 'statMode'],
     ];
+    $('ending-card').classList.toggle('fail', !!e.fail);
     $('ending-card').innerHTML = `
       <p class="ending-rank">${esc(tr(e.rank))}</p>
       <h1 class="ending-title">${esc(tr(e.title))}</h1>
       <div class="ending-text">${tr(G.endingText(e, s.mode)).map(t => `<p>${esc(t)}</p>`).join('')}</div>
       <div class="stats">${stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${tx(l)}</span></div>`).join('')}</div>
-      <p class="lead">${tx('endUnlocked', { n: got.length, total: G.ENDING_ORDER.length })}${tx(got.length < G.ENDING_ORDER.length ? 'endMore' : 'endAll')}</p>
+      <p class="lead">${e.fail ? tx('failLead') : tx('endUnlocked', { n: got.length, total: G.ENDING_ORDER.length }) + tx(got.length < G.ENDING_ORDER.length ? 'endMore' : 'endAll')}</p>
       <div class="row">
-        ${Store.read('preend') ? `<button class="btn primary" type="button" id="btn-preend">${tx('backBefore')}</button>` : ''}
+        ${!e.fail && Store.read('preend') ? `<button class="btn primary" type="button" id="btn-preend">${tx('backBefore')}</button>` : ''}
         <button class="btn" type="button" id="btn-end-gallery">${tx('galleryTitle')}</button>
         <button class="btn" type="button" id="btn-end-title">${tx('titleScreen')}</button>
         ${langSwitch()}

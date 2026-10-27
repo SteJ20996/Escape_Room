@@ -118,6 +118,16 @@ function stateActions(s) {
   return acts;
 }
 
+// 每則訊息都必須是 { zh, en }：兩種語言都有內容，且英文裡沒有任何中日韓文字或全形標點
+const CJK = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+function textProblem(t) {
+  if (!t || typeof t !== 'object') return '訊息不是雙語物件：' + JSON.stringify(t);
+  if (typeof t.zh !== 'string' || !t.zh.trim()) return '缺少中文：' + JSON.stringify(t);
+  if (typeof t.en !== 'string' || !t.en.trim()) return '缺少英文：' + JSON.stringify(t);
+  if (CJK.test(t.en)) return '英文裡混有中文：' + t.en;
+  return null;
+}
+
 function apply(s, a) {
   switch (a.t) {
     case 'look': return E.interact(s, a.h);
@@ -161,8 +171,10 @@ function explore(opts = {}) {
         try { r = apply(n, a); } catch (e) { errors.push({ state: canonical(s), room, action: a, error: e.stack }); continue; }
         const silent = a.t === 'submit' && G.puzzles[a.p].silent;
         const responded = r.messages.length || r.open || r.ending || r.moved || silent;
-        if (!responded || r.messages.some(m => typeof m.text !== 'string' || !m.text.trim())) {
-          errors.push({ state: canonical(s), room, action: a, error: '回傳了空白或格式錯誤的訊息' });
+        if (!responded) errors.push({ state: canonical(s), room, action: a, error: '沒有任何回應' });
+        for (const m of r.messages) {
+          const bad = textProblem(m.text);
+          if (bad) errors.push({ state: canonical(s), room, action: a, error: bad, text: m.text });
         }
         const j = add(closure(n));
         // 邊上標記「解開了哪個謎題」，公平性檢查會用到
@@ -224,8 +236,10 @@ function inertActions(graph) {
       for (const a of acts) {
         tried++;
         const n = E.clone(base);
-        try { apply(n, a); } catch (e) { problems.push({ room, action: a, error: e.message }); continue; }
+        let r;
+        try { r = apply(n, a); } catch (e) { problems.push({ room, action: a, error: e.message }); continue; }
         if (canonical(n) !== key) problems.push({ room, action: a, error: '改變了邏輯狀態', before: key, after: canonical(n) });
+        for (const m of r.messages) { const bad = textProblem(m.text); if (bad) problems.push({ room, action: a, error: bad }); }
       }
     }
   }
@@ -248,7 +262,7 @@ function reachableWithout(graph, skip) {
   return seen;
 }
 
-module.exports = { E, explore, canReach, reachableWithout, canonical, closure, enter, inertActions, correctAnswers };
+module.exports = { E, explore, canReach, reachableWithout, canonical, closure, enter, inertActions, correctAnswers, textProblem, CJK };
 
 if (require.main === module) {
   const t0 = Date.now();

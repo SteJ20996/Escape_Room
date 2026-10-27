@@ -10,6 +10,11 @@
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // 雙語文字：{ zh, en }。引擎產生的所有訊息都同時帶兩種語言，由介面依目前語言顯示。
+  const L = (zh, en) => ({ zh, en });
+  // 英文冠詞：專有名詞所有格（Lu Guan's …）與出口類名稱不加 the
+  const the = name => /^(Lu Guan|Back |Downstairs|Under |Ladder)/.test(name) ? name : 'the ' + name;
+
   function create(G) {
     const hotspotById = {};
     for (const h of G.hotspots) {
@@ -33,6 +38,9 @@
       };
     }
 
+    const NOT_HERE = L('這裡沒有那樣東西。', 'That isn\'t here.');
+    const NOT_HELD = L('你身上沒有那樣東西。', 'You don\'t have that.');
+
     /* ---------- 結果與上下文 ---------- */
     function result() { return { ok: true, messages: [], open: null, ending: null, moved: null }; }
     function fail(text) { const r = result(); r.ok = false; r.messages.push({ text, kind: 'bad' }); return r; }
@@ -47,7 +55,7 @@
         give(id, quiet) {
           if (!G.items[id]) throw new Error('不存在的物品：' + id);
           if (!s.inv.includes(id)) s.inv.push(id);
-          if (!quiet) out.messages.push({ text: '獲得：' + itemName(s, id), kind: 'item', item: id });
+          if (!quiet) { const n = itemName(s, id); out.messages.push({ text: L('獲得：' + n.zh, 'Obtained: ' + n.en), kind: 'item', item: id }); }
         },
         take(id) { const i = s.inv.indexOf(id); if (i >= 0) s.inv.splice(i, 1); },
         say(text, kind) { out.messages.push({ text, kind: kind || 'info' }); },
@@ -56,7 +64,8 @@
           if (!G.docs[id]) throw new Error('不存在的線索：' + id);
           if (!s.notes.includes(id)) {
             s.notes.push(id);
-            out.messages.push({ text: '線索已記入筆記：' + G.docs[id].title, kind: 'note' });
+            const t = G.docs[id].title;
+            out.messages.push({ text: L('線索已記入筆記：' + t.zh, 'Added to your notebook: ' + t.en), kind: 'note' });
           }
         },
         goto(room) { enterRoom(s, room, out, ctx); },
@@ -69,7 +78,7 @@
     function enterRoom(s, room, out, ctx) {
       const R = G.rooms[room];
       if (!R) throw new Error('不存在的房間：' + room);
-      if (!R.accessible(s)) { out.messages.push({ text: R.name + '還進不去。', kind: 'bad' }); out.ok = false; return; }
+      if (!R.accessible(s)) { out.messages.push({ text: L(R.name.zh + '還進不去。', `You can't get into the ${R.name.en.toLowerCase()} yet.`), kind: 'bad' }); out.ok = false; return; }
       s.room = room;
       s.visited[room] = true;
       out.moved = room;
@@ -82,14 +91,15 @@
     function visibleHotspots(s) { return G.hotspots.filter(h => isVisible(s, h)); }
     function canEnter(s, room) { return !!G.rooms[room] && G.rooms[room].accessible(s); }
     function itemName(s, id) {
-      if (id === 'diary') return `${G.items.diary.name}（${(s.flags.diaryPages || []).length}/4）`;
-      return G.items[id] ? G.items[id].name : id;
+      const n = G.items[id] ? G.items[id].name : L(id, id);
+      if (id === 'diary') { const k = (s.flags.diaryPages || []).length; return L(`${n.zh}（${k}/4）`, `${n.en} (${k}/4)`); }
+      return n;
     }
     function pageCount(s) { return G.countPages(s); }
 
     function guard(s) {
-      if (!s || typeof s !== 'object') return '狀態無效。';
-      if (s.ending) return '遊戲已經結束。';
+      if (!s || typeof s !== 'object') return L('狀態無效。', 'Invalid game state.');
+      if (s.ending) return L('遊戲已經結束。', 'The game is over.');
       return null;
     }
     function done(s, out) { if (out.ok) s.stats.actions++; return out; }
@@ -98,7 +108,7 @@
     function interact(s, hsId) {
       const g = guard(s); if (g) return fail(g);
       const h = hotspotById[hsId];
-      if (!h || !isVisible(s, h)) return fail('這裡沒有那樣東西。');
+      if (!h || !isVisible(s, h)) return fail(NOT_HERE);
       const out = result();
       h.examine(makeCtx(s, out));
       return done(s, out);
@@ -106,16 +116,16 @@
 
     function useItem(s, itemId, hsId) {
       const g = guard(s); if (g) return fail(g);
-      if (!s.inv.includes(itemId)) return fail('你身上沒有那樣東西。');
+      if (!s.inv.includes(itemId)) return fail(NOT_HELD);
       const h = hotspotById[hsId];
-      if (!h || !isVisible(s, h)) return fail('這裡沒有那樣東西。');
+      if (!h || !isVisible(s, h)) return fail(NOT_HERE);
       const out = result();
       const ctx = makeCtx(s, out);
       if (h.use && h.use[itemId]) h.use[itemId](ctx);
-      else if (s.room === 'darkroom' && itemId === 'flashlight') ctx.say('你想起活板門上的警告——白光會毀掉一切。你沒有打開手電筒。');
+      else if (s.room === 'darkroom' && itemId === 'flashlight') ctx.say(L('你想起活板門上的警告——白光會毀掉一切。你沒有打開手電筒。', 'You remember the warning on the trapdoor — white light ruins everything. You leave the flashlight off.'));
       else if (h.useAny) h.useAny(ctx, itemId);
-      else if (itemId === 'flashlight') ctx.say(`手電筒照亮了${h.name}，沒有發現什麼特別的。`);
-      else ctx.say(`把${itemName(s, itemId)}用在${h.name}上，似乎沒什麼用。`);
+      else if (itemId === 'flashlight') ctx.say(L(`手電筒照亮了${h.name.zh}，沒有發現什麼特別的。`, `The flashlight lights up ${the(h.name.en)}. Nothing unusual.`));
+      else { const n = itemName(s, itemId); ctx.say(L(`把${n.zh}用在${h.name.zh}上，似乎沒什麼用。`, `Using ${the(n.en)} on ${the(h.name.en)} doesn't seem to do anything.`)); }
       return done(s, out);
     }
 
@@ -129,13 +139,14 @@
 
     function combine(s, a, b) {
       const g = guard(s); if (g) return fail(g);
-      if (a === b) return fail('同一樣東西沒辦法和自己組合。');
-      if (!s.inv.includes(a) || !s.inv.includes(b)) return fail('你身上沒有那樣東西。');
+      if (a === b) return fail(L('同一樣東西沒辦法和自己組合。', 'You can\'t combine something with itself.'));
+      if (!s.inv.includes(a) || !s.inv.includes(b)) return fail(NOT_HELD);
       const r = findRecipe(a, b);
       if (!r) {
         const out = result();
         out.ok = false;
-        out.messages.push({ text: `${itemName(s, a)}和${itemName(s, b)}組合不起來。`, kind: 'bad' });
+        const na = itemName(s, a), nb = itemName(s, b);
+        out.messages.push({ text: L(`${na.zh}和${nb.zh}組合不起來。`, `You can't combine ${the(na.en)} with ${the(nb.en)}.`), kind: 'bad' });
         return out;
       }
       const out = result();
@@ -145,8 +156,8 @@
 
     function move(s, room) {
       const g = guard(s); if (g) return fail(g);
-      if (!G.rooms[room]) return fail('沒有那個地方。');
-      if (s.room === room) return fail('你已經在' + G.rooms[room].name + '了。');
+      if (!G.rooms[room]) return fail(L('沒有那個地方。', 'There is no such place.'));
+      if (s.room === room) return fail(L('你已經在' + G.rooms[room].name.zh + '了。', `You're already in the ${G.rooms[room].name.en.toLowerCase()}.`));
       const out = result();
       enterRoom(s, room, out);
       return done(s, out);
@@ -155,11 +166,11 @@
     function submit(s, puzzleId, answer) {
       const g = guard(s); if (g) return fail(g);
       const p = G.puzzles[puzzleId];
-      if (!p) return fail('沒有那個機關。');
-      if (!p.available(s)) return fail('現在沒辦法操作那個機關。');
+      if (!p) return fail(L('沒有那個機關。', 'There is no such mechanism.'));
+      if (!p.available(s)) return fail(L('現在沒辦法操作那個機關。', 'You can\'t operate that right now.'));
       const out = result();
       const solved = p.check(makeCtx(s, out), answer);
-      if (solved === null) return fail('這個選項現在不能用。'); // 不合法的輸入：不改變任何狀態
+      if (solved === null) return fail(L('這個選項現在不能用。', 'That option isn\'t available right now.')); // 不合法的輸入：不改變任何狀態
       out.solved = !!solved;
       if (p.silent && !out.messages.length) return out; // 純介面狀態（閥門開關、鏡子角度）不計入行動次數
       return done(s, out);
@@ -188,7 +199,7 @@
     /* ---------- 進度摘要（狀態列用） ---------- */
     function progress(s) {
       const emblems = G.EMBLEMS.map(e => ({
-        id: e, glyph: G.items[e].glyph,
+        id: e,
         state: s.flags['inserted_' + e] ? 'inserted' : s.inv.includes(e) ? 'held' : 'missing',
       }));
       return {
@@ -202,19 +213,19 @@
     /* ---------- 存檔驗證 ---------- */
     function validate(s) {
       const errs = [];
-      if (!s || typeof s !== 'object') return ['不是有效的存檔資料'];
-      if (s.v !== G.saveVersion) errs.push('存檔版本不符');
-      if (!G.rooms[s.room]) errs.push('房間無效');
-      if (!Array.isArray(s.inv) || s.inv.some(i => !G.items[i])) errs.push('物品無效');
-      if (!s.flags || typeof s.flags !== 'object') errs.push('旗標無效');
-      if (!Array.isArray(s.notes) || s.notes.some(n => !G.docs[n])) errs.push('筆記無效');
-      if (!s.puz || typeof s.puz !== 'object') errs.push('機關狀態無效');
-      if (!s.stats || typeof s.stats !== 'object') errs.push('統計無效');
-      if (s.ending && !G.endings[s.ending]) errs.push('結局無效');
+      if (!s || typeof s !== 'object') return [L('不是有效的存檔資料', 'not valid save data')];
+      if (s.v !== G.saveVersion) errs.push(L('存檔版本不符', 'wrong save version'));
+      if (!G.rooms[s.room]) errs.push(L('房間無效', 'invalid room'));
+      if (!Array.isArray(s.inv) || s.inv.some(i => !G.items[i])) errs.push(L('物品無效', 'invalid items'));
+      if (!s.flags || typeof s.flags !== 'object') errs.push(L('旗標無效', 'invalid flags'));
+      if (!Array.isArray(s.notes) || s.notes.some(n => !G.docs[n])) errs.push(L('筆記無效', 'invalid notebook'));
+      if (!s.puz || typeof s.puz !== 'object') errs.push(L('機關狀態無效', 'invalid mechanism state'));
+      if (!s.stats || typeof s.stats !== 'object') errs.push(L('統計無效', 'invalid statistics'));
+      if (s.ending && !G.endings[s.ending]) errs.push(L('結局無效', 'invalid ending'));
       const dp = s.flags && s.flags.diaryPages;
-      if (dp !== undefined && (!Array.isArray(dp) || dp.some(p => !G.PAGES.includes(p)) || new Set(dp).size !== dp.length)) errs.push('日記頁面無效');
-      if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push('物品重複');
-      if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push('所在房間尚未解鎖');
+      if (dp !== undefined && (!Array.isArray(dp) || dp.some(p => !G.PAGES.includes(p)) || new Set(dp).size !== dp.length)) errs.push(L('日記頁面無效', 'invalid diary pages'));
+      if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push(L('物品重複', 'duplicate items'));
+      if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push(L('所在房間尚未解鎖', 'current room is not unlocked yet'));
       return errs;
     }
     function normalize(s) {

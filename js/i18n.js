@@ -1,0 +1,283 @@
+/*
+ * 觀星者之屋 The Stargazer's House — 介面文字（中文／English）
+ * 遊戲內容（故事、謎題、提示）在 data.js；這裡只放介面本身的文字。
+ * tr(text, lang)：把 { zh, en } 取出目前語言；字串與數字原樣傳回。
+ * fmt(str, vars)：把 {name} 代入。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.I18N = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const L = (zh, en) => ({ zh, en });
+  const tr = (t, lang) => {
+    if (t == null) return '';
+    if (typeof t !== 'object') return String(t);
+    const v = t[lang] != null ? t[lang] : t.zh;
+    return v;
+  };
+  const fmt = (str, vars) => String(str).replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null ? vars[k] : ''));
+
+  const UI = {
+    // 標題畫面
+    eyebrow: L('密室逃脫', 'An Escape Room'),
+    newGame: L('新遊戲', 'New Game'),
+    confirmNew: L('確定開始新遊戲？（自動存檔會被覆蓋）', 'Start a new game? (Your autosave will be replaced)'),
+    continueGame: L('繼續遊戲', 'Continue'),
+    loadGame: L('讀取存檔', 'Load Game'),
+    endingsGallery: L('結局圖鑑', 'Endings'),
+    howToPlay: L('遊戲說明', 'How to Play'),
+    titleFoot: L('五個房間・十一道謎題・五種結局', 'Five rooms · eleven puzzles · five endings'),
+    endingsUnlocked: L('已解鎖結局 {n} / {total}', 'Endings unlocked: {n} / {total}'),
+    noContinue: L('沒有可以繼續的進度。', 'There\'s no game to continue.'),
+    language: L('語言', 'Language'),
+    switchLang: L('切換語言', 'Switch language'),
+
+    // 開場
+    next: L('繼續', 'Continue'),
+    pickUpLetter: L('拾起那封信', 'Pick up the letter'),
+    skipIntro: L('跳過開場', 'Skip intro'),
+    pickedUp: L('你拾起地毯上的信。（已記入線索筆記）', 'You pick up the letter from the rug. (Added to your notebook.)'),
+
+    // 上方狀態列
+    hints: L('提示', 'Hints'),
+    notebook: L('線索筆記', 'Notebook'),
+    save: L('存檔', 'Save'),
+    menu: L('選單', 'Menu'),
+    diaryChip: L('日記 {n}/4', 'Diary {n}/4'),
+    plateChip: L('玻璃底片', 'Glass plate'),
+    playTime: L('遊戲時間', 'Play time'),
+    emblemProgress: L('徽章進度', 'Emblem progress'),
+    emblemMissing: L('尚未找到', 'not found yet'),
+    emblemHeld: L('在身上', 'in your hands'),
+    emblemInserted: L('已嵌回大門', 'set in the door'),
+
+    // 主畫面
+    itemsPanel: L('物品', 'Items'),
+    logPanel: L('紀錄', 'Log'),
+    invEmpty: L('身上什麼也沒有。', 'You\'re not carrying anything.'),
+    lookAt: L('查看：', 'Look at:'),
+    useOn: L('把「{item}」用在：', 'Use {item} on:'),
+    objectsAria: L('這個房間裡可以互動的東西', 'Things you can interact with here'),
+    navAria: L('前往其他房間', 'Go to another room'),
+    lockedRoom: L('（鎖著）', ' (locked)'),
+    tipUse: L('使用「{item}」→ {target}', 'Use {item} → {target}'),
+    tipHolding: L('拿著「{item}」：點擊要使用的地方', 'Holding {item}: click where to use it'),
+    examine: L('查看', 'Examine'),
+    combine: L('組合…', 'Combine…'),
+    cancelCombine: L('取消組合', 'Cancel'),
+    putAway: L('放下', 'Put away'),
+    holdTipCombine: L('再點另一個物品，試著把它們組合起來。', 'Click another item to combine them.'),
+    holdTipUse: L('點擊場景中的物件來使用它。', 'Click something in the scene to use it.'),
+    combineSelf: L('要把「{item}」和另一樣東西組合——請點物品欄裡的另一個物品，或按「取消組合」。', 'To combine {item} with something, click another item in your inventory, or press "Cancel".'),
+    errorAction: L('出了點意外：{msg}（遊戲狀態沒有改變）', 'Something went wrong: {msg} (the game state was not changed)'),
+
+    // 對話框共用
+    back: L('← 返回', '← Back'),
+    close: L('關閉', 'Close'),
+    missingView: L('這個畫面不存在。', 'This screen doesn\'t exist.'),
+    yes: L('確定', 'Yes'),
+    thinkAgain: L('再想想', 'Let me think'),
+    cancel: L('取消', 'Cancel'),
+
+    // 物品檢視
+    holdIt: L('拿在手上', 'Hold it'),
+    combineWith: L('和其他物品組合…', 'Combine with…'),
+    overlayLead: L('三個圈起來的星星底下，各有一個數字。', 'Under each of the three circled stars is a digit.'),
+    noteLeftLead: L('只有左半邊，每一行都斷在撕口。', 'Only the left half — every line breaks off at the tear.'),
+    noteRightLead: L('只有右半邊，每一行都缺了開頭。', 'Only the right half — every line is missing its beginning.'),
+    transcript: L('謄寫', 'Transcript'),
+    diaryMissing: L('日記還缺 {n} 頁。', 'The diary is still missing {n} page(s).'),
+    diaryComplete: L('四頁都齊了。', 'All four pages are here.'),
+    plateLead: L('紙套背面是陸觀當晚寫下的坐標：赤緯先寫成 −17，那個「7」被劃掉，改成了 6。', 'On the back of the sleeve are the coordinates Lu Guan wrote that night: the declination was first written as −17, then the "7" was struck out and corrected to 6.'),
+
+    // 謎題畫面
+    shelfTitle: L('書架', 'Bookshelf'),
+    shelfLead: L('中間那一層排著九卷《星空圖鑑》，書脊下方印著卷數。有幾卷的書脊是彩色的。', 'The middle shelf holds the nine volumes of the Star Atlas, each with its volume number near the bottom of the spine. A few of the spines are colored.'),
+    posterLead: L('陸觀自己命名的八個星座。每個星座旁都註明了它有幾顆星。', 'Eight constellations Lu Guan named himself. Each one is labeled with how many stars it has.'),
+    eyeTitle: L('望遠鏡目鏡', 'Telescope Eyepiece'),
+    eyeLead: L('觀測窗朝向：{dir}方。你湊近目鏡，視野裡有三團明亮的星群；視野邊緣還看得到地平線上的山稜和樹影。', 'The slit faces {dir}. You put your eye to the eyepiece: three bright groups of stars — and at the edge of the view, the ridge and trees along the horizon.'),
+    turnDome: L('轉動穹頂…', 'Turn the dome…'),
+    domeTitle: L('穹頂轉輪', 'Dome Wheel'),
+    domeLead: L('轉動轉輪，可以把穹頂的觀測窗轉向八個方位。', 'Turn the wheel to point the dome\'s slit in any of eight directions.'),
+    domeAria: L('選擇方位', 'Choose a direction'),
+    domeNow: L('目前', 'Now'),
+    lookThrough: L('看望遠鏡', 'Look through the telescope'),
+    noEyepiece: L('（望遠鏡還沒有目鏡。）', '(The telescope has no eyepiece yet.)'),
+    dialTitle: L('星盤', 'Star Dial'),
+    ringOuter: L('外環', 'Outer'),
+    ringMiddle: L('中環', 'Middle'),
+    ringInner: L('內環', 'Inner'),
+    heightHigh: L('天空中最高', 'highest in the sky'),
+    heightMid: L('天空中居中', 'in between'),
+    heightLow: L('天空中最低', 'lowest in the sky'),
+    prevConst: L('{ring}：上一個星座', '{ring} ring: previous constellation'),
+    nextConst: L('{ring}：下一個星座', '{ring} ring: next constellation'),
+    setRings: L('轉動到位', 'Set the rings'),
+    lockAria: L('{n} 位數字鎖', '{n}-digit lock'),
+    digitUp: L('第 {i} 位加一', 'Digit {i} up'),
+    digitDown: L('第 {i} 位減一', 'Digit {i} down'),
+    digitLabel: L('第 {i} 位：{d}', 'Digit {i}: {d}'),
+    unlock: L('開鎖', 'Unlock'),
+    lockKeys: L('也可以直接用鍵盤輸入數字，按 Enter 開鎖。', 'You can also type the digits and press Enter.'),
+    potsTitle: L('花盆架', 'Pot Shelf'),
+    potName: L('{name}盆', '{name} pot'),
+    digHere: L('挖開這一盆', 'Dig in this pot'),
+    needTool: L('盆土壓得很實。也許該先找把工具。', 'The soil is packed hard. Maybe find a tool first.'),
+    valvesTitle: L('灌溉系統', 'Irrigation System'),
+    valvesLead: L('點擊閥門切換開關（閥門上標示著「開」或「關」）。每條管線從哪個桶出發、流進哪一格花床，都畫在圖上。設好之後再轉開總閘。', 'Click a valve to switch it (each valve shows ON or OFF). The diagram shows which tank each pipe leaves from and which bed it flows into. Set them all, then open the main valve.'),
+    openMain: L('轉開總閘', 'Open the main valve'),
+    turnMain: L('轉動總閘', 'Turn the main valve'),
+    readRules: L('看園丁守則', 'Read the gardener\'s rules'),
+    noWheel: L('總閘上只剩一根光禿禿的閥桿，手輪不見了。', 'Only a bare stem is left on the main valve; the handwheel is missing.'),
+    mirrorsTitle: L('天窗反光鏡', 'Skylight Mirrors'),
+    mirrorsLead: L('月光從天窗射下。點擊鏡子可以切換它的斜向（「/」或「\\」），讓光一路折射，照到右下角的月光花。', 'Moonlight falls through the skylight. Click a mirror to flip its angle ("/" or "\\") and bounce the light all the way to the moonflower at the bottom right.'),
+    mirrorsLit: L('月光照到了月光花。', 'The moonlight reaches the moonflower.'),
+    clockTitle: L('落地鐘', 'Grandfather Clock'),
+    hourHand: L('時針', 'Hour'),
+    minuteHand: L('分針', 'Minute'),
+    hourBack: L('時針往回', 'Hour back'),
+    hourFwd: L('時針往前', 'Hour forward'),
+    minBack: L('分針往回五分', 'Minutes back by five'),
+    minFwd: L('分針往前五分', 'Minutes forward by five'),
+    hourVal: L('{h} 點', '{h} o\'clock'),
+    minVal: L('{m} 分', '{m} min'),
+    thisMoment: L('就是這一刻', 'This is the moment'),
+    devTitle: L('顯影台', 'Developing Bench'),
+    devLead: L('三個藥盤和一個清洗槽排成一列，旁邊是封存底片的避光盒。依序選出要倒的藥瓶（四步），再開始沖洗。陸觀留了幾張廢片，可以先試。', 'Three trays and a rinse bath stand in a row beside the light-tight box that holds the plate. Choose which bottle to pour at each of the four steps, then develop. Lu Guan left some scrap film, so you can test first.'),
+    stepN: L('第 {i} 步', 'Step {i}'),
+    clear: L('清除', 'Clear'),
+    develop: L('開始沖洗', 'Develop'),
+    readCard: L('看藥瓶卡片', 'Read the bottle card'),
+    readNote: L('看拼好的便條', 'Read the mended note'),
+
+    // 電話
+    phoneTitle: L('電話', 'Telephone'),
+    phoneSpeaker: L('聽筒裡傳來一個沙啞的男聲', 'A hoarse man\'s voice on the line'),
+    phoneLines: L([
+      '「……是阿遙吧？我是韓嶽。」',
+      '「我就在門外的車裡。地下室那盞紅燈亮了很久，我都看見了。你找到那張底片了，對不對？」',
+      '「聽著，你老師已經走了。一張舊底片能改變什麼？只會讓兩個老頭子的名聲一起爛掉，還有你的前途——你不是一直想進天文台工作嗎？」',
+      '「把底片從大門的信件口塞出來。這扇門的機關，從外面也能用鑰匙打開——陸觀當年給過我一把。我會放你出去，再給你一張支票，數字隨你填。」',
+    ], [
+      '"…Yao, isn\'t it? This is Han Yue."',
+      '"I\'m in the car outside your door. That red light in the basement has been on a long while — I saw it. You found that plate, didn\'t you?"',
+      '"Listen. Your teacher is gone. What can one old plate change? It will only drag two old men\'s names through the mud — and your future with them. Don\'t you still want a post at the observatory?"',
+      '"Push the plate out through the mail slot. That door\'s mechanism can be opened from outside with a key — Lu Guan gave me one, years ago. I\'ll let you out, and write you a check. Name your figure."',
+    ]),
+    phoneConfirm: L('真的要把底片交出去嗎？這會立刻結束遊戲。', 'Really hand over the plate? This ends the game immediately.'),
+    phoneYes: L('確定，交出底片', 'Yes, hand it over'),
+    phoneAccept: L('把底片塞出信件口，接受交易', 'Push the plate through the mail slot and take the deal'),
+    phoneRefuse: L('「我不會交給你。」——掛斷電話', '"You\'re not getting it." — hang up'),
+    phoneLater: L('先不回答，放下聽筒', 'Don\'t answer — put the receiver down'),
+    phoneLaterSaid: L('你放下了聽筒。電話還在響。', 'You put the receiver down. The phone keeps ringing.'),
+
+    // 大門
+    exitTitle: L('大門', 'Front Door'),
+    exitLead: L('三枚徽章都已歸位。沉重的大門只要輕輕一推就會打開。門外，雨後的山路泛著月光。', 'All three emblems are in place. The heavy door will open at a touch. Outside, the mountain road shines with moonlight after the rain.'),
+    exitCarrying: L('你帶著：日記 {n} / 4 頁{plate}。', 'You are carrying: {n} / 4 diary pages{plate}.'),
+    exitCarryingPlate: L('、玻璃底片', ' and the glass plate'),
+    exitPublish: L('帶著底片離開，把真相公諸於世', 'Leave with the plate and make the truth public'),
+    exitLeavePlate: L('把底片留在屋裡，獨自離開', 'Leave the plate in the house and go alone'),
+    exitLeave: L('推開大門，離開這棟屋子', 'Push the door open and leave the house'),
+    exitStay: L('先不走，我還想在屋裡看看', 'Not yet — I want to look around some more'),
+    exitConfirm: L('「{choice}」——離開之後，故事就結束了。確定嗎？', '"{choice}" — once you leave, the story ends. Are you sure?'),
+
+    // 筆記與提示
+    notesTitle: L('線索筆記', 'Notebook'),
+    notesLead: L('你讀過、看過的線索都會自動記在這裡，隨時可以重讀。（物品本身請在物品欄「查看」。）', 'Every clue you read or look at is recorded here automatically, so you can reread it any time. (To look at an item itself, use "Examine" in your inventory.)'),
+    hintsTitle: L('提示', 'Hints'),
+    hintsLead: L('每個目標的提示分三段：先給方向，再指出線索在哪，最後才是答案。用過的提示次數會出現在結算畫面上。', 'Each goal has three hints: first a direction, then where the clues are, and finally the answer. The number of hints you use is shown at the end.'),
+    hintFirst: L('給我一點提示', 'Give me a hint'),
+    hintMore: L('再多一點（{n}/{max}）', 'A bit more ({n}/{max})'),
+    hintDone: L('已經是答案了', 'That\'s the answer'),
+    hintNone: L('目前沒有可以提示的目標。', 'Nothing to hint at right now.'),
+
+    // 選單與說明
+    menuTitle: L('選單', 'Menu'),
+    saveLoad: L('存檔 / 讀檔', 'Save / Load'),
+    toTitle: L('回到標題畫面', 'Back to the title screen'),
+    toTitleConfirm: L('回到標題畫面？目前進度已自動存檔，可以用「繼續遊戲」回來。', 'Return to the title screen? Your progress is autosaved — choose "Continue" to come back.'),
+    toTitleYes: L('回到標題', 'Back to title'),
+    helpTitle: L('遊戲說明', 'How to Play'),
+    help: L([
+      ['目標', '找回日、月、星三枚徽章，嵌回門廳的大門就能離開。屋裡還藏著另一個秘密，它決定你會看到哪一個結局。'],
+      ['查看', '點擊場景裡發亮的物件，或點場景下方的物件名稱。'],
+      ['使用物品', '在右邊的物品欄點一下物品（拿在手上），再點場景裡的物件。'],
+      ['組合線索', '點選物品後按「組合…」，再點另一個物品。撕開的紙、疊在一起的圖、裝電池……很多線索要合在一起才看得懂。'],
+      ['線索筆記', '讀過的文件會自動記下，隨時能重讀。'],
+      ['提示', '卡關時按「提示」，每個目標分三段，從方向到答案。'],
+      ['存檔', '每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。'],
+      ['公平原則', '所有謎題的答案都在屋子裡，不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死。'],
+      ['語言', '在標題畫面或「選單」裡可以隨時切換中文與英文，進度不受影響。'],
+      ['鍵盤', 'Tab 移動、Enter 選擇、Esc 關閉視窗或放下手上的物品；數字鎖可以直接打數字。'],
+    ], [
+      ['Goal', 'Find the Sun, Moon and Star emblems and set them back into the front door to leave. The house also hides another secret, and it decides which ending you see.'],
+      ['Look', 'Click anything in the scene that lights up, or the object names below the scene.'],
+      ['Use items', 'Click an item in your inventory to hold it, then click something in the scene.'],
+      ['Combine clues', 'Select an item, press "Combine…", then click another item. Torn paper, overlapping charts, batteries… many clues only make sense together.'],
+      ['Notebook', 'Every document you read is recorded automatically so you can reread it.'],
+      ['Hints', 'Stuck? Press "Hints". Each goal has three steps, from a nudge to the answer.'],
+      ['Saving', 'The game autosaves after every action. You can also save to three slots, or copy a save code to carry your progress elsewhere.'],
+      ['Fair play', 'Every answer is inside the house — no outside knowledge needed. Wrong answers are never punished and can never leave you stuck.'],
+      ['Language', 'Switch between Chinese and English any time from the title screen or the Menu. Your progress is kept.'],
+      ['Keyboard', 'Tab to move, Enter to choose, Esc to close a window or put an item away. You can type digits straight into locks.'],
+    ]),
+    galleryTitle: L('結局圖鑑', 'Endings'),
+    galleryCount: L('已解鎖 {n} / {total}', 'Unlocked {n} / {total}'),
+    galleryLocked: L('尚未解鎖', 'Not found yet'),
+    galleryUnknown: L('？？？', '???'),
+
+    // 存讀檔
+    saveTitle: L('存檔 / 讀檔', 'Save / Load'),
+    loadTitle: L('讀取存檔', 'Load Game'),
+    slotAuto: L('自動存檔', 'Autosave'),
+    slot1: L('欄位一', 'Slot 1'),
+    slot2: L('欄位二', 'Slot 2'),
+    slot3: L('欄位三', 'Slot 3'),
+    slotPreend: L('結局前的存檔', 'Before the ending'),
+    slotEmptyDesc: L('空的', 'Empty'),
+    slotCorrupt: L('存檔損毀，無法讀取', 'Damaged save — can\'t be loaded'),
+    slotDesc: L('{when}・{room}・徽章 {e}/3・日記 {p}/4・{time}', '{when} · {room} · emblems {e}/3 · diary {p}/4 · {time}'),
+    noStorage: L('這個瀏覽器目前無法長期保存資料（例如私密視窗或被封鎖的網站資料）。存檔只會保留到關閉頁面為止——請用下方的存檔碼把進度帶走。', 'This browser can\'t store data permanently right now (for example in a private window, or with site data blocked). Saves only last until you close the page — use the save code below to keep your progress.'),
+    saveHere: L('存到這裡', 'Save here'),
+    loadBtn: L('讀取', 'Load'),
+    deleteBtn: L('刪除', 'Delete'),
+    confirmOverwrite: L('覆蓋這個欄位的存檔？', 'Overwrite this slot?'),
+    confirmDelete: L('刪除這個欄位的存檔？', 'Delete this save?'),
+    savedTo: L('已存到{slot}。', 'Saved to {slot}.'),
+    overwritten: L('已覆蓋{slot}。', 'Overwrote {slot}.'),
+    deleted: L('已刪除。', 'Deleted.'),
+    slotEmpty: L('這個欄位是空的。', 'This slot is empty.'),
+    exportTitle: L('匯出存檔碼', 'Export save code'),
+    exportLead: L('複製這段文字保存起來，之後可以在任何瀏覽器貼回來繼續。', 'Copy this text and keep it; paste it back in any browser to carry on.'),
+    copy: L('複製', 'Copy'),
+    copied: L('存檔碼已複製。', 'Save code copied.'),
+    copyFallback: L('已選取存檔碼，請按 Ctrl+C（或長按）複製。', 'The code is selected — press Ctrl+C (or long-press) to copy it.'),
+    importTitle: L('匯入存檔碼', 'Import save code'),
+    importPlaceholder: L('把 STAR1. 開頭的存檔碼貼在這裡', 'Paste a save code starting with STAR1. here'),
+    importBtn: L('讀取存檔碼', 'Load save code'),
+    saveUnreadable: L('存檔內容無法解讀。', 'This save can\'t be read.'),
+    saveUnusable: L('這份存檔無法使用：{errs}。', 'This save can\'t be used: {errs}.'),
+    saveEnded: L('這份存檔的故事已經結束了。', 'This save\'s story has already ended.'),
+    loaded: L('已讀取：{label}', 'Loaded: {label}'),
+    fromCode: L('存檔碼', 'save code'),
+    beforeUpdate: L('更新前的進度', 'progress from before the update'),
+    listSep: L('、', ', '),
+
+    // 結局畫面
+    statTime: L('遊戲時間', 'Play time'),
+    statActions: L('行動次數', 'Actions'),
+    statWrong: L('錯誤嘗試', 'Wrong attempts'),
+    statHints: L('使用提示', 'Hints used'),
+    statPages: L('日記頁數', 'Diary pages'),
+    endUnlocked: L('已解鎖結局 {n} / {total}', 'Endings unlocked: {n} / {total}'),
+    endMore: L('。換一個選擇，或多找一些東西，也許會看到不同的結局。', '. Make a different choice, or find more, and you may see a different ending.'),
+    endAll: L('。你看過了這棟屋子的每一種結局。', '. You have seen every ending this house holds.'),
+    backBefore: L('回到做出選擇之前', 'Go back to before the choice'),
+    titleScreen: L('回到標題', 'Title screen'),
+  };
+
+  return { L, tr, fmt, UI, LANGS: ['zh', 'en'] };
+}));

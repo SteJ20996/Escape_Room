@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { G, makeGame, VALVE_SOLUTION } = require('./helpers');
+const { textProblem } = require('./solver');
 
 function recorder() {
   const P = makeGame();
@@ -13,7 +14,9 @@ function recorder() {
       seen.add(h.id);
       h.texts.forEach((t, i) => {
         const text = typeof t === 'function' ? t(P.s) : t;
-        assert.ok(typeof text === 'string' && text.trim() && !/undefined|NaN/.test(text), `提示 ${h.id} 第 ${i + 1} 段內容異常：${text}`);
+        const bad = textProblem(text);
+        assert.ok(!bad, `提示 ${h.id} 第 ${i + 1} 段：${bad}`);
+        assert.ok(!/undefined|NaN/.test(text.zh + text.en), `提示 ${h.id} 第 ${i + 1} 段內容異常`);
       });
     }
   };
@@ -27,16 +30,16 @@ function recorder() {
 
 test('新遊戲時，提示只會說「還有沒看過的地方」，不會預告任何機關或獎勵', () => {
   const { P } = recorder();
-  const titles = P.E.hintList(P.s).map(h => h.title);
+  const titles = P.E.hintList(P.s).map(h => h.title.zh);
   assert.deepEqual(titles, ['還沒仔細看過的地方']);
   P.go('study');
-  assert.ok(!P.E.hintList(P.s).some(h => /保險箱|徽/.test(h.title)), '還沒取下油畫前不應出現保險箱');
+  assert.ok(!P.E.hintList(P.s).some(h => /保險箱|徽/.test(h.title.zh) || /safe|emblem/i.test(h.title.en)), '還沒取下油畫前不應出現保險箱');
   P.look('s_painting');
-  assert.ok(P.E.hintList(P.s).some(h => h.title === '牆裡的保險箱'));
+  assert.ok(P.E.hintList(P.s).some(h => h.title.zh === '牆裡的保險箱'));
 });
 
 test('提示標題不包含獎勵名稱（日徽、月徽、星徽）', () => {
-  for (const h of G.hints) assert.ok(!/日徽|月徽|星徽/.test(h.title), h.title);
+  for (const h of G.hints) assert.ok(!/日徽|月徽|星徽/.test(h.title.zh) && !/emblem/i.test(h.title.en.replace('Setting the Emblems', '')), h.title.en);
 });
 
 test('完整玩一遍時，每一個提示都會在某個時刻出現，且三段文字都有內容', () => {

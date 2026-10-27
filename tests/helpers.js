@@ -3,13 +3,17 @@
 const G = require('../js/data.js');
 const { create } = require('../js/engine.js');
 
+// 訊息文字（雙語物件）取中文，供測試以正規式比對
+const zh = t => (t && typeof t === 'object') ? t.zh : t;
+const txt = m => zh(m.text);
+
 function makeGame() {
   const E = create(G);
   const s = E.newState();
   const log = [];
   function check(label, r) {
-    log.push(`${label} → ${r.messages.map(m => m.text).join(' / ')}`);
-    if (!r.ok) throw new Error(`動作失敗：${label}\n${r.messages.map(m => m.text).join('\n')}`);
+    log.push(`${label} → ${r.messages.map(txt).join(' / ')}`);
+    if (!r.ok) throw new Error(`動作失敗：${label}\n${r.messages.map(txt).join('\n')}`);
     return r;
   }
   const P = {
@@ -94,4 +98,4 @@ function insertAll(P) {
   for (const e of G.EMBLEMS) P.use(e, 'f_door');
 }
 
-module.exports = { G, create, makeGame, mainPath, darkroomPath, insertAll, MIRROR_SOLUTION, VALVE_SOLUTION };
+module.exports = { G, create, makeGame, mainPath, darkroomPath, insertAll, MIRROR_SOLUTION, VALVE_SOLUTION, txt, zh };

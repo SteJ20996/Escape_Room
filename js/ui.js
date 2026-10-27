@@ -1,6 +1,7 @@
 /*
- * 觀星者之屋 — 介面
+ * 觀星者之屋 The Stargazer's House — 介面
  * 只負責顯示與輸入；所有規則判定都交給 engine.js。
+ * 語言：所有文字都以 { zh, en } 保存，畫面在繪製時才取出目前語言，所以遊戲中途切換語言不影響進度。
  */
 (function () {
   'use strict';
@@ -8,9 +9,87 @@
   const E = window.EscapeEngine.create(G);
   const Art = window.Art;
   const Store = window.SaveStore;
+  const I = window.I18N;
   const esc = Art.esc;
   const $ = id => document.getElementById(id);
 
+  /* ================= 語言 ================= */
+  let LANG = 'zh';
+  const tr = x => I.tr(x, LANG);
+  // 介面文字：TL 回傳兩種語言（可以存進紀錄，切換語言後重畫）；T 回傳目前語言；tx 已跳脫，可直接放進 HTML
+  function TL(key, vars) {
+    const src = I.UI[key];
+    if (src == null) throw new Error('缺少介面文字：' + key);
+    const out = {};
+    for (const l of I.LANGS) {
+      const v = {};
+      for (const k in vars || {}) v[k] = I.tr(vars[k], l);
+      const s = I.tr(src, l);
+      out[l] = typeof s === 'string' ? I.fmt(s, v) : s;
+    }
+    return out;
+  }
+  const T = (key, vars) => tr(TL(key, vars));
+  const tx = (key, vars) => esc(T(key, vars));
+  // 變數本身是 HTML（例如 <strong>）時用這個：只跳脫範本
+  const TH = (key, html) => I.fmt(esc(I.tr(I.UI[key], LANG)), html);
+  const cap = s => (LANG === 'en' && s ? s[0].toUpperCase() + s.slice(1) : s);
+  const joinL = arr => {
+    const out = {};
+    for (const l of I.LANGS) out[l] = arr.map(x => I.tr(x, l)).join(I.tr(I.UI.listSep, l));
+    return out;
+  };
+
+  function initialLang() {
+    let q = null;
+    try { q = new URLSearchParams(window.location.search).get('lang'); } catch (e) { /* 沒有網址參數 */ }
+    if (q === 'zh' || q === 'en') return q;
+    const saved = Store.getSetting('lang');
+    if (saved === 'zh' || saved === 'en') return saved;
+    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    return /^zh/i.test(nav) ? 'zh' : 'en';
+  }
+
+  function setLang(l, { persist = true } = {}) {
+    LANG = l === 'en' ? 'en' : 'zh';
+    Art.setLang(LANG);
+    if (persist) Store.setSetting('lang', LANG);
+    document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-Hant';
+    document.title = tr(G.title);
+    applyStatic();
+    if (app.screen === 'title') refreshTitle();
+    if (app.screen === 'intro') renderIntro(false);
+    if (app.screen === 'game') render();
+    if (app.screen === 'ending' && app.endingId) renderEnding(app.endingId);
+    if (app.stack.length) renderModal();
+  }
+
+  // index.html 裡的固定文字
+  function applyStatic() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', T(el.dataset.i18nAria)); });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = T(el.dataset.i18nTitle); });
+    document.querySelectorAll('[data-game-title]').forEach(el => { el.textContent = tr(G.title); });
+    $('title-sub').textContent = tr(G.subtitle);
+    $('btn-new').textContent = T(app.confirmNew ? 'confirmNew' : 'newGame');
+    const other = LANG === 'en' ? 'zh' : 'en';
+    const lb = $('btn-lang');
+    lb.textContent = other === 'zh' ? '中文' : 'EN';
+    lb.lang = other === 'zh' ? 'zh-Hant' : 'en';
+    lb.dataset.lang = other;
+    syncLangButtons();
+  }
+  function syncLangButtons() {
+    document.querySelectorAll('.lang-switch [data-lang]').forEach(b => {
+      const on = b.dataset.lang === LANG;
+      b.setAttribute('aria-pressed', on);
+      b.classList.toggle('cur', on);
+    });
+  }
+  const langSwitch = () => `<div class="lang-switch" role="group" aria-label="${tx('language')}">
+      <button class="btn small" type="button" data-lang="zh" lang="zh-Hant">中文</button><button class="btn small" type="button" data-lang="en" lang="en">English</button></div>`;
+
+  /* ================= 狀態 ================= */
   const app = {
     s: null,
     screen: 'title',
@@ -22,9 +101,12 @@
     lastFocus: null,
     ui: freshUi(),
     introStep: 0,
+    endingId: null,
+    lastRoom: null,
+    confirmNew: false,
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: '' };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null };
   }
 
   /* ================= 畫面切換 ================= */
@@ -32,6 +114,7 @@
     for (const id of ['title', 'intro', 'game', 'ending']) $(id).hidden = id !== screen;
     app.screen = screen;
     if (screen === 'title') { refreshTitle(); startSky(); } else stopSky();
+    if (screen !== 'game') app.lastRoom = null;
     window.scrollTo(0, 0);
   }
 
@@ -39,13 +122,56 @@
     const auto = Store.read('auto');
     $('btn-continue').disabled = !(auto && auto.state && !auto.state.ending);
     const got = Store.getEndings().length;
-    $('title-foot').textContent = got
-      ? `已解鎖結局 ${got} / ${G.ENDING_ORDER.length}`
-      : '五個房間・十一道謎題・五種結局';
+    $('title-foot').textContent = got ? T('endingsUnlocked', { n: got, total: G.ENDING_ORDER.length }) : T('titleFoot');
   }
 
-  /* ================= 星空（標題背景） ================= */
+  /* ================= 星空與老屋剪影（標題背景） ================= */
   let skyRaf = 0;
+  function drawHouse(ctx, w, h) {
+    const s = Math.max(0.55, Math.min(w / 1000, h / 640, 1.25));
+    const hx = w < 640 ? w * 0.5 : w * 0.8, y0 = h - 34 * s;
+    // 山丘
+    ctx.fillStyle = '#04060d';
+    ctx.beginPath();
+    ctx.moveTo(0, h); ctx.lineTo(0, y0 + 30 * s);
+    ctx.quadraticCurveTo(hx - 260 * s, y0 - 10 * s, hx - 200 * s, y0);
+    ctx.lineTo(hx + 180 * s, y0);
+    ctx.quadraticCurveTo(hx + 300 * s, y0 + 6 * s, w, y0 + 40 * s);
+    ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+    // 松樹
+    for (const [dx, th] of [[-250, 70], [-226, 96], [-204, 60], [222, 84], [246, 58]]) {
+      const x = hx + dx * s, base = y0 + (Math.abs(dx) > 240 ? 8 : 2) * s, tt = th * s;
+      ctx.beginPath(); ctx.moveTo(x - tt * 0.22, base); ctx.lineTo(x, base - tt); ctx.lineTo(x + tt * 0.22, base); ctx.fill();
+    }
+    ctx.fillStyle = '#060912';
+    // 天文台塔樓與穹頂
+    ctx.fillRect(hx - 160 * s, y0 - 150 * s, 60 * s, 150 * s);
+    ctx.beginPath(); ctx.arc(hx - 130 * s, y0 - 150 * s, 34 * s, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = 'rgba(160,175,220,.22)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(hx - 130 * s, y0 - 150 * s, 34 * s, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = '#0d1430'; ctx.fillRect(hx - 134 * s, y0 - 183 * s, 8 * s, 30 * s);
+    // 主屋
+    ctx.fillStyle = '#060912';
+    ctx.fillRect(hx - 100 * s, y0 - 112 * s, 170 * s, 112 * s);
+    ctx.beginPath(); ctx.moveTo(hx - 112 * s, y0 - 110 * s); ctx.lineTo(hx - 15 * s, y0 - 176 * s); ctx.lineTo(hx + 82 * s, y0 - 110 * s); ctx.fill();
+    ctx.fillRect(hx + 30 * s, y0 - 172 * s, 16 * s, 42 * s);
+    // 溫室
+    ctx.fillStyle = 'rgba(70,120,95,.22)';
+    ctx.beginPath(); ctx.moveTo(hx + 70 * s, y0); ctx.lineTo(hx + 70 * s, y0 - 64 * s); ctx.lineTo(hx + 105 * s, y0 - 86 * s); ctx.lineTo(hx + 140 * s, y0 - 64 * s); ctx.lineTo(hx + 140 * s, y0); ctx.fill();
+    ctx.strokeStyle = 'rgba(140,190,160,.25)';
+    ctx.beginPath(); ctx.moveTo(hx + 70 * s, y0 - 64 * s); ctx.lineTo(hx + 105 * s, y0 - 86 * s); ctx.lineTo(hx + 140 * s, y0 - 64 * s); ctx.stroke();
+    for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(hx + (70 + i * 17.5) * s, y0); ctx.lineTo(hx + (70 + i * 17.5) * s, y0 - 64 * s); ctx.stroke(); }
+    // 窗：書房的燈還亮著
+    const win = (x, y, lit) => {
+      if (lit) { ctx.fillStyle = 'rgba(233,199,122,.18)'; ctx.fillRect(x - 6 * s, y - 6 * s, 26 * s, 34 * s); }
+      ctx.fillStyle = lit ? '#e9c77a' : '#10172a';
+      ctx.fillRect(x, y, 14 * s, 22 * s);
+    };
+    win(hx - 80 * s, y0 - 92 * s, false); win(hx - 40 * s, y0 - 92 * s, false); win(hx + 4 * s, y0 - 92 * s, false); win(hx + 40 * s, y0 - 92 * s, false);
+    win(hx - 80 * s, y0 - 46 * s, true); win(hx - 40 * s, y0 - 46 * s, false); win(hx + 40 * s, y0 - 46 * s, false);
+    ctx.fillStyle = '#2a1a0f'; ctx.fillRect(hx - 6 * s, y0 - 46 * s, 22 * s, 46 * s);
+    win(hx - 140 * s, y0 - 120 * s, false);
+  }
   function startSky() {
     const c = $('sky');
     const ctx = c.getContext && c.getContext('2d');
@@ -58,30 +184,41 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       let x = 12345;
       const r = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
-      stars = Array.from({ length: Math.round(c.clientWidth * c.clientHeight / 2600) }, () => ({ x: r() * c.clientWidth, y: r() * c.clientHeight, s: 0.4 + r() * 1.4, p: r() * 6.28, v: 0.4 + r() * 1.6 }));
+      stars = Array.from({ length: Math.round(c.clientWidth * c.clientHeight / 2600) }, () => ({ x: r() * c.clientWidth, y: r() * c.clientHeight * 0.92, s: 0.4 + r() * 1.4, p: r() * 6.28, v: 0.4 + r() * 1.6 }));
     }
     function draw(t) {
       const w = c.clientWidth, h = c.clientHeight;
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#05070f'); g.addColorStop(1, '#141c38');
+      g.addColorStop(0, '#04060e'); g.addColorStop(0.7, '#111a36'); g.addColorStop(1, '#1d2547');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      // 銀河
+      const mw = ctx.createLinearGradient(0, h * 0.9, w, 0);
+      mw.addColorStop(0.3, 'rgba(160,170,230,0)'); mw.addColorStop(0.5, 'rgba(160,170,230,.07)'); mw.addColorStop(0.7, 'rgba(160,170,230,0)');
+      ctx.fillStyle = mw; ctx.fillRect(0, 0, w, h);
       for (const st of stars) {
         const a = reduce ? 0.7 : 0.45 + 0.45 * Math.sin(st.p + t / 1000 * st.v);
         ctx.globalAlpha = a; ctx.fillStyle = '#f3ecd6';
         ctx.beginPath(); ctx.arc(st.x, st.y, st.s, 0, 6.283); ctx.fill();
       }
+      ctx.globalAlpha = 1;
+      // 月亮
+      const mx = w * 0.86, my = h * 0.15, mr = Math.max(14, Math.min(w, h) * 0.035);
+      const halo = ctx.createRadialGradient(mx, my, mr, mx, my, mr * 4);
+      halo.addColorStop(0, 'rgba(240,236,214,.18)'); halo.addColorStop(1, 'rgba(240,236,214,0)');
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx, my, mr * 4, 0, 6.283); ctx.fill();
+      ctx.fillStyle = '#efe9d2'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 6.283); ctx.fill();
       // 一顆緩慢移動的彗星
-      const cx = (w * 0.15 + (reduce ? 0 : (t / 90) % (w * 0.9))), cy = h * 0.22 + (cx - w * 0.15) * 0.18;
+      const cx = (w * 0.15 + (reduce ? w * 0.4 : (t / 90) % (w * 0.9))), cy = h * 0.22 + (cx - w * 0.15) * 0.18;
       const tail = ctx.createLinearGradient(cx, cy, cx - 120, cy - 22);
       tail.addColorStop(0, 'rgba(255,250,232,.8)'); tail.addColorStop(1, 'rgba(255,250,232,0)');
-      ctx.globalAlpha = 1; ctx.strokeStyle = tail; ctx.lineWidth = 2;
+      ctx.strokeStyle = tail; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - 120, cy - 22); ctx.stroke();
       ctx.fillStyle = '#fffbe8'; ctx.beginPath(); ctx.arc(cx, cy, 2.2, 0, 6.283); ctx.fill();
-      ctx.globalAlpha = 1;
+      drawHouse(ctx, w, h);
       if (!reduce && app.screen === 'title') skyRaf = requestAnimationFrame(draw);
     }
     resize();
-    window.onresize = () => { if (app.screen === 'title') resize(); };
+    window.onresize = () => { if (app.screen === 'title') { resize(); if (reduce) draw(0); } };
     cancelAnimationFrame(skyRaf);
     skyRaf = requestAnimationFrame(draw);
   }
@@ -99,16 +236,20 @@
     show('intro');
     nextIntro();
   }
+  function renderIntro(animateLast) {
+    const paras = tr(G.intro).slice(0, app.introStep);
+    $('intro-text').innerHTML = paras.map((p, i) => `<p class="${animateLast && i === paras.length - 1 ? 'fresh' : ''}">${esc(p)}</p>`).join('');
+    $('btn-intro-next').textContent = T(app.introStep >= tr(G.intro).length ? 'pickUpLetter' : 'next');
+  }
   function nextIntro() {
-    if (app.introStep >= G.intro.length) { beginGame(); return; }
-    $('intro-text').insertAdjacentHTML('beforeend', `<p>${esc(G.intro[app.introStep])}</p>`);
+    if (app.introStep >= tr(G.intro).length) { beginGame(); return; }
     app.introStep++;
-    $('btn-intro-next').textContent = app.introStep >= G.intro.length ? '拾起那封信' : '繼續';
+    renderIntro(true);
     $('btn-intro-next').focus();
   }
   function beginGame() {
     show('game');
-    say([{ text: G.rooms[app.s.room].enterText(app.s), kind: 'room' }, { text: '你拾起地毯上的信。（已記入線索筆記）', kind: 'note' }]);
+    say([{ text: G.rooms[app.s.room].enterText(app.s), kind: 'room' }, { text: I.UI.pickedUp, kind: 'note' }]);
     autosave();
     render();
     openView({ view: 'item', id: 'letter' });
@@ -127,7 +268,7 @@
     let r;
     try { r = fn(); } catch (e) {
       console.error(e);
-      r = { ok: false, messages: [{ text: '出了點意外：' + e.message + '（遊戲狀態沒有改變）', kind: 'bad' }] };
+      r = { ok: false, messages: [{ text: TL('errorAction', { msg: e.message }), kind: 'bad' }] };
     }
     say(r.messages);
     if (r.ending) { finishGame(r.ending); return r; }
@@ -150,7 +291,7 @@
 
   function onItem(id) {
     if (app.combining && app.selected === id) {
-      say([{ text: `要把「${E.itemName(app.s, id)}」和另一樣東西組合——請點物品欄裡的另一個物品，或按「取消組合」。`, kind: 'note' }]);
+      say([{ text: TL('combineSelf', { item: E.itemName(app.s, id) }), kind: 'note' }]);
       render();
       return;
     }
@@ -180,15 +321,19 @@
     const t = Math.floor((ms || 0) / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
     return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
   }
+  const msgHtml = (m, cls = '') => `<p class="m-${m.kind || 'info'} ${cls}">${esc(tr(m.text))}</p>`;
 
   function render() {
     if (!app.s || app.screen !== 'game') return;
     const s = app.s;
-    $('room-name').textContent = G.rooms[s.room].name;
+    $('room-name').textContent = tr(G.rooms[s.room].name);
     const p = E.progress(s);
-    const stName = { missing: '尚未找到', held: '在身上', inserted: '已嵌回大門' };
-    $('progress').innerHTML = p.emblems.map(e => `<span class="emb ${e.state}" title="${esc(G.items[e.id].name)}：${stName[e.state]}" aria-label="${esc(G.items[e.id].name)}：${stName[e.state]}">${e.glyph}</span>`).join('');
-    $('chip-pages').textContent = `日記 ${p.pages}/4`;
+    const stName = { missing: 'emblemMissing', held: 'emblemHeld', inserted: 'emblemInserted' };
+    $('progress').innerHTML = p.emblems.map(e => {
+      const label = esc(`${tr(G.items[e.id].name)}: ${T(stName[e.state])}`);
+      return `<span class="emb ${e.state}" role="img" title="${label}" aria-label="${label}">${Art.emblemChip(e.id, e.state)}</span>`;
+    }).join('');
+    $('chip-pages').textContent = T('diaryChip', { n: p.pages });
     $('chip-pages').classList.toggle('on', p.pages === 4);
     $('chip-plate').hidden = !p.plate;
     $('chip-plate').classList.toggle('on', p.plate);
@@ -199,7 +344,7 @@
     renderNav();
     renderInventory();
     renderLog();
-    $('narration').innerHTML = app.latest.map(m => `<p class="m-${m.kind || 'info'}">${esc(m.text)}</p>`).join('');
+    $('narration').innerHTML = app.latest.map(m => msgHtml(m)).join('');
   }
 
   function visible(id) {
@@ -207,7 +352,16 @@
     return !!h && h.room === app.s.room && (!h.visible || !!h.visible(app.s));
   }
   function renderScene() {
-    $('scene').innerHTML = Art.scene(app.s.room, { s: app.s, vis: visible, label: id => E.hotspot(id).name });
+    const wrap = $('scene').parentElement;
+    if (app.lastRoom !== app.s.room) {
+      // 換房間時淡入
+      wrap.classList.remove('enter');
+      void wrap.offsetWidth;
+      wrap.classList.add('enter');
+      wrap.dataset.room = app.s.room;
+      app.lastRoom = app.s.room;
+    }
+    $('scene').innerHTML = Art.scene(app.s.room, { s: app.s, vis: visible, label: id => tr(E.hotspot(id).name) });
     updateTip(null);
   }
   function updateTip(id) {
@@ -215,17 +369,17 @@
     if (app.selected) {
       tip.hidden = false;
       const item = E.itemName(app.s, app.selected);
-      tip.textContent = id ? `使用「${item}」→ ${E.hotspot(id).name}` : `拿著「${item}」：點擊要使用的地方`;
+      tip.textContent = id ? T('tipUse', { item, target: E.hotspot(id).name }) : T('tipHolding', { item });
     } else if (id) {
       tip.hidden = false;
-      tip.textContent = E.hotspot(id).name;
+      tip.textContent = tr(E.hotspot(id).name);
     } else tip.hidden = true;
   }
 
   function renderObjects() {
     const hs = E.visibleHotspots(app.s);
-    $('objects').innerHTML = `<span class="label ${app.selected ? 'holding-label' : ''}">${app.selected ? `把「${esc(E.itemName(app.s, app.selected))}」用在：` : '查看：'}</span>` +
-      hs.map(h => `<button class="btn obj-btn" type="button" data-obj="${h.id}">${esc(h.name)}</button>`).join('');
+    $('objects').innerHTML = `<span class="label ${app.selected ? 'holding-label' : ''}">${app.selected ? tx('useOn', { item: E.itemName(app.s, app.selected) }) : tx('lookAt')}</span>` +
+      hs.map(h => `<button class="btn obj-btn" type="button" data-obj="${h.id}">${esc(tr(h.name))}</button>`).join('');
   }
 
   function renderNav() {
@@ -233,7 +387,7 @@
     $('nav').innerHTML = G.roomOrder.map(r => {
       if (r === 'darkroom' && !s.flags.trapdoorFound) return '';
       const open = E.canEnter(s, r), here = s.room === r;
-      return `<button class="btn ${here ? 'here' : ''}" type="button" data-room="${r}" ${!open || here ? 'disabled' : ''} ${here ? 'aria-current="true"' : ''}>${esc(G.rooms[r].name)}${open ? '' : '（鎖著）'}</button>`;
+      return `<button class="btn ${here ? 'here' : ''}" type="button" data-room="${r}" ${!open || here ? 'disabled' : ''} ${here ? 'aria-current="true"' : ''}>${esc(tr(G.rooms[r].name))}${open ? '' : tx('lockedRoom')}</button>`;
     }).join('');
   }
 
@@ -242,30 +396,30 @@
     $('inventory').innerHTML = s.inv.length ? s.inv.map(id => {
       const it = G.items[id];
       const cls = ['inv-tile', app.selected === id ? 'sel' : '', app.combining && app.selected !== id ? 'target' : ''].join(' ');
-      return `<button class="${cls}" type="button" data-item="${id}" aria-pressed="${app.selected === id}"><span class="seal k-${it.kind}" aria-hidden="true">${it.glyph}</span><span>${esc(E.itemName(s, id))}</span></button>`;
-    }).join('') : '<p class="inv-empty">身上什麼也沒有。</p>';
+      return `<button class="${cls}" type="button" data-item="${id}" aria-pressed="${app.selected === id}"><span class="icon-wrap k-${it.kind}">${Art.icon(id)}</span><span class="inv-name">${esc(tr(E.itemName(s, id)))}</span></button>`;
+    }).join('') : `<p class="inv-empty">${tx('invEmpty')}</p>`;
     const d = $('item-detail');
     if (!app.selected) { d.hidden = true; d.innerHTML = ''; return; }
     const it = G.items[app.selected];
     d.hidden = false;
-    d.innerHTML = `<h3>${esc(E.itemName(s, app.selected))}</h3><p>${esc(it.desc)}</p>
-      <p class="hold-tip">${app.combining ? '再點另一個物品，試著把它們組合起來。' : '點擊場景中的物件來使用它。'}</p>
+    d.innerHTML = `<div class="detail-head"><span class="icon-wrap k-${it.kind}">${Art.icon(app.selected)}</span><h3>${esc(tr(E.itemName(s, app.selected)))}</h3></div><p>${esc(tr(it.desc))}</p>
+      <p class="hold-tip">${tx(app.combining ? 'holdTipCombine' : 'holdTipUse')}</p>
       <div class="row">
-        <button class="btn small" type="button" data-detail="view">查看</button>
-        <button class="btn small ${app.combining ? 'primary' : ''}" type="button" data-detail="combine">${app.combining ? '取消組合' : '組合…'}</button>
-        <button class="btn small ghost" type="button" data-detail="drop">放下</button>
+        <button class="btn small" type="button" data-detail="view">${tx('examine')}</button>
+        <button class="btn small ${app.combining ? 'primary' : ''}" type="button" data-detail="combine">${tx(app.combining ? 'cancelCombine' : 'combine')}</button>
+        <button class="btn small ghost" type="button" data-detail="drop">${tx('putAway')}</button>
       </div>`;
   }
 
   function renderLog() {
     const latest = new Set(app.latest);
     const items = app.log.slice(-40).reverse();
-    $('log').innerHTML = items.map(m => `<p class="m-${m.kind || 'info'} ${latest.has(m) ? 'fresh' : 'old'}">${esc(m.text)}</p>`).join('');
+    $('log').innerHTML = items.map(m => msgHtml(m, latest.has(m) ? 'fresh' : 'old')).join('');
   }
 
   /* ================= 對話框 ================= */
-  const fb = () => `<div class="feedback" aria-live="polite">${app.ui.feedback.map(m => `<p class="m-${m.kind || 'info'}">${esc(m.text)}</p>`).join('')}</div>`;
-  const paper = (d, extra = '') => `<div class="paper ${d.style || 'plain'}">${extra}${d.body.map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
+  const fb = () => `<div class="feedback" aria-live="polite">${app.ui.feedback.map(m => msgHtml(m)).join('')}</div>`;
+  const paper = (d, extra = '') => `<div class="paper ${d.style || 'plain'}">${extra}${tr(d.body).map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
   const center = html => `<div class="row" style="justify-content:center">${html}</div>`;
 
   function openView(view) {
@@ -305,9 +459,10 @@
     }
     const keep = fresh ? null : focusKey(document.activeElement);
     const V = VIEWS[view.view];
-    const out = V ? V(view) : { title: '？', html: '<p>這個畫面不存在。</p>' };
+    const out = V ? V(view) : { title: '?', html: `<p>${tx('missingView')}</p>` };
     $('modal-title').textContent = out.title;
     $('modal-body').innerHTML = out.html;
+    $('modal').dataset.view = view.view;
     $('modal-back-btn').hidden = app.stack.length < 2;
     back.hidden = false;
     app.viewKeys = out.keys || null;
@@ -319,7 +474,7 @@
   function docView(id) {
     const d = G.docs[id];
     if (d.view) return VIEWS[d.view]({});
-    return { title: d.title, html: paper(d) };
+    return { title: tr(d.title), html: paper(d) };
   }
 
   function itemContent(id) {
@@ -328,17 +483,20 @@
     switch (it.view) {
       case 'grid': return `<div class="art-box narrow">${Art.gridSvg({ digits: true })}</div>`;
       case 'transparency': return `<div class="art-box narrow">${Art.gridSvg({ digits: false, stars: true })}</div>`;
-      case 'overlay': return `<div class="art-box narrow">${Art.gridSvg({ digits: true, stars: true })}</div><p class="lead">三個圈起來的星星底下，各有一個數字。</p>`;
-      case 'note_left': return `<div class="art-box narrow">${Art.note('left')}</div><p class="lead">只有左半邊，每一行都斷在撕口。</p>`;
-      case 'note_right': return `<div class="art-box narrow">${Art.note('right')}</div><p class="lead">只有右半邊，每一行都缺了開頭。</p>`;
-      case 'note_full': return `<div class="art-box">${Art.note('full')}</div>` + paper({ style: 'hand', body: [G.NOTE_LINES.map(l => l[0] + l[1]).filter(Boolean).join('')] }, '<h3>謄寫</h3>');
+      case 'overlay': return `<div class="art-box narrow">${Art.gridSvg({ digits: true, stars: true })}</div><p class="lead">${tx('overlayLead')}</p>`;
+      case 'note_left': return `<div class="art-box narrow">${Art.note('left')}</div><p class="lead">${tx('noteLeftLead')}</p>`;
+      case 'note_right': return `<div class="art-box narrow">${Art.note('right')}</div><p class="lead">${tx('noteRightLead')}</p>`;
+      case 'note_full': {
+        const lines = (G.NOTE_LINES[LANG] || G.NOTE_LINES.zh).map(l => l[0] + l[1]).filter(Boolean);
+        return `<div class="art-box">${Art.note('full')}</div><div class="paper hand"><h3>${tx('transcript')}</h3><p>${lines.map(esc).join('<br>')}</p></div>`;
+      }
       case 'diary': {
         const pages = app.s.flags.diaryPages || [];
-        return pages.map(p => paper(G.docs[p], `<h3>${esc(G.docs[p].title)}</h3>`)).join('') +
-          (pages.length < 4 ? `<p class="lead">日記還缺 ${4 - pages.length} 頁。</p>` : '<p class="lead">四頁都齊了。</p>');
+        return pages.map(p => paper(G.docs[p], `<h3>${esc(tr(G.docs[p].title))}</h3>`)).join('') +
+          `<p class="lead">${pages.length < 4 ? tx('diaryMissing', { n: 4 - pages.length }) : tx('diaryComplete')}</p>`;
       }
-      case 'plate': return `<div class="art-box narrow" style="max-width:440px">${Art.plate()}</div><p class="lead">紙套背面是陸觀當晚寫下的坐標：赤緯先寫成 −17，那個「7」被劃掉，改成了 6。</p>`;
-      default: return '';
+      case 'plate': return `<div class="art-box narrow" style="max-width:440px">${Art.plate()}</div><p class="lead">${tx('plateLead')}</p>`;
+      default: return `<div class="item-hero k-${it.kind}">${Art.icon(id)}</div>`;
     }
   }
 
@@ -349,9 +507,9 @@
       const it = G.items[id];
       const held = app.s && app.s.inv.includes(id);
       return {
-        title: E.itemName(app.s, id),
-        html: `<p class="lead">${esc(it.desc)}</p>${itemContent(id)}
-          ${held ? center(`<button class="btn" type="button" data-act="hold">拿在手上</button><button class="btn" type="button" data-act="combine">和其他物品組合…</button>`) : ''}`,
+        title: tr(E.itemName(app.s, id)),
+        html: `<p class="lead">${esc(tr(it.desc))}</p>${itemContent(id)}
+          ${held ? center(`<button class="btn" type="button" data-act="hold">${tx('holdIt')}</button><button class="btn" type="button" data-act="combine">${tx('combineWith')}</button>`) : ''}`,
         bind(root) {
           const hold = root.querySelector('[data-act=hold]');
           if (hold) hold.onclick = () => { app.selected = id; app.combining = false; closeAll(); render(); };
@@ -362,23 +520,23 @@
     },
 
     bookshelf: () => ({
-      title: '書架',
-      html: `<p class="lead">中間那一層排著九卷《星空圖鑑》，書脊下方印著卷數。有幾卷的書脊是彩色的。</p><div class="art-box">${Art.bookshelf()}</div>`,
+      title: T('shelfTitle'),
+      html: `<p class="lead">${tx('shelfLead')}</p><div class="art-box">${Art.bookshelf()}</div>`,
     }),
 
     poster: () => ({
-      title: '手繪星座圖',
-      html: `<p class="lead">陸觀自己命名的八個星座。每個星座旁都註明了它有幾顆星。</p><div class="art-box">${Art.poster()}</div>`,
+      title: tr(G.docs.poster.title),
+      html: `<p class="lead">${tx('posterLead')}</p><div class="art-box">${Art.poster()}</div>`,
     }),
 
     eyepiece: () => {
       const dir = app.s.puz.dome || 'N';
-      const name = G.DIRECTIONS.find(d => d.id === dir).name;
+      const name = tr(G.DIRECTIONS.find(d => d.id === dir).name);
       return {
-        title: '望遠鏡目鏡',
-        html: `<p class="lead">觀測窗朝向：<strong>${name}方</strong>。你湊近目鏡，視野裡有三團明亮的星群；視野邊緣還看得到地平線上的山稜和樹影。</p>
+        title: T('eyeTitle'),
+        html: `<p class="lead">${TH('eyeLead', { dir: `<strong>${esc(name)}</strong>` })}</p>
           <div class="eyepiece">${Art.eyepiece(dir)}</div>
-          ${center('<button class="btn" type="button" data-act="dome">轉動穹頂…</button>')}`,
+          ${center(`<button class="btn" type="button" data-act="dome">${tx('turnDome')}</button>`)}`,
         bind(root) { root.querySelector('[data-act=dome]').onclick = () => { app.stack.pop(); openView({ view: 'dome' }); }; },
       };
     },
@@ -386,14 +544,14 @@
     dome: () => {
       const cur = app.s.puz.dome || 'N';
       const grid = ['NW', 'N', 'NE', 'W', null, 'E', 'SW', 'S', 'SE'];
-      const name = id => G.DIRECTIONS.find(d => d.id === id).name;
+      const name = id => cap(tr(G.DIRECTIONS.find(d => d.id === id).name));
       return {
-        title: '穹頂轉輪',
-        html: `<p class="lead">轉動轉輪，可以把穹頂的觀測窗轉向八個方位。</p>
-          <div class="compass" role="group" aria-label="選擇方位">${grid.map(id => id
-            ? `<button class="btn ${id === cur ? 'cur' : ''}" type="button" data-dir="${id}" aria-pressed="${id === cur}">${name(id)}</button>`
-            : `<div class="center">目前<br>${name(cur)}</div>`).join('')}</div>
-          ${center(app.s.flags.eyepieceInstalled ? '<button class="btn primary" type="button" data-act="look">看望遠鏡</button>' : '<span class="lead">（望遠鏡還沒有目鏡。）</span>')}${fb()}`,
+        title: T('domeTitle'),
+        html: `<p class="lead">${tx('domeLead')}</p>
+          <div class="compass" role="group" aria-label="${tx('domeAria')}">${grid.map(id => id
+            ? `<button class="btn ${id === cur ? 'cur' : ''}" type="button" data-dir="${id}" aria-pressed="${id === cur}">${esc(name(id))}</button>`
+            : `<div class="center">${tx('domeNow')}<br>${esc(name(cur))}</div>`).join('')}</div>
+          ${center(app.s.flags.eyepieceInstalled ? `<button class="btn primary" type="button" data-act="look">${tx('lookThrough')}</button>` : `<span class="lead">${tx('noEyepiece')}</span>`)}${fb()}`,
         bind(root) {
           root.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => submit('dome', b.dataset.dir, { closeOnSolve: false }); });
           const look = root.querySelector('[data-act=look]');
@@ -403,16 +561,17 @@
     },
 
     dial: () => {
-      const sel = app.s.puz.dial, rings = ['外環', '中環', '內環'], heights = ['最高', '居中', '最低'], order = G.CONSTELLATION_ORDER;
+      const sel = app.s.puz.dial, order = G.CONSTELLATION_ORDER;
+      const rings = ['ringOuter', 'ringMiddle', 'ringInner'], heights = ['heightHigh', 'heightMid', 'heightLow'];
       return {
-        title: '星盤',
+        title: T('dialTitle'),
         html: `<div class="split"><div class="art-box narrow">${Art.dialSvg(sel)}</div><div class="stack">
           ${paper(G.docs.dial_inscription)}
-          <div class="picker">${sel.map((id, i) => `<div class="picker-row"><span class="lbl">${rings[i]}<small>天空中${heights[i]}</small></span>
-            <button class="btn" type="button" data-prev="${i}" aria-label="${rings[i]}：上一個星座">◀</button>
-            <span class="name" aria-live="polite">${G.CONSTELLATIONS[id].name}</span>
-            <button class="btn" type="button" data-next="${i}" aria-label="${rings[i]}：下一個星座">▶</button></div>`).join('')}</div>
-          ${center('<button class="btn primary" type="button" data-act="turn">轉動到位</button>')}${fb()}</div></div>`,
+          <div class="picker">${sel.map((id, i) => `<div class="picker-row"><span class="lbl">${tx(rings[i])}<small>${tx(heights[i])}</small></span>
+            <button class="btn" type="button" data-prev="${i}" aria-label="${tx('prevConst', { ring: T(rings[i]) })}">◀</button>
+            <span class="name" aria-live="polite">${esc(tr(G.CONSTELLATIONS[id].name))}</span>
+            <button class="btn" type="button" data-next="${i}" aria-label="${tx('nextConst', { ring: T(rings[i]) })}">▶</button></div>`).join('')}</div>
+          ${center(`<button class="btn primary" type="button" data-act="turn">${tx('setRings')}</button>`)}${fb()}</div></div>`,
         bind(root) {
           const step = (i, d) => { sel[i] = order[(order.indexOf(sel[i]) + d + order.length) % order.length]; app.ui.feedback = []; autosave(); renderModal(); };
           root.querySelectorAll('[data-prev]').forEach(b => { b.onclick = () => step(+b.dataset.prev, -1); });
@@ -426,14 +585,14 @@
       const P = G.puzzles[id];
       const cur = app.ui.locks[id] || (app.ui.locks[id] = Array(P.digits).fill(0));
       return {
-        title: P.title,
-        html: `<p class="lead">${esc(P.prompt)}</p>
-          <div class="lock" role="group" aria-label="${P.digits} 位數字鎖">${cur.map((d, i) => `<div class="wheel">
-            <button class="btn" type="button" data-up="${i}" aria-label="第 ${i + 1} 位加一">▲</button>
-            <div class="digit" aria-label="第 ${i + 1} 位：${d}">${d}</div>
-            <button class="btn" type="button" data-down="${i}" aria-label="第 ${i + 1} 位減一">▼</button></div>`).join('')}</div>
-          ${center('<button class="btn primary" type="button" data-act="open" data-autofocus>開鎖</button>')}${fb()}
-          <p class="lead" style="font-size:.85rem;text-align:center">也可以直接用鍵盤輸入數字，按 Enter 開鎖。</p>`,
+        title: tr(P.title),
+        html: `<p class="lead">${esc(tr(P.prompt))}</p>
+          <div class="lock" role="group" aria-label="${tx('lockAria', { n: P.digits })}">${cur.map((d, i) => `<div class="wheel">
+            <button class="btn" type="button" data-up="${i}" aria-label="${tx('digitUp', { i: i + 1 })}">▲</button>
+            <div class="digit" aria-label="${tx('digitLabel', { i: i + 1, d })}">${d}</div>
+            <button class="btn" type="button" data-down="${i}" aria-label="${tx('digitDown', { i: i + 1 })}">▼</button></div>`).join('')}</div>
+          ${center(`<button class="btn primary" type="button" data-act="open" data-autofocus>${tx('unlock')}</button>`)}${fb()}
+          <p class="lead" style="font-size:.85rem;text-align:center">${tx('lockKeys')}</p>`,
         bind(root) {
           root.querySelectorAll('[data-up]').forEach(b => { b.onclick = () => { cur[+b.dataset.up] = (cur[+b.dataset.up] + 1) % 10; app.ui.feedback = []; renderModal(); }; });
           root.querySelectorAll('[data-down]').forEach(b => { b.onclick = () => { cur[+b.dataset.down] = (cur[+b.dataset.down] + 9) % 10; app.ui.feedback = []; renderModal(); }; });
@@ -449,12 +608,13 @@
 
     pots: () => {
       const trowel = app.s.inv.includes('trowel');
+      const rule = G.docs.pots_rule;
       return {
-        title: '花盆架',
-        html: paper({ style: 'plain', body: G.docs.pots_rule.body.slice(0, 2) }) +
-          `<div class="pots">${G.POTS.map(p => `<div class="pot"><h3>${p.name}盆</h3><q>${esc(p.says)}</q>
-            <button class="btn small" type="button" data-pot="${p.id}">挖開這一盆</button></div>`).join('')}</div>
-          ${trowel ? '' : '<p class="notice">盆土壓得很實。也許該先找把工具。</p>'}${fb()}`,
+        title: T('potsTitle'),
+        html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, 2), en: rule.body.en.slice(0, 2) } }) +
+          `<div class="pots">${G.POTS.map(p => `<div class="pot pot-${p.id}"><h3>${tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
+            <button class="btn small" type="button" data-pot="${p.id}">${tx('digHere')}</button></div>`).join('')}</div>
+          ${trowel ? '' : `<p class="notice">${tx('needTool')}</p>`}${fb()}`,
         bind(root) { root.querySelectorAll('[data-pot]').forEach(b => { b.onclick = () => submit('pots', b.dataset.pot); }); },
       };
     },
@@ -463,11 +623,11 @@
       const open = Object.assign({}, app.s.puz.valves);
       const wheel = app.s.flags.wheelInstalled;
       return {
-        title: '灌溉系統',
-        html: `<p class="lead">點擊閥門切換開關（閥門上方標示著「開」或「關」）。每條管線從哪個桶出發、流進哪一格花床，都畫在圖上。設好之後再轉開總閘。</p>
+        title: T('valvesTitle'),
+        html: `<p class="lead">${tx('valvesLead')}</p>
           <div class="art-box">${Art.valvesSvg(open, app.s.flags.waterOk)}</div>
-          ${center(`<button class="btn primary" type="button" data-act="main">${wheel ? '轉開總閘' : '轉動總閘'}</button><button class="btn small" type="button" data-doc="garden_rules">看園丁守則</button>`)}
-          ${wheel ? '' : '<p class="notice">總閘上只剩一根光禿禿的閥桿，手輪不見了。</p>'}${fb()}`,
+          ${center(`<button class="btn primary" type="button" data-act="main">${tx(wheel ? 'openMain' : 'turnMain')}</button><button class="btn small" type="button" data-doc="garden_rules">${tx('readRules')}</button>`)}
+          ${wheel ? '' : `<p class="notice">${tx('noWheel')}</p>`}${fb()}`,
         bind(root) {
           root.querySelectorAll('[data-valve]').forEach(g => {
             const flip = () => { open[g.dataset.valve] = !open[g.dataset.valve]; E.submit(app.s, 'valves_set', open); app.ui.feedback = []; autosave(); renderModal(); };
@@ -484,10 +644,10 @@
       const cfg = Object.assign({}, G.MIRROR_GRID.initial, app.s.puz.mirrors);
       const hit = G.traceBeam(cfg).hit;
       return {
-        title: '天窗反光鏡',
-        html: `<p class="lead">月光從天窗射下。點擊鏡子可以切換它的斜向（「/」或「\\」），讓光一路折射，照到右下角的月光花。</p>
+        title: T('mirrorsTitle'),
+        html: `<p class="lead">${tx('mirrorsLead')}</p>
           <div class="art-box">${Art.mirrorsSvg(cfg)}</div>
-          ${hit ? '<p class="m-good" style="margin:0;text-align:center">月光照到了月光花。</p>' : ''}${fb()}`,
+          ${hit ? `<p class="m-good" style="margin:0;text-align:center">${tx('mirrorsLit')}</p>` : ''}${fb()}`,
         bind(root) {
           root.querySelectorAll('[data-mirror]').forEach(g => {
             const flip = () => {
@@ -506,14 +666,14 @@
     clock: () => {
       const c = app.s.puz.clock;
       return {
-        title: '落地鐘',
+        title: T('clockTitle'),
         html: `<div class="split"><div class="art-box narrow" style="max-width:280px">${Art.clockSvg(c.h, c.m)}</div><div class="stack">
           ${paper(G.docs.clock_inscription)}
           <div class="picker">
-            <div class="picker-row"><span class="lbl">時針</span><button class="btn" type="button" data-h="-1" aria-label="時針往回">◀</button><span class="name" aria-live="polite">${c.h} 點</span><button class="btn" type="button" data-h="1" aria-label="時針往前">▶</button></div>
-            <div class="picker-row"><span class="lbl">分針</span><button class="btn" type="button" data-m="-5" aria-label="分針往回五分">◀</button><span class="name" aria-live="polite">${String(c.m).padStart(2, '0')} 分</span><button class="btn" type="button" data-m="5" aria-label="分針往前五分">▶</button></div>
+            <div class="picker-row"><span class="lbl">${tx('hourHand')}</span><button class="btn" type="button" data-h="-1" aria-label="${tx('hourBack')}">◀</button><span class="name" aria-live="polite">${tx('hourVal', { h: c.h })}</span><button class="btn" type="button" data-h="1" aria-label="${tx('hourFwd')}">▶</button></div>
+            <div class="picker-row"><span class="lbl">${tx('minuteHand')}</span><button class="btn" type="button" data-m="-5" aria-label="${tx('minBack')}">◀</button><span class="name" aria-live="polite">${tx('minVal', { m: String(c.m).padStart(2, '0') })}</span><button class="btn" type="button" data-m="5" aria-label="${tx('minFwd')}">▶</button></div>
           </div>
-          ${center('<button class="btn primary" type="button" data-act="set">就是這一刻</button>')}${fb()}</div></div>`,
+          ${center(`<button class="btn primary" type="button" data-act="set">${tx('thisMoment')}</button>`)}${fb()}</div></div>`,
         bind(root) {
           root.querySelectorAll('[data-h]').forEach(b => { b.onclick = () => { c.h = ((c.h - 1 + +b.dataset.h + 12) % 12) + 1; app.ui.feedback = []; autosave(); renderModal(); }; });
           root.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { c.m = (c.m + +b.dataset.m + 60) % 60; app.ui.feedback = []; autosave(); renderModal(); }; });
@@ -524,15 +684,15 @@
 
     develop: () => {
       const seq = app.ui.dev;
-      const name = id => G.BOTTLES.find(b => b.id === id).name;
+      const name = id => tr(G.BOTTLES.find(b => b.id === id).name);
       const hasNote = app.s.inv.includes('note_full');
       return {
-        title: '顯影台',
-        html: `<p class="lead">三個藥盤和一個清洗槽排成一列，旁邊是封存底片的避光盒。依序選出要倒的藥瓶（四步），再開始沖洗。陸觀留了幾張廢片，可以先試。</p>
-          <div class="bottles">${G.BOTTLES.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= 4 ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${b.name}</span></button>`).join('')}</div>
-          <div class="slots">${[0, 1, 2, 3].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">第 ${i + 1} 步<br>${seq[i] ? name(seq[i]) : '—'}</div>`).join('')}</div>
-          ${center(`<button class="btn" type="button" data-act="clear">清除</button><button class="btn primary" type="button" data-act="go" ${seq.length < 4 ? 'disabled' : ''}>開始沖洗</button>`)}${fb()}
-          ${center(`<button class="btn small" type="button" data-doc="bottle_card">看藥瓶卡片</button>${hasNote ? '<button class="btn small" type="button" data-note="1">看拼好的便條</button>' : ''}`)}`,
+        title: T('devTitle'),
+        html: `<p class="lead">${tx('devLead')}</p>
+          <div class="bottles">${G.BOTTLES.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= 4 ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
+          <div class="slots">${[0, 1, 2, 3].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
+          ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < 4 ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
+          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}`)}`,
         bind(root) {
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < 4) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
@@ -547,48 +707,43 @@
     phone: () => {
       const confirming = app.ui.confirm === 'accept';
       return {
-        title: '電話',
+        title: T('phoneTitle'),
         html: `<div class="dialogue">
-            <p class="speaker">聽筒裡傳來一個沙啞的男聲</p>
-            <p class="line">「……是阿遙吧？我是韓嶽。」</p>
-            <p class="line">「我就在門外的車裡。地下室那盞紅燈亮了很久，我都看見了。你找到那張底片了，對不對？」</p>
-            <p class="line">「聽著，你老師已經走了。一張舊底片能改變什麼？只會讓兩個老頭子的名聲一起爛掉，還有你的前途——你不是一直想進天文台工作嗎？」</p>
-            <p class="line">「把底片從大門的信件口塞出來。這扇門的機關，從外面也能用鑰匙打開——陸觀當年給過我一把。我會放你出去，再給你一張支票，數字隨你填。」</p>
+            <p class="speaker">${tx('phoneSpeaker')}</p>
+            ${T('phoneLines').map(l => `<p class="line">${esc(l)}</p>`).join('')}
           </div>
           ${confirming
-            ? `<div class="confirm"><p style="margin:0">真的要把底片交出去嗎？<strong>這會立刻結束遊戲。</strong></p>
-                <div class="row"><button class="btn danger" type="button" data-act="yes">確定，交出底片</button><button class="btn" type="button" data-act="no" data-autofocus>再想想</button></div></div>`
+            ? `<div class="confirm"><p style="margin:0"><strong>${tx('phoneConfirm')}</strong></p>
+                <div class="row"><button class="btn danger" type="button" data-act="yes">${tx('phoneYes')}</button><button class="btn" type="button" data-act="no" data-autofocus>${tx('thinkAgain')}</button></div></div>`
             : `<div class="choices">
-                <button class="btn" type="button" data-act="accept">把底片塞出信件口，接受交易</button>
-                <button class="btn" type="button" data-act="refuse">「我不會交給你。」——掛斷電話</button>
-                <button class="btn ghost" type="button" data-act="later">先不回答，放下聽筒</button></div>`}${fb()}`,
+                <button class="btn" type="button" data-act="accept">${tx('phoneAccept')}</button>
+                <button class="btn" type="button" data-act="refuse">${tx('phoneRefuse')}</button>
+                <button class="btn ghost" type="button" data-act="later">${tx('phoneLater')}</button></div>`}${fb()}`,
         bind(root) {
           const on = (a, f) => { const b = root.querySelector(`[data-act=${a}]`); if (b) b.onclick = f; };
           on('accept', () => { app.ui.confirm = 'accept'; renderModal(true); });
           on('no', () => { app.ui.confirm = null; renderModal(true); });
           on('yes', () => submit('phone', 'accept'));
           on('refuse', () => submit('phone', 'refuse'));
-          on('later', () => { closeAll(); say([{ text: '你放下了聽筒。電話還在響。', kind: 'info' }]); render(); });
+          on('later', () => { closeAll(); say([{ text: I.UI.phoneLaterSaid, kind: 'info' }]); render(); });
         },
       };
     },
 
     exit: () => {
       const s = app.s, plate = s.inv.includes('plate'), pages = E.pageCount(s);
-      const opts = plate
-        ? [['publish', '帶著底片離開，把真相公諸於世'], ['leave_plate', '把底片留在屋裡，獨自離開']]
-        : [['leave', '推開大門，離開這棟屋子']];
+      const opts = plate ? [['publish', 'exitPublish'], ['leave_plate', 'exitLeavePlate']] : [['leave', 'exitLeave']];
       const c = app.ui.confirm;
       const label = c && opts.find(o => o[0] === c);
       return {
-        title: '大門',
-        html: `<p class="lead">三枚徽章都已歸位。沉重的大門只要輕輕一推就會打開。門外，雨後的山路泛著月光。</p>
-          <p class="lead">你帶著：日記 ${pages} / 4 頁${plate ? '、玻璃底片' : ''}。</p>
+        title: T('exitTitle'),
+        html: `<p class="lead">${tx('exitLead')}</p>
+          <p class="lead">${tx('exitCarrying', { n: pages, plate: plate ? T('exitCarryingPlate') : '' })}</p>
           ${label
-            ? `<div class="confirm"><p style="margin:0">「${label[1]}」——離開之後，故事就結束了。確定嗎？</p>
-                <div class="row"><button class="btn primary" type="button" data-yes="${c}">確定</button><button class="btn" type="button" data-act="no" data-autofocus>再想想</button></div></div>`
-            : `<div class="choices">${opts.map(([id, t]) => `<button class="btn" type="button" data-choice="${id}">${t}</button>`).join('')}
-                <button class="btn ghost" type="button" data-act="stay">先不走，我還想在屋裡看看</button></div>`}`,
+            ? `<div class="confirm"><p style="margin:0">${tx('exitConfirm', { choice: T(label[1]) })}</p>
+                <div class="row"><button class="btn primary" type="button" data-yes="${c}">${tx('yes')}</button><button class="btn" type="button" data-act="no" data-autofocus>${tx('thinkAgain')}</button></div></div>`
+            : `<div class="choices">${opts.map(([id, key]) => `<button class="btn" type="button" data-choice="${id}">${tx(key)}</button>`).join('')}
+                <button class="btn ghost" type="button" data-act="stay">${tx('exitStay')}</button></div>`}`,
         bind(root) {
           root.querySelectorAll('[data-choice]').forEach(b => { b.onclick = () => { app.ui.confirm = b.dataset.choice; renderModal(true); }; });
           const yes = root.querySelector('[data-yes]');
@@ -604,9 +759,9 @@
     notes: () => {
       const notes = app.s.notes;
       return {
-        title: '線索筆記',
-        html: `<p class="lead">你讀過、看過的線索都會自動記在這裡，隨時可以重讀。（物品本身請在物品欄「查看」。）</p>
-          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(G.docs[id].title)}</span><span aria-hidden="true">›</span></button>`).join('')}</div>`,
+        title: T('notesTitle'),
+        html: `<p class="lead">${tx('notesLead')}</p>
+          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(tr(G.docs[id].title))}</span><span aria-hidden="true">›</span></button>`).join('')}</div>`,
         bind(root) {
           root.querySelectorAll('[data-note]').forEach(b => { b.onclick = () => openView(b.dataset.note === 'letter' ? { view: 'item', id: 'letter' } : { view: 'doc', id: b.dataset.note }); });
         },
@@ -616,11 +771,11 @@
     hints: () => {
       const list = E.hintList(app.s);
       return {
-        title: '提示',
-        html: `<p class="lead">每個目標的提示分三段：先給方向，再指出線索在哪，最後才是答案。用過的提示次數會出現在結算畫面上。</p>
-          ${list.map(h => `<div class="hint"><h3>${esc(h.title)}</h3>
-            ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
-            <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? '給我一點提示' : h.level >= h.max ? '已經是答案了' : `再多一點（${h.level + 1}/${h.max}）`}</button></div></div>`).join('') || '<p>目前沒有可以提示的目標。</p>'}`,
+        title: T('hintsTitle'),
+        html: `<p class="lead">${tx('hintsLead')}</p>
+          ${list.map(h => `<div class="hint"><h3>${esc(tr(h.title))}</h3>
+            ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(tr(t))}</li>`).join('')}</ol>` : ''}
+            <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div></div>`).join('') || `<p>${tx('hintNone')}</p>`}`,
         bind(root) {
           root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { if (E.revealHint(app.s, b.dataset.hint)) autosave(); renderModal(); }; });
         },
@@ -631,16 +786,18 @@
     load: () => saveView(false),
 
     menu: () => ({
-      title: '選單',
+      title: T('menuTitle'),
       html: `<div class="list">
-          <button class="btn" type="button" data-go="save">存檔 / 讀檔</button>
-          <button class="btn" type="button" data-go="help">遊戲說明</button>
-          <button class="btn" type="button" data-go="gallery">結局圖鑑</button>
+          <div class="lang-row"><span>${tx('language')}</span>${langSwitch()}</div>
+          <button class="btn" type="button" data-go="save">${tx('saveLoad')}</button>
+          <button class="btn" type="button" data-go="help">${tx('helpTitle')}</button>
+          <button class="btn" type="button" data-go="gallery">${tx('galleryTitle')}</button>
           ${app.ui.confirm === 'title'
-            ? `<div class="confirm"><p style="margin:0">回到標題畫面？目前進度已自動存檔，可以用「繼續遊戲」回來。</p><div class="row"><button class="btn primary" type="button" data-act="title-yes">回到標題</button><button class="btn" type="button" data-act="title-no">取消</button></div></div>`
-            : '<button class="btn" type="button" data-act="title">回到標題畫面</button>'}
+            ? `<div class="confirm"><p style="margin:0">${tx('toTitleConfirm')}</p><div class="row"><button class="btn primary" type="button" data-act="title-yes">${tx('toTitleYes')}</button><button class="btn" type="button" data-act="title-no">${tx('cancel')}</button></div></div>`
+            : `<button class="btn" type="button" data-act="title">${tx('toTitle')}</button>`}
         </div>`,
       bind(root) {
+        syncLangButtons();
         root.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => openView({ view: b.dataset.go }); });
         const on = (a, f) => { const b = root.querySelector(`[data-act=${a}]`); if (b) b.onclick = f; };
         on('title', () => { app.ui.confirm = 'title'; renderModal(); });
@@ -650,27 +807,24 @@
     }),
 
     help: () => ({
-      title: '遊戲說明',
-      html: `<div class="paper plain">
-        <p><strong>目標</strong>：找回日、月、星三枚徽章，嵌回門廳的大門就能離開。屋裡還藏著另一個秘密，它決定你會看到哪一個結局。</p>
-        <p><strong>查看</strong>：點擊場景裡發亮的物件，或點場景下方的物件名稱。</p>
-        <p><strong>使用物品</strong>：在右邊的物品欄點一下物品（拿在手上），再點場景裡的物件。</p>
-        <p><strong>組合線索</strong>：點選物品後按「組合…」，再點另一個物品。撕開的紙、疊在一起的圖、裝電池……很多線索要合在一起才看得懂。</p>
-        <p><strong>線索筆記</strong>：讀過的文件會自動記下，隨時能重讀。</p>
-        <p><strong>提示</strong>：卡關時按「提示」，每個目標分三段，從方向到答案。</p>
-        <p><strong>存檔</strong>：每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。</p>
-        <p><strong>公平原則</strong>：所有謎題的答案都在屋子裡，不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死。</p>
-        <p><strong>鍵盤</strong>：Tab 移動、Enter 選擇、Esc 關閉視窗或放下手上的物品；數字鎖可以直接打數字。</p></div>`,
+      title: T('helpTitle'),
+      html: `<div class="paper plain help">${T('help').map(([k, v]) => `<p><strong>${esc(k)}</strong>${LANG === 'en' ? '. ' : '：'}${esc(v)}</p>`).join('')}</div>`,
     }),
 
     gallery: () => {
       const got = Store.getEndings();
+      const excerpt = s => {
+        if (LANG !== 'en') return s.slice(0, 26) + '……';
+        if (s.length <= 90) return s;
+        const cut = s.slice(0, 90);
+        return cut.slice(0, cut.lastIndexOf(' ')) + '…';
+      };
       return {
-        title: '結局圖鑑',
-        html: `<p class="lead">已解鎖 ${got.length} / ${G.ENDING_ORDER.length}</p>
+        title: T('galleryTitle'),
+        html: `<p class="lead">${tx('galleryCount', { n: got.length, total: G.ENDING_ORDER.length })}</p>
           <div class="gallery">${G.ENDING_ORDER.map(id => {
             const e = G.endings[id], ok = got.includes(id);
-            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? e.rank : '？？？'}</span><span>${ok ? '「' + esc(e.title) + '」' + esc(e.text[0].slice(0, 26)) + '……' : '尚未解鎖'}</span></div>`;
+            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(e.text)[0]))}` : tx('galleryLocked')}</span></div>`;
           }).join('')}</div>`,
       };
     },
@@ -688,19 +842,20 @@
   function checkpoint() { if (app.s && !app.s.ending) Store.write('preend', record(app.s)); }
 
   function describe(rec) {
-    if (!rec) return '空的';
-    if (rec.corrupt) return '存檔損毀，無法讀取';
+    if (!rec) return T('slotEmptyDesc');
+    if (rec.corrupt) return T('slotCorrupt');
     const d = new Date(rec.savedAt);
     const when = isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return `${when}・${G.rooms[rec.room] ? G.rooms[rec.room].name : '？'}・徽章 ${rec.emblems}/3・日記 ${rec.pages}/4・${fmtTime(rec.state.stats && rec.state.stats.playMs)}`;
+    return T('slotDesc', { when, room: G.rooms[rec.room] ? G.rooms[rec.room].name : '?', e: rec.emblems, p: rec.pages, time: fmtTime(rec.state.stats && rec.state.stats.playMs) });
   }
 
+  // 成功時回傳 null，失敗時回傳雙語錯誤訊息
   function loadState(state, label) {
     let st;
-    try { st = E.normalize(JSON.parse(JSON.stringify(state))); } catch (e) { return '存檔內容無法解讀。'; }
+    try { st = E.normalize(JSON.parse(JSON.stringify(state))); } catch (e) { return I.UI.saveUnreadable; }
     const errs = E.validate(st);
-    if (errs.length) return '這份存檔無法使用：' + errs.join('、') + '。';
-    if (st.ending) return '這份存檔的故事已經結束了。';
+    if (errs.length) return TL('saveUnusable', { errs: joinL(errs) });
+    if (st.ending) return I.UI.saveEnded;
     app.s = st;
     app.selected = null; app.combining = false;
     app.ui = freshUi();
@@ -708,7 +863,7 @@
     app.stack = [];
     renderModal();
     show('game');
-    say([{ text: `已讀取：${label}`, kind: 'note' }, { text: G.rooms[st.room].enterText(st), kind: 'room' }]);
+    say([{ text: TL('loaded', { label }), kind: 'note' }, { text: G.rooms[st.room].enterText(st), kind: 'room' }]);
     autosave();
     render();
     return null;
@@ -716,75 +871,77 @@
 
   function saveView(inGame) {
     const canSave = inGame && app.s && !app.s.ending;
-    const slots = [['auto', '自動存檔'], ['1', '欄位一'], ['2', '欄位二'], ['3', '欄位三'], ['preend', '結局前的存檔']];
+    const slots = [['auto', 'slotAuto'], ['1', 'slot1'], ['2', 'slot2'], ['3', 'slot3'], ['preend', 'slotPreend']];
     const c = app.ui.confirm;
     return {
-      title: inGame ? '存檔 / 讀檔' : '讀取存檔',
-      html: `${Store.persistent ? '' : '<p class="notice warn">這個瀏覽器目前無法長期保存資料（例如私密視窗或被封鎖的網站資料）。存檔只會保留到關閉頁面為止——請用下方的存檔碼把進度帶走。</p>'}
-        ${app.ui.saveNote ? `<p class="notice">${esc(app.ui.saveNote)}</p>` : ''}
-        <div class="list">${slots.map(([id, name]) => {
+      title: T(inGame ? 'saveTitle' : 'loadTitle'),
+      html: `${Store.persistent ? '' : `<p class="notice warn">${tx('noStorage')}</p>`}
+        ${app.ui.saveNote ? `<p class="notice">${esc(tr(app.ui.saveNote))}</p>` : ''}
+        <div class="list">${slots.map(([id, key]) => {
           const rec = Store.read(id);
           const usable = rec && rec.state && !rec.state.ending;
           const manual = /^[123]$/.test(id);
           if (c === 'over:' + id || c === 'del:' + id) {
             const over = c.startsWith('over');
-            return `<div class="slot-card"><strong>${name}</strong><p style="margin:0">${over ? '覆蓋這個欄位的存檔？' : '刪除這個欄位的存檔？'}</p>
-              <div class="row"><button class="btn ${over ? 'primary' : 'danger'}" type="button" data-yes="${c}">確定</button><button class="btn" type="button" data-act="cancel">取消</button></div></div>`;
+            return `<div class="slot-card"><strong>${tx(key)}</strong><p style="margin:0">${tx(over ? 'confirmOverwrite' : 'confirmDelete')}</p>
+              <div class="row"><button class="btn ${over ? 'primary' : 'danger'}" type="button" data-yes="${c}">${tx('yes')}</button><button class="btn" type="button" data-act="cancel">${tx('cancel')}</button></div></div>`;
           }
           if (!manual && !rec) return '';
-          return `<div class="slot-card"><strong>${name}</strong><span class="meta">${esc(describe(rec))}</span>
+          return `<div class="slot-card"><strong>${tx(key)}</strong><span class="meta">${esc(describe(rec))}</span>
             <div class="row">
-              ${canSave && manual ? `<button class="btn small" type="button" data-save="${id}">存到這裡</button>` : ''}
-              <button class="btn small" type="button" data-load="${id}" ${usable ? '' : 'disabled'}>讀取</button>
-              ${manual && rec ? `<button class="btn small danger" type="button" data-del="${id}">刪除</button>` : ''}
+              ${canSave && manual ? `<button class="btn small" type="button" data-save="${id}">${tx('saveHere')}</button>` : ''}
+              <button class="btn small" type="button" data-load="${id}" ${usable ? '' : 'disabled'}>${tx('loadBtn')}</button>
+              ${manual && rec ? `<button class="btn small danger" type="button" data-del="${id}">${tx('deleteBtn')}</button>` : ''}
             </div></div>`;
         }).join('')}</div>
-        ${canSave ? `<div class="slot-card"><strong>匯出存檔碼</strong><span class="meta">複製這段文字保存起來，之後可以在任何瀏覽器貼回來繼續。</span>
+        ${canSave ? `<div class="slot-card"><strong>${tx('exportTitle')}</strong><span class="meta">${tx('exportLead')}</span>
           <textarea class="code" id="code-out" readonly>${esc(Store.encode(app.s))}</textarea>
-          <div class="row"><button class="btn small" type="button" data-act="copy">複製</button></div></div>` : ''}
-        <div class="slot-card"><strong>匯入存檔碼</strong>
-          <textarea class="code" id="code-in" placeholder="把 STAR1. 開頭的存檔碼貼在這裡">${esc(app.ui.importText)}</textarea>
-          <div class="row"><button class="btn small" type="button" data-act="import">讀取存檔碼</button></div></div>
+          <div class="row"><button class="btn small" type="button" data-act="copy">${tx('copy')}</button></div></div>` : ''}
+        <div class="slot-card"><strong>${tx('importTitle')}</strong>
+          <textarea class="code" id="code-in" placeholder="${tx('importPlaceholder')}">${esc(app.ui.importText)}</textarea>
+          <div class="row"><button class="btn small" type="button" data-act="import">${tx('importBtn')}</button></div></div>
         ${fb()}`,
       bind(root) {
         const note = msg => { app.ui.saveNote = msg; app.ui.confirm = null; renderModal(); };
+        const slotName = id => I.UI['slot' + id];
         root.querySelectorAll('[data-save]').forEach(b => {
           b.onclick = () => {
             const id = b.dataset.save;
             if (Store.read(id) && app.ui.confirm !== 'over:' + id) { app.ui.confirm = 'over:' + id; renderModal(); return; }
-            Store.write(id, record(app.s)); note(`已存到欄位${'一二三'[id - 1]}。`);
+            Store.write(id, record(app.s)); note(TL('savedTo', { slot: slotName(id) }));
           };
         });
         root.querySelectorAll('[data-del]').forEach(b => { b.onclick = () => { app.ui.confirm = 'del:' + b.dataset.del; renderModal(); }; });
         const yes = root.querySelector('[data-yes]');
         if (yes) yes.onclick = () => {
           const [kind, id] = yes.dataset.yes.split(':');
-          if (kind === 'over') { Store.write(id, record(app.s)); note(`已覆蓋欄位${'一二三'[id - 1]}。`); }
-          else { Store.remove(id); note('已刪除。'); }
+          if (kind === 'over') { Store.write(id, record(app.s)); note(TL('overwritten', { slot: slotName(id) })); }
+          else { Store.remove(id); note(I.UI.deleted); }
         };
         const cancel = root.querySelector('[data-act=cancel]');
         if (cancel) cancel.onclick = () => { app.ui.confirm = null; renderModal(); };
         root.querySelectorAll('[data-load]').forEach(b => {
           b.onclick = () => {
             const rec = Store.read(b.dataset.load);
-            const err = rec && rec.state ? loadState(rec.state, slots.find(x => x[0] === b.dataset.load)[1]) : '這個欄位是空的。';
+            const key = slots.find(x => x[0] === b.dataset.load)[1];
+            const err = rec && rec.state ? loadState(rec.state, I.UI[key]) : I.UI.slotEmpty;
             if (err) note(err);
           };
         });
         const copy = root.querySelector('[data-act=copy]');
         if (copy) copy.onclick = () => {
           const ta = $('code-out');
-          const fallback = () => { ta.focus(); ta.select(); note('已選取存檔碼，請按 Ctrl+C（或長按）複製。'); };
+          const fallback = () => { ta.focus(); ta.select(); note(I.UI.copyFallback); };
           try {
-            navigator.clipboard.writeText(ta.value).then(() => note('存檔碼已複製。'), fallback);
+            navigator.clipboard.writeText(ta.value).then(() => note(I.UI.copied), fallback);
           } catch (e) { fallback(); }
         };
         const imp = root.querySelector('[data-act=import]');
         imp.onclick = () => {
           app.ui.importText = $('code-in').value;
           let state;
-          try { state = Store.decode(app.ui.importText); } catch (e) { note(e.message); return; }
-          const err = loadState(state, '存檔碼');
+          try { state = Store.decode(app.ui.importText); } catch (e) { note(e.text || e.message); return; }
+          const err = loadState(state, I.UI.fromCode);
           if (err) note(err); else app.ui.importText = '';
         };
       },
@@ -793,32 +950,39 @@
 
   /* ================= 結局 ================= */
   function finishGame(id) {
-    const e = G.endings[id];
-    const s = app.s;
-    const got = Store.addEnding(id);
+    Store.addEnding(id);
     Store.remove('auto');
     app.stack = []; renderModal();
+    app.endingId = id;
     show('ending');
+    renderEnding(id);
+    ($('btn-preend') || $('btn-end-title')).focus();
+  }
+  function renderEnding(id) {
+    const e = G.endings[id];
+    const s = app.s;
+    const got = Store.getEndings();
     const stats = [
-      [fmtTime(s.stats.playMs), '遊戲時間'], [s.stats.actions, '行動次數'], [s.stats.wrong, '錯誤嘗試'],
-      [s.stats.hints, '使用提示'], [E.pageCount(s) + ' / 4', '日記頁數'],
+      [fmtTime(s.stats.playMs), 'statTime'], [s.stats.actions, 'statActions'], [s.stats.wrong, 'statWrong'],
+      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'],
     ];
     $('ending-card').innerHTML = `
-      <p class="ending-rank">${esc(e.rank)}</p>
-      <h1 class="ending-title">${esc(e.title)}</h1>
-      <div class="ending-text">${e.text.map(t => `<p>${esc(t)}</p>`).join('')}</div>
-      <div class="stats">${stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
-      <p class="lead">已解鎖結局 ${got.length} / ${G.ENDING_ORDER.length}${got.length < G.ENDING_ORDER.length ? '。換一個選擇，或多找一些東西，也許會看到不同的結局。' : '。你看過了這棟屋子的每一種結局。'}</p>
+      <p class="ending-rank">${esc(tr(e.rank))}</p>
+      <h1 class="ending-title">${esc(tr(e.title))}</h1>
+      <div class="ending-text">${tr(e.text).map(t => `<p>${esc(t)}</p>`).join('')}</div>
+      <div class="stats">${stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${tx(l)}</span></div>`).join('')}</div>
+      <p class="lead">${tx('endUnlocked', { n: got.length, total: G.ENDING_ORDER.length })}${tx(got.length < G.ENDING_ORDER.length ? 'endMore' : 'endAll')}</p>
       <div class="row">
-        ${Store.read('preend') ? '<button class="btn primary" type="button" id="btn-preend">回到做出選擇之前</button>' : ''}
-        <button class="btn" type="button" id="btn-end-gallery">結局圖鑑</button>
-        <button class="btn" type="button" id="btn-end-title">回到標題</button>
+        ${Store.read('preend') ? `<button class="btn primary" type="button" id="btn-preend">${tx('backBefore')}</button>` : ''}
+        <button class="btn" type="button" id="btn-end-gallery">${tx('galleryTitle')}</button>
+        <button class="btn" type="button" id="btn-end-title">${tx('titleScreen')}</button>
+        ${langSwitch()}
       </div>`;
+    syncLangButtons();
     const pre = $('btn-preend');
-    if (pre) pre.onclick = () => { const rec = Store.read('preend'); if (rec && rec.state) loadState(rec.state, '結局前的存檔'); };
+    if (pre) pre.onclick = () => { const rec = Store.read('preend'); if (rec && rec.state) { app.endingId = null; loadState(rec.state, I.UI.slotPreend); } };
     $('btn-end-gallery').onclick = () => openView({ view: 'gallery' });
-    $('btn-end-title').onclick = () => show('title');
-    ($('btn-preend') || $('btn-end-title')).focus();
+    $('btn-end-title').onclick = () => { app.endingId = null; show('title'); };
   }
 
   /* ================= 事件繫結 ================= */
@@ -827,31 +991,37 @@
       const auto = Store.read('auto');
       if (auto && auto.state && !auto.state.ending && !app.confirmNew) {
         app.confirmNew = true;
-        $('btn-new').textContent = '確定開始新遊戲？（自動存檔會被覆蓋）';
+        $('btn-new').textContent = T('confirmNew');
         return;
       }
       app.confirmNew = false;
-      $('btn-new').textContent = '新遊戲';
+      $('btn-new').textContent = T('newGame');
       newGame();
     };
     $('btn-continue').onclick = () => {
       const rec = Store.read('auto');
-      const err = rec && rec.state ? loadState(rec.state, '自動存檔') : '沒有可以繼續的進度。';
-      if (err) { $('title-foot').textContent = err; refreshTitle(); }
+      const err = rec && rec.state ? loadState(rec.state, I.UI.slotAuto) : I.UI.noContinue;
+      if (err) { refreshTitle(); $('title-foot').textContent = tr(err); }
     };
     $('btn-load').onclick = () => openView({ view: 'load' });
     $('btn-gallery').onclick = () => openView({ view: 'gallery' });
     $('btn-help').onclick = () => openView({ view: 'help' });
     $('btn-intro-next').onclick = nextIntro;
-    $('btn-intro-skip').onclick = () => { app.introStep = G.intro.length; beginGame(); };
+    $('btn-intro-skip').onclick = () => { app.introStep = tr(G.intro).length; beginGame(); };
 
     $('btn-hints').onclick = () => openView({ view: 'hints' });
     $('btn-notes').onclick = () => openView({ view: 'notes' });
-    $('btn-save').onclick = () => { app.ui.saveNote = ''; openView({ view: 'save' }); };
+    $('btn-save').onclick = () => { app.ui.saveNote = null; openView({ view: 'save' }); };
     $('btn-menu').onclick = () => openView({ view: 'menu' });
     $('modal-close').onclick = closeAll;
     $('modal-back-btn').onclick = closeView;
     $('modal-back').addEventListener('click', e => { if (e.target === $('modal-back')) closeAll(); });
+
+    // 語言切換（標題畫面、選單、結局畫面、上方狀態列）
+    document.addEventListener('click', e => {
+      const b = e.target.closest && e.target.closest('[data-lang]');
+      if (b && b.dataset.lang !== LANG) setLang(b.dataset.lang);
+    });
 
     const scene = $('scene');
     scene.addEventListener('click', e => { const g = e.target.closest('.hs'); if (g) onHotspot(g.dataset.hs); });
@@ -916,8 +1086,9 @@
   /* ================= 啟動 ================= */
   function start(data) {
     bindStatic();
+    setLang(initialLang(), { persist: false });
     show('title');
-    if (data && data.state) loadState(data.state, '更新前的進度');
+    if (data && data.state) loadState(data.state, I.UI.beforeUpdate);
   }
   const hot = window.claude && window.claude.hot;
   if (hot && typeof hot.snapshot === 'function') {
@@ -927,5 +1098,5 @@
   else start((hot && hot.data) || {});
 
   // 提供給自動化測試的唯讀窺視口（不影響遊戲）
-  window.__stargazer = { get state() { return app.s; }, get screen() { return app.screen; } };
+  window.__stargazer = { get state() { return app.s; }, get screen() { return app.screen; }, get lang() { return LANG; } };
 }());

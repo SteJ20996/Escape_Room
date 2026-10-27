@@ -89,7 +89,7 @@ function finish(s) {
       continue; // 進入門廳可能讓電話響起，重新評估
     }
     const r = act(s);
-    if (!r.ok) return { ok: false, why: r.messages.map(m => m.text).join(' / '), s };
+    if (!r.ok) return { ok: false, why: r.messages.map(m => m.text.zh || m.text).join(' / '), s };
   }
   return { ok: s.ending === 'B', why: '結局：' + s.ending, s };
 }
@@ -132,13 +132,13 @@ test('日記裝訂：任何殘頁組合、任何裝訂順序都不會遺失頁�
       for (let i = 1; i < order.length; i++) {
         const a = i === 1 ? order[0] : 'diary';
         const r = E.combine(s, a, order[i]);
-        assert.ok(r.ok, r.messages.map(m => m.text).join());
+        assert.ok(r.ok, r.messages.map(m => m.text.zh).join());
       }
       assert.equal(G.countPages(s), held.length);
       if (held.length >= 2) {
         assert.deepEqual(s.flags.diaryPages, pages.filter(p => held.includes(p)), '裝訂後應按日期排序');
         assert.ok(s.inv.includes('diary'));
-        assert.equal(E.itemName(s, 'diary'), `陸觀的日記（${held.length}/4）`);
+        assert.deepEqual(E.itemName(s, 'diary'), { zh: `陸觀的日記（${held.length}/4）`, en: `Lu Guan's Diary (${held.length}/4)` });
       }
     }
   }

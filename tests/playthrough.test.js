@@ -2,7 +2,7 @@
 // 以玩家身分逐一走完五個結局的關鍵路線。
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { G, makeGame, mainPath, darkroomPath, insertAll } = require('./helpers');
+const { G, makeGame, mainPath, darkroomPath, insertAll, txt } = require('./helpers');
 
 test('結局 A「破曉」：只拿三枚徽章離開', () => {
   const P = makeGame();
@@ -27,7 +27,7 @@ test('結局 B「陸觀彗星」：底片 + 四頁日記 + 公開', () => {
   assert.deepEqual(P.s.flags.diaryPages, ['page1', 'page2', 'page3', 'page4']);
   assert.equal(G.countPages(P.s), 4);
   const r = P.go('foyer');
-  assert.ok(r.messages.some(m => /電話/.test(m.text)), '帶著底片回到門廳時電話應該響起');
+  assert.ok(r.messages.some(m => /電話/.test(txt(m))), '帶著底片回到門廳時電話應該響起');
   P.look('f_phone');
   P.solve('phone', 'refuse');
   insertAll(P);
@@ -101,7 +101,7 @@ test('拒絕交易後仍可走到真結局；電話不會再響', () => {
   P.solve('phone', 'refuse');
   P.go('study');
   const r = P.go('foyer');
-  assert.ok(!r.messages.some(m => /電話.*響/.test(m.text)));
+  assert.ok(!r.messages.some(m => /電話.*響/.test(txt(m))));
   assert.equal(P.E.submit(P.s, 'phone', 'accept').ok, false, '掛斷後不能再接受交易');
   insertAll(P);
   assert.equal(P.solve('exit', 'publish').ending, 'B');

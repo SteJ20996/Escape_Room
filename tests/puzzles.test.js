@@ -25,11 +25,12 @@ test('星圖疊合：三個標記落在三個不同格子，讀出 472', () => {
 });
 
 test('最後的觀測：日誌的日期在月落表內，月落 + 1 小時 = 答案', () => {
-  const row = G.MOONSET.find(([d]) => d === '三日');
-  assert.ok(row);
+  const row = G.MOONSET.find(([d]) => d.zh === '三日');
+  assert.ok(row && row[0].en === 'Oct 3');
   const [hh, mm] = row[1].split(':').map(Number);
   assert.deepEqual({ h: (hh + 1) % 12 || 12, m: mm }, G.CLOCK_ANSWER);
-  assert.ok(G.docs.obs_log.body.some(t => t.includes('十月三日') && t.includes('最後一次觀測') && t.includes('一小時')));
+  assert.ok(G.docs.obs_log.body.zh.some(t => t.includes('十月三日') && t.includes('最後一次觀測') && t.includes('一小時')));
+  assert.ok(G.docs.obs_log.body.en.some(t => t.includes('3 October') && t.includes('Last observation') && t.includes('one full hour')));
 });
 
 test('灌溉管線：32 種閥門組合中恰好一種符合守則', () => {
@@ -54,10 +55,12 @@ test('倒立的星空：八個星座星數各不相同，可以靠數星辨認�
   const counts = G.CONSTELLATION_ORDER.map(id => G.CONSTELLATIONS[id].stars.length);
   assert.equal(new Set(counts).size, counts.length);
   for (const [dir, f] of Object.entries(G.SKY_FIELDS)) assert.equal(new Set(f).size, 3, dir);
-  assert.equal(G.DIRECTIONS.find(d => d.id === G.COMET_DIRECTION).name, '東南');
-  // 「東南」在遊戲內至少有兩個來源：剪報與日記殘頁（一）
-  assert.ok(G.docs.clipping.body.join('').includes('東南'));
-  assert.ok(G.docs.page1.body.join('').includes('東南'));
+  assert.deepEqual(G.DIRECTIONS.find(d => d.id === G.COMET_DIRECTION).name, { zh: '東南', en: 'southeast' });
+  // 「東南」在遊戲內至少有兩個來源：剪報與日記殘頁（一）——兩種語言都要
+  for (const id of ['clipping', 'page1']) {
+    assert.ok(G.docs[id].body.zh.join('').includes('東南'), id);
+    assert.ok(/southeast/i.test(G.docs[id].body.en.join('')), id);
+  }
   // 不考慮倒像直接照目鏡上下順序輸入會是錯的（倒像是必要的推理步驟）
   assert.notDeepEqual(G.SKY_FIELDS.SE.slice().reverse(), G.DIAL_ANSWER);
   // 每條連線都指向存在的星
@@ -85,15 +88,24 @@ test('目鏡畫面：八個方位的星都在視野內、不被地平線遮住�
   }
 });
 
-test('撕開的便條：密碼與沖洗順序都橫跨撕口，單看任一半都讀不出來', () => {
-  const left = G.NOTE_LINES.map(l => l[0]).join('\n');
-  const right = G.NOTE_LINES.map(l => l[1]).join('\n');
-  const full = G.NOTE_LINES.map(l => l[0] + l[1]).join('\n');
-  assert.ok(full.includes(G.TRAPDOOR_CODE.slice(0, 2) + G.TRAPDOOR_CODE.slice(2)) || full.includes('12' + '08'));
-  assert.ok(!left.includes(G.TRAPDOOR_CODE) && !right.includes(G.TRAPDOOR_CODE));
-  assert.ok(full.includes('顯影→停影→定影→清水'));
-  assert.ok(!left.includes('停影') && !right.includes('停影→'));
-});
+for (const lang of ['zh', 'en']) {
+  test(`撕開的便條（${lang}）：密碼與沖洗順序都橫跨撕口，單看任一半都讀不出來`, () => {
+    const lines = G.NOTE_LINES[lang];
+    assert.equal(lines.length, G.NOTE_LINES.zh.length, '兩種語言的行數相同');
+    const left = lines.map(l => l[0]).join('\n');
+    const right = lines.map(l => l[1]).join('\n');
+    const full = lines.map(l => l[0] + l[1]).join('\n');
+    assert.ok(full.includes(G.TRAPDOOR_CODE), '拼起來能讀到密碼');
+    assert.ok(!left.includes(G.TRAPDOOR_CODE) && !right.includes(G.TRAPDOOR_CODE), '任一半都讀不到完整密碼');
+    const order = G.NOTE_ORDER_TEXT[lang];
+    assert.ok(full.includes(order), '拼起來能讀到完整沖洗順序');
+    assert.ok(!left.includes(order) && !right.includes(order), '任一半都讀不到完整順序');
+    // 每一半都只看得到順序的片段：左半缺結尾、右半缺開頭
+    const words = lang === 'zh' ? ['停影', '定影'] : ['stop bath', 'fixer'];
+    assert.ok(!left.includes(words[0]) || !left.includes(words[1]));
+    assert.ok(!right.includes(lang === 'zh' ? '顯影→' : 'developer'));
+  });
+}
 
 test('顯影藥劑：24 種排列中只有一種同時滿足卡片四條規則', () => {
   const colors = G.BOTTLES.map(b => b.id); // 由左到右
@@ -111,22 +123,25 @@ test('顯影藥劑：24 種排列中只有一種同時滿足卡片四條規則',
   assert.deepEqual(G.DEVELOP_ANSWER, ['yellow', 'white', 'blue', 'red']);
 });
 
-test('被照抄的「7」：剪報的 −17、日記三的劃掉的 7、日記四提到紙套，三者一致', () => {
-  assert.ok(G.docs.clipping.body.join('').includes('−17'));
-  const p3 = G.docs.page3.body.join('');
-  assert.ok(p3.includes('−16') && p3.includes('−17') && p3.includes('「7」'));
-  assert.ok(G.docs.page4.body.join('').includes('紙套'));
-  assert.ok(G.items.plate.desc.includes('紙套'));
-  assert.ok(G.endings.B.text.join('').includes('「7」'));
+test('被照抄的「7」：剪報的 −17、日記三的劃掉的 7、日記四提到紙套，三者一致（兩種語言）', () => {
+  for (const lang of ['zh', 'en']) {
+    assert.ok(G.docs.clipping.body[lang].join('').includes('−17'), lang);
+    const p3 = G.docs.page3.body[lang].join('');
+    assert.ok(p3.includes('−16') && p3.includes('−17'), lang);
+  }
+  assert.ok(G.docs.page3.body.zh.join('').includes('「7」') && G.docs.page3.body.en.join('').includes('"7"'));
+  assert.ok(G.docs.page4.body.zh.join('').includes('紙套') && G.docs.page4.body.en.join('').includes('sleeve'));
+  assert.ok(G.items.plate.desc.zh.includes('紙套') && G.items.plate.desc.en.includes('sleeve'));
+  assert.ok(G.endings.B.text.zh.join('').includes('「7」') && G.endings.B.text.en.join('').includes('"7"'));
 });
 
 test('每一份線索文件與物品文件都存在且非空', () => {
   for (const [id, d] of Object.entries(G.docs)) {
-    assert.ok(d.title, id);
-    assert.ok(d.view || (Array.isArray(d.body) && d.body.length), id);
+    assert.ok(d.title && d.title.zh && d.title.en, id);
+    assert.ok(d.view || (d.body.zh.length && d.body.zh.length === d.body.en.length), id + '：兩種語言的段落數應相同');
   }
   for (const [id, it] of Object.entries(G.items)) {
-    assert.ok(it.name && it.desc && it.glyph, id);
+    assert.ok(it.name.zh && it.name.en && it.desc.zh && it.desc.en && it.kind, id);
     if (it.doc) assert.ok(G.docs[it.doc], id);
   }
 });

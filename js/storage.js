@@ -49,6 +49,9 @@
   function write(slot, rec) { return rawSet('slot.' + slot, JSON.stringify(rec)); }
   function remove(slot) { rawDel('slot.' + slot); }
 
+  function getSetting(key) { return rawGet('setting.' + key); }
+  function setSetting(key, value) { return rawSet('setting.' + key, String(value)); }
+
   function getEndings() {
     try { const v = JSON.parse(rawGet('endings') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
@@ -82,19 +85,22 @@
     const json = JSON.stringify(state);
     return 'STAR1.' + toB64(json) + '.' + checksum(json);
   }
+  // 錯誤同時帶中英文：message 為中文（供測試與主控台），text 為 { zh, en } 供介面顯示
+  const err = (zh, en) => Object.assign(new Error(zh), { text: { zh, en } });
+  const ERR_CORRUPT = ['存檔碼內容損毀，無法解讀。', 'The save code is damaged and can\'t be read.'];
   function decode(code) {
     const clean = String(code || '').replace(/\s+/g, '');
     const parts = clean.split('.');
-    if (parts.length !== 3 || parts[0] !== 'STAR1') throw new Error('這不是《觀星者之屋》的存檔碼。');
+    if (parts.length !== 3 || parts[0] !== 'STAR1') throw err('這不是《觀星者之屋》的存檔碼。', 'This isn\'t a save code for The Stargazer\'s House.');
     let json;
-    try { json = fromB64(parts[1]); } catch (e) { throw new Error('存檔碼內容損毀，無法解讀。'); }
-    if (checksum(json) !== parts[2]) throw new Error('存檔碼不完整或被改動過（校驗失敗）。請確認整段都有複製到。');
-    try { return JSON.parse(json); } catch (e) { throw new Error('存檔碼內容損毀，無法解讀。'); }
+    try { json = fromB64(parts[1]); } catch (e) { throw err(...ERR_CORRUPT); }
+    if (checksum(json) !== parts[2]) throw err('存檔碼不完整或被改動過（校驗失敗）。請確認整段都有複製到。', 'The save code is incomplete or has been altered (checksum failed). Make sure you copied all of it.');
+    try { return JSON.parse(json); } catch (e) { throw err(...ERR_CORRUPT); }
   }
 
   return {
     get persistent() { return !!ls; },
-    read, write, remove, getEndings, addEnding, encode, decode,
+    read, write, remove, getEndings, addEnding, encode, decode, getSetting, setSetting,
     _reset() { for (const k of Object.keys(memory)) delete memory[k]; },
   };
 }));

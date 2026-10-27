@@ -478,13 +478,25 @@
   }
 
   function plate() {
-    return `<svg viewBox="0 0 400 300" class="art" role="img" aria-label="玻璃底片：群星之間一顆拖著短尾的彗星，片角刻著 1999.12.08 陸觀">
+    const hand = `font-family="'LXGW WenKai TC','Kaiti TC','Noto Serif TC',serif"`;
+    const mono = `font-family="'JetBrains Mono',ui-monospace,monospace"`;
+    const cw = 18 * 0.6; // 等寬字一格的寬度
+    return `<svg viewBox="0 0 400 430" class="art" role="img" aria-label="玻璃底片：群星之間一顆拖著短尾的彗星，片角刻著 1999.12.08 陸觀。紙套背面寫著：1999.12.08 22:40 東南方，赤經 5h27m，赤緯負十七度的 7 被劃掉，改成負十六度。">
       <defs><linearGradient id="pl-tail" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fffbe8" stop-opacity=".9"/><stop offset="1" stop-color="#fffbe8" stop-opacity="0"/></linearGradient></defs>
       <rect x="10" y="10" width="380" height="280" rx="6" fill="#0c0f16" stroke="#9aa6b8" stroke-width="3"/>
       ${starfield(77, 90, 20, 20, 360, 260)}
       <path d="M150 150 Q240 130 330 100 L334 112 Q244 146 152 158 Z" fill="url(#pl-tail)"/>
       <circle cx="150" cy="154" r="7" fill="#fffbe8"/><circle cx="150" cy="154" r="16" fill="#fffbe8" opacity=".25"/>
-      <text x="374" y="280" text-anchor="end" font-size="13" fill="#c9cfdb" font-family="'JetBrains Mono',monospace">1999.12.08　陸觀</text></svg>`;
+      <text x="374" y="280" text-anchor="end" font-size="13" fill="#c9cfdb" ${mono}>1999.12.08　陸觀</text>
+      <rect x="10" y="302" width="380" height="120" rx="4" fill="#e9dfc4"/>
+      <text x="26" y="326" font-size="13" fill="#6b5a3a">紙套背面（陸觀的筆跡）</text>
+      <text x="26" y="354" font-size="18" fill="#2b2418" ${hand}>1999.12.08　22:40　東南方</text>
+      <text x="26" y="382" font-size="18" fill="#2b2418" ${hand}>赤經</text><text x="72" y="382" font-size="18" fill="#2b2418" ${mono}>5h27m</text>
+      <text x="26" y="410" font-size="18" fill="#2b2418" ${hand}>赤緯</text>
+      <text x="72" y="410" font-size="18" fill="#2b2418" ${mono}>−1</text>
+      <text x="${72 + cw * 2}" y="410" font-size="18" fill="#2b2418" ${mono}>7</text>
+      <line x1="${70 + cw * 2}" y1="406" x2="${74 + cw * 3}" y2="400" stroke="#8a2a20" stroke-width="1.8"/>
+      <text x="${78 + cw * 3}" y="410" font-size="18" fill="#2b2418" ${mono}>6°</text></svg>`;
   }
 
   // 灌溉管線圖
@@ -564,7 +576,7 @@
       return `<g class="mirror" data-mirror="${m.id}" tabindex="0" role="button" aria-label="反光鏡 ${m.id}，目前「${d}」，點擊切換">
         <rect x="${x - cs / 2 + 3}" y="${y - cs / 2 + 3}" width="${cs - 6}" height="${cs - 6}" rx="8" fill="#1a2436" stroke="#3a4a66"/>
         <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d7e4ef" stroke-width="6" stroke-linecap="round"/>
-        <text x="${x - cs / 2 + 9}" y="${y - cs / 2 + 17}" font-size="12" fill="#8fa3c2">${m.id}</text></g>`;
+        <text x="${x - cs / 2 + 7}" y="${y + 4.5}" font-size="12" font-weight="700" fill="#b9c8de">${m.id}</text></g>`;
     }).join('');
     const fx = ox + g.cols * cs + 30, fy = oy + g.target.r * cs + cs / 2;
     return `<svg viewBox="0 0 ${W} ${Hh}" class="art mirrors-art" role="group" aria-label="反光鏡格子">
@@ -602,10 +614,12 @@
     const ring = (r, id, label) => `<circle cx="150" cy="150" r="${r}" fill="none" stroke="#6b4a1e" stroke-width="30" opacity=".35"/>
       <text x="150" y="${150 - r + 7}" text-anchor="middle" font-size="20" font-weight="700" fill="#2b1a08">${G.CONSTELLATIONS[id].name}</text>
       <text x="${150 + r * 0.72}" y="${150 + r * 0.72}" text-anchor="middle" font-size="10" fill="#5a3d16">${label}</text>`;
-    return `<svg viewBox="0 0 300 300" class="art dial-art" role="img" aria-label="星盤：外環${G.CONSTELLATIONS[sel[0]].name}、中環${G.CONSTELLATIONS[sel[1]].name}、內環${G.CONSTELLATIONS[sel[2]].name}">
+    return `<svg viewBox="0 -18 300 318" class="art dial-art" role="img" aria-label="星盤：外環${G.CONSTELLATIONS[sel[0]].name}、中環${G.CONSTELLATIONS[sel[1]].name}、內環${G.CONSTELLATIONS[sel[2]].name}">
       <circle cx="150" cy="150" r="146" fill="#c9a24f"/><circle cx="150" cy="150" r="140" fill="#dcbc72"/>
       ${ring(118, sel[0], '外環')}${ring(80, sel[1], '中環')}${ring(42, sel[2], '內環')}
-      <circle cx="150" cy="150" r="14" fill="#6b4a1e"/><path d="M150 6 l-9 -2 h18 z M150 30 l-8 -16 h16 z" fill="#7a1c14"/></svg>`;
+      <circle cx="150" cy="150" r="14" fill="#6b4a1e"/>
+      <line x1="150" y1="16" x2="150" y2="150" stroke="#7a1c14" stroke-width="1" stroke-dasharray="3 4" opacity=".45"/>
+      <path d="M150 1 l-10 -16 h20 z" fill="#7a1c14" stroke="#f3d68f" stroke-width="1"/></svg>`;
   }
 
   function bottleSvg(b) {

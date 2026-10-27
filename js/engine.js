@@ -25,7 +25,7 @@
         inv: G.startItems.slice(),
         flags: {},
         notes: ['letter'],
-        puz: { dome: 'N', valves: {}, mirrors: Object.assign({}, G.MIRROR_GRID.initial) },
+        puz: { dome: 'N', valves: {}, mirrors: Object.assign({}, G.MIRROR_GRID.initial), dial: ['lamp', 'lamp', 'lamp'], clock: { h: 12, m: 0 } },
         hints: {},
         visited: { [G.startRoom]: true },
         stats: { actions: 0, wrong: 0, hints: 0, playMs: 0 },
@@ -233,7 +233,12 @@
         const d = obj(puz.mirrors)[m.id];
         mirrors[m.id] = d === '/' || d === '\\' ? d : G.MIRROR_GRID.initial[m.id];
       }
-      s.puz = { dome, valves, mirrors };
+      // 星盤三環與落地鐘指針的位置（純顯示，存檔後重新讀取時保留）
+      const dialIn = Array.isArray(puz.dial) ? puz.dial : [];
+      const dial = [0, 1, 2].map(i => G.CONSTELLATIONS[dialIn[i]] ? dialIn[i] : 'lamp');
+      const ck = obj(puz.clock);
+      const clock = { h: Number.isInteger(ck.h) && ck.h >= 1 && ck.h <= 12 ? ck.h : 12, m: Number.isInteger(ck.m) && ck.m >= 0 && ck.m < 60 && ck.m % 5 === 0 ? ck.m : 0 };
+      s.puz = { dome, valves, mirrors, dial, clock };
       const st = obj(s.stats);
       s.stats = {};
       for (const k of ['actions', 'wrong', 'hints', 'playMs']) s.stats[k] = Number.isFinite(+st[k]) && +st[k] >= 0 ? +st[k] : 0;

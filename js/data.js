@@ -212,6 +212,7 @@
         '《山城日報》1999 年 12 月 11 日',
         '【新彗星現身東南夜空　韓嶽教授率先發現】',
         '本報訊　天文學家韓嶽教授昨日宣布，他於本月十日夜間，在東南方的天空中發現一顆從未被記錄的彗星。國際天文組織已初步確認，暫定名為「韓嶽彗星」。韓教授表示：「這是我觀測生涯中最幸運的一夜。」',
+        '據韓教授公布的觀測資料，彗星當晚位於赤經 5 時 27 分、赤緯 −17 度附近。',
         '（剪報的「十日」旁，有人用紅筆重重畫了一個問號。）',
       ],
     },
@@ -311,7 +312,7 @@
       title: '日記殘頁（三）', style: 'hand',
       body: [
         '1999 年 12 月 12 日',
-        '報紙頭版：「韓嶽教授發現新彗星」。坐標、時刻，和我的紀錄一模一樣——連我抄錯了又劃掉的那個「7」，他也照抄了上去。',
+        '今天才看到昨天的報紙。頭版：「韓嶽教授發現新彗星」。坐標、時刻，和我的紀錄一模一樣——那晚我把赤緯 −16 度誤寫成 −17，當場劃掉改正；他連那個劃掉的「7」都照抄了上去。',
         '我打了十一通電話，他一通也沒接。',
       ],
     },
@@ -320,7 +321,7 @@
       body: [
         '九月二十日',
         '醫生說，我的時間不多了。二十年來，我一次也沒有打開那個避光盒。我恨過他，後來不恨了，只是累。',
-        '阿遙，第三張底片留給你。彗星每晚都在群星之間移動，底片上它和星星的相對位置，就是那一夜的日期，誰也偽造不了。再加上那個被照抄的錯誤——你會知道該怎麼做。',
+        '阿遙，第三張底片留給你。彗星每晚都在群星之間移動，底片上它和星星的相對位置，就是那一夜的日期，誰也偽造不了。底片紙套背面，也記著那晚同一個劃掉的「7」。底片、紙套、報上照抄的錯誤，三樣放在一起，誰也賴不掉。',
         '或者，你也可以讓它繼續沉睡。由你決定。',
       ],
     },
@@ -354,7 +355,7 @@
     emblem_sun: { name: '日徽', glyph: '日', kind: 'emblem', desc: '一枚沉甸甸的黃銅徽章，刻著光芒四射的太陽。' },
     emblem_moon: { name: '月徽', glyph: '月', kind: 'emblem', desc: '一枚銀白色的徽章，刻著一彎新月。' },
     emblem_star: { name: '星徽', glyph: '星', kind: 'emblem', desc: '一枚深藍色的琺瑯徽章，嵌著一顆八角星。' },
-    plate: { name: '玻璃底片', glyph: '底', kind: 'evidence', desc: '剛沖洗出來的玻璃底片。群星之間，一顆拖著短尾的彗星清清楚楚。片角刻著：1999.12.08　陸觀。', view: 'plate' },
+    plate: { name: '玻璃底片', glyph: '底', kind: 'evidence', desc: '剛沖洗出來的玻璃底片，裝在陸觀手寫的紙套裡。群星之間，一顆拖著短尾的彗星清清楚楚。片角刻著：1999.12.08　陸觀。', view: 'plate' },
   };
 
   /* ================================================================
@@ -1161,28 +1162,66 @@
   }
   const F = (s, k) => !!s.flags[k];
   const has = (s, id) => s.inv.includes(id);
+  const seen = (s, note) => s.notes.includes(note);
+  const roomOpen = (s, r) => rooms[r].accessible(s);
+
+  // 「還沒仔細看過的地方」：依常見的探索順序，列出玩家可以到達、卻還沒調查過的重要物件。
+  // 提示的標題與內容只會提到玩家已經能看見的東西，不會預告還沒發現的機關或獎勵。
+  const DISCOVERIES = [
+    { room: 'foyer', name: '衣帽架', done: s => F(s, 'coatSearched') },
+    { room: 'study', name: '書架', done: s => seen(s, 'bookshelf') },
+    { room: 'study', name: '書桌抽屜', done: s => seen(s, 'drawer_note') || F(s, 'drawerOpen') },
+    { room: 'study', name: '牆上的剪報', done: s => seen(s, 'clipping') },
+    { room: 'study', name: '書桌桌面', done: s => F(s, 'gridTaken') },
+    { room: 'study', name: '星空油畫', done: s => F(s, 'paintingMoved') },
+    { room: 'study', name: '廢紙簍', done: s => F(s, 'wasteSearched') },
+    { room: 'foyer', name: '落地鐘', done: s => seen(s, 'clock_inscription') || F(s, 'clockSolved') },
+    { room: 'greenhouse', name: '工具架', done: s => F(s, 'trowelTaken') },
+    { room: 'greenhouse', name: '花盆架', done: s => seen(s, 'pots_rule') || F(s, 'keyDug') },
+    { room: 'greenhouse', name: '灌溉系統', done: s => seen(s, 'garden_rules') },
+    { room: 'observatory', name: '望遠鏡', done: s => seen(s, 'telescope_note') },
+    { room: 'observatory', name: '星盤', done: s => seen(s, 'dial_inscription') },
+    { room: 'observatory', name: '星座圖', done: s => seen(s, 'poster') },
+    { room: 'observatory', name: '觀測日誌', done: s => F(s, 'logBookmark') },
+    { room: 'observatory', name: '月落時刻表', done: s => seen(s, 'almanac') },
+    { room: 'observatory', name: '地圖櫃', done: s => F(s, 'transparencyTaken') },
+    { room: 'observatory', name: '紅光檯燈', done: s => F(s, 'bulbTaken') },
+    { room: 'darkroom', name: '藥瓶架', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card') },
+    { room: 'darkroom', name: '晾片繩', done: s => !F(s, 'darkroomLit') || F(s, 'p4Taken') },
+  ];
+  const nextDiscovery = s => DISCOVERIES.find(d => roomOpen(s, d.room) && !d.done(s));
+
   const hints = [
     {
-      id: 'drawer', title: '書桌抽屜的鎖',
-      avail: () => true, done: s => F(s, 'drawerOpen'),
+      id: 'explore', title: '還沒仔細看過的地方',
+      avail: s => !!nextDiscovery(s), done: s => !nextDiscovery(s),
       texts: [
-        '書房的書桌抽屜上了四位數字鎖，鎖旁的便條提到四種顏色。',
-        '仔細看書架：書脊上印著「第幾卷」。注意書並不是按卷數順序排的，問的是卷數，不是位置。',
+        '有些已經能到達的地方，你還沒仔細看過。每個房間裡的物件都點點看，讀過的文件會記進線索筆記。',
+        s => { const d = nextDiscovery(s); return d ? `去${rooms[d.room].name}再看看。` : '你已經把能到的地方都看過了。'; },
+        s => { const d = nextDiscovery(s); return d ? `${rooms[d.room].name}的「${d.name}」。` : '你已經把能到的地方都看過了。'; },
+      ],
+    },
+    {
+      id: 'drawer', title: '書桌抽屜的鎖',
+      avail: s => seen(s, 'drawer_note'), done: s => F(s, 'drawerOpen'),
+      texts: [
+        '鎖旁的便條提到四種顏色，還問「第幾卷」。屋裡哪裡有分卷的東西？',
+        '仔細看書房的書架：書脊下方印著卷數。書並不是按卷數排的——問的是卷數，不是位置。',
         `紅＝第 3 卷、黃＝第 7 卷、藍＝第 5 卷、綠＝第 1 卷。密碼是 ${DRAWER_CODE}。`,
       ],
     },
     {
-      id: 'flashlight', title: '讓手電筒亮起來',
-      avail: s => F(s, 'drawerOpen') || F(s, 'coatSearched'), done: s => has(s, 'flashlight'),
+      id: 'flashlight', title: '沒電的手電筒',
+      avail: s => has(s, 'flashlight_dead'), done: s => has(s, 'flashlight'),
       texts: [
-        '屋裡有好幾個太暗、看不清的角落。你需要一支能亮的手電筒。',
-        '門廳衣帽架上的大衣口袋裡有一支沒電的手電筒；書桌抽屜裡有電池。',
-        '在物品欄選中手電筒，按「組合」，再點電池。',
+        '屋裡有好幾個太暗、看不清的角落。這支手電筒需要電。',
+        '書桌抽屜裡有一捆電池。',
+        '在物品欄選中手電筒，按「組合…」，再點電池。',
       ],
     },
     {
       id: 'greenhouse', title: '打開溫室',
-      avail: s => F(s, 'drawerOpen'), done: s => F(s, 'greenhouseOpen'),
+      avail: s => has(s, 'greenhouse_key'), done: s => F(s, 'greenhouseOpen'),
       texts: [
         '抽屜裡那把鑰匙的握柄是葉子形狀。',
         '門廳右邊溫室門的鑰匙孔旁，也刻著一片葉子。',
@@ -1191,16 +1230,16 @@
     },
     {
       id: 'pots', title: '四個花盆',
-      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'keyDug'),
+      avail: s => seen(s, 'pots_rule'), done: s => F(s, 'keyDug'),
       texts: [
-        '木牌說：四句話裡只有一句是真的。先從溫室的工具架拿小鏟子。',
-        '逐一假設鑰匙在每個盆裡，數數看那時有幾句話成立。只有一種假設恰好讓一句話成立。',
-        '答案是玫瑰盆：鑰匙在玫瑰盆時，只有薰衣草盆那句「鑰匙不在我這裡」是真的。',
+        '木牌說：四句話裡只有一句是真的。挖土需要工具——看看溫室的工具架。',
+        '逐一假設東西埋在每個盆裡，數數看那時有幾句話成立。只有一種假設恰好讓一句話成立。',
+        '答案是玫瑰盆：東西在玫瑰盆時，只有薰衣草盆那句「鑰匙不在我這裡」是真的。',
       ],
     },
     {
       id: 'gate', title: '樓梯鐵門',
-      avail: s => F(s, 'keyDug'), done: s => F(s, 'gateOpen'),
+      avail: s => has(s, 'brass_key'), done: s => F(s, 'gateOpen'),
       texts: [
         '黃銅鑰匙的匙柄刻著樓梯。',
         '門廳的樓梯鐵門掛著一把黃銅掛鎖。',
@@ -1209,48 +1248,53 @@
     },
     {
       id: 'eyepiece', title: '望遠鏡的目鏡',
-      avail: s => F(s, 'gateOpen'), done: s => F(s, 'eyepieceInstalled'),
+      avail: s => seen(s, 'eyepiece_box'), done: s => F(s, 'eyepieceInstalled'),
       texts: [
-        '望遠鏡少了目鏡。看看目鏡盒蓋內側寫了什麼。',
-        '目鏡滾到地圖櫃底下了，那裡太暗，需要能亮的手電筒。',
-        '對「地圖櫃底下」使用手電筒拿到目鏡，再對望遠鏡使用目鏡。',
+        '目鏡盒蓋內側寫著目鏡滾到哪裡去了。',
+        '地圖櫃底下太暗，需要一支能亮的手電筒。',
+        '對「地圖櫃底下」使用能亮的手電筒拿到目鏡，再對望遠鏡使用目鏡。',
       ],
     },
     {
-      id: 'dial', title: '星盤（星徽）',
-      avail: s => F(s, 'eyepieceInstalled'), done: s => F(s, 'starDialSolved'),
+      id: 'dial', title: '星盤',
+      avail: s => seen(s, 'dial_inscription'), done: s => F(s, 'starDialSolved'),
       texts: [
-        '星盤要你對準「彗星初次現身的方位」上的三個星座。哪裡提到過彗星出現在哪個方向？',
-        '日記殘頁（一）和書房的剪報都寫著「東南方」。用穹頂轉輪把觀測窗轉向東南，再看望遠鏡。記住望遠鏡上的便條：成像上下顛倒。用星座圖上的星數辨認星座。',
-        '東南方目鏡裡由上而下是：鳥（4 星）、舟（5 星）、鑰（6 星）。倒回真實天空，由高到低是鑰、舟、鳥。外環＝鑰、中環＝舟、內環＝鳥。',
+        '星盤要你對準「彗星初次現身的方位」上的三個星座。哪些文件提到過彗星出現在哪個方向？',
+        '日記殘頁（一）和書房的剪報都寫著「東南方」。用穹頂轉輪把觀測窗轉向東南，再看望遠鏡。記住望遠鏡上的便條：成像上下顛倒。星座圖上註明了每個星座的星數。',
+        '東南方的目鏡裡由上而下是：鳥（4 星）、舟（5 星）、鑰（6 星）。倒回真實天空，由高到低是鑰、舟、鳥。外環＝鑰、中環＝舟、內環＝鳥。',
       ],
     },
     {
-      id: 'safe', title: '油畫後的保險箱（日徽）',
-      avail: s => F(s, 'drawerOpen'), done: s => F(s, 'safeOpen'),
+      id: 'safe', title: '牆裡的保險箱',
+      avail: s => F(s, 'paintingMoved'), done: s => F(s, 'safeOpen'),
       texts: [
-        '書房那幅星空油畫的畫框有點歪。畫背面寫著：「星星會告訴你數字。」',
+        '畫框背面寫著：「星星會告訴你數字。」保險箱要三位數。',
         '書桌上的數字方格紙和天文台地圖櫃裡的星圖膠片，四個角都有小十字——試著把它們組合。',
         `疊合後，①②③ 依序落在 ${SAFE_CODE.split('').join('、')} 上。保險箱密碼是 ${SAFE_CODE}。`,
       ],
     },
     {
       id: 'clock', title: '落地鐘',
-      avail: () => true, done: s => F(s, 'clockSolved'),
+      avail: s => seen(s, 'clock_inscription'), done: s => F(s, 'clockSolved'),
       texts: [
-        '鐘上刻著：「讓指針回到我最後一次觀測開始的那一刻。」觀測的紀錄應該在天文台。',
+        '鐘上刻著：「讓指針回到我最後一次觀測開始的那一刻。」陸觀的觀測紀錄會放在哪裡？',
         '天文台的觀測日誌寫了最後一次觀測的日期和規矩；牆上的月落時刻表列著那天月亮落下的時刻。',
         '十月三日月落 02:15，再過整整一小時就是 3:15。把落地鐘撥到 3 點 15 分。',
       ],
     },
     {
       id: 'wheel', title: '溫室的總閘',
-      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'wheelInstalled'),
+      avail: s => seen(s, 'garden_rules') && !has(s, 'valve_wheel'), done: s => F(s, 'wheelInstalled') || has(s, 'valve_wheel'),
       texts: [
-        '灌溉系統的總閘少了手輪，轉不動。',
-        '手輪被陸觀藏在某個機關裡——門廳的落地鐘還沒打開。',
-        '解開落地鐘拿到閥門手輪，再對溫室的「灌溉系統」使用它。',
+        '總閘少了手輪，轉不動。陸觀把它藏起來了。',
+        '手輪被藏在某個需要解開的機關裡——門廳的落地鐘還沒打開。',
+        '解開落地鐘就能拿到閥門手輪（見「落地鐘」的提示）。',
       ],
+    },
+    {
+      id: 'wheel_use', title: '閥門手輪',
+      avail: s => has(s, 'valve_wheel'), done: s => F(s, 'wheelInstalled'),
+      texts: ['手輪背面貼著紙條：「溫室總閘」。', '溫室的灌溉系統上有一根光禿禿的閥桿。', '選中閥門手輪，再點溫室的「灌溉系統」。'],
     },
     {
       id: 'valves', title: '灌溉管線',
@@ -1262,18 +1306,18 @@
       ],
     },
     {
-      id: 'mirrors', title: '月光反光鏡',
-      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
+      id: 'mirrors', title: '天窗反光鏡',
+      avail: s => seen(s, 'garden_rules') || F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
       texts: [
-        '守則說月光花只在月光照到時開花。天窗下的反光鏡可以轉動。',
+        '園丁守則說月光花只在月光照到時開花。天窗下的反光鏡可以轉動。',
         '點擊鏡子會切換斜向，光線會即時顯示。從光線第一個碰到的鏡子開始，一面一面往花的方向修正。',
         mirrorHint(),
       ],
     },
     {
-      id: 'moon', title: '月光花（月徽）',
+      id: 'moon', title: '月光花',
       avail: s => F(s, 'waterOk') && F(s, 'lightOk'), done: s => F(s, 'moonTaken'),
-      texts: ['月光花有了雨水和月光。', '去看看月光花。', '點擊溫室裡的「月光花」。'],
+      texts: ['月光花有了雨水，也有了月光。', '去看看月光花。', '點擊溫室裡的「月光花」。'],
     },
     {
       id: 'door', title: '把徽章嵌回大門',
@@ -1297,9 +1341,11 @@
       id: 'darkroom', title: '光照不到的地方（選擇性）',
       avail: s => F(s, 'drawerOpen'), done: s => F(s, 'trapdoorOpen'),
       texts: [
-        '信裡說真相藏在「光照不到的地方」。屋裡有一張被撕成兩半的便條。',
-        '書房的廢紙簍和天文台的觀測日誌裡各有半張便條，把它們組合起來。溫室工作台底下很暗，用手電筒照照看。',
-        `活板門在溫室工作台底下（用手電筒照工作台），密碼是 ${TRAPDOOR_CODE}。`,
+        '信裡說，二十年前的真相藏在「光照不到的地方」。哪裡又暗、又沒人會去看？',
+        s => (has(s, 'note_left') || has(s, 'note_right') || has(s, 'note_full'))
+          ? '撕成兩半的便條要拼起來才讀得懂：一半在書房的廢紙簍，一半夾在天文台的觀測日誌裡。溫室工作台底下很暗，用能亮的手電筒照照看。'
+          : '書房的廢紙簍和天文台的觀測日誌裡各有半張便條。溫室工作台底下很暗，用能亮的手電筒照照看。',
+        `用手電筒照溫室的工作台底下，會找到活板門；密碼在拼好的便條上：${TRAPDOOR_CODE}。`,
       ],
     },
     {
@@ -1324,8 +1370,8 @@
       id: 'diary', title: '陸觀的日記（選擇性）',
       avail: s => countPages(s) > 0, done: s => countPages(s) >= 4,
       texts: [
-        s => `日記一共四頁，你找到了 ${countPages(s)} 頁。`,
-        '四頁分別藏在：書桌抽屜、落地鐘、書房壁爐的煙囪、暗房的晾片繩。',
+        s => `日記一共四頁，你找到了 ${countPages(s)} 頁。殘頁散落在屋子各處，有的藏在很暗的地方。`,
+        '還沒找到的頁面，可能在：書桌抽屜、落地鐘、書房壁爐的煙囪、暗房的晾片繩。',
         '煙囪那一頁要用能亮的手電筒照壁爐；暗房那一頁要先點亮紅燈。',
       ],
     },
@@ -1354,6 +1400,6 @@
     MOONSET, CLOCK_ANSWER, VALVES, BEDS, evalValves, MIRROR_GRID, traceBeam, MIRROR_SOLUTIONS,
     CONSTELLATIONS, CONSTELLATION_ORDER, DIRECTIONS, SKY_FIELDS, COMET_DIRECTION, DIAL_ANSWER,
     NOTE_LINES, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
-    EMBLEMS, PAGES, countPages, allInserted,
+    EMBLEMS, PAGES, countPages, allInserted, DISCOVERIES,
   };
 }));

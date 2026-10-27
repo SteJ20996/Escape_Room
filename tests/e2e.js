@@ -199,7 +199,7 @@ async function observatory(P) {
   await P.obj('紅光檯燈');
   await P.combine('grid_paper', 'transparency');
   await P.item('overlay'); await page.click('[data-detail=view]'); await P.shot('overlay'); await P.close();
-  await P.item('overlay'); // 放下
+  ok(!(await page.evaluate(() => document.body.classList.contains('holding'))), '查看之後物品不應仍拿在手上');
 }
 
 async function clockSafeValves(P) {
@@ -238,7 +238,6 @@ async function darkroom(P) {
   await P.obj('觀測日誌'); await P.close();
   await P.combine('note_left', 'note_right');
   await P.item('note_full'); await page.click('[data-detail=view]'); await P.shot('note-full'); await P.close();
-  await P.item('note_full');
   await P.room('溫室');
   await P.obj('活板門');
   await P.lockType('1208');
@@ -330,7 +329,14 @@ async function exitWith(P, choice, endingTitle) {
     await P.combine('diary', 'page3');
     await P.combine('diary', 'page4');
     ok(/4\/4/.test(await page.locator('#inventory').innerText()), '日記 4/4');
-    await P.item('diary'); await page.click('[data-detail=view]'); await P.shot('diary'); await P.close(); await P.item('diary');
+    await P.item('diary'); await page.click('[data-detail=view]'); await P.shot('diary'); await P.close();
+    await P.item('plate'); await page.click('[data-detail=view]');
+    ok(/劃掉/.test(await page.locator('#modal-body').innerText()), '底片紙套上看得到劃掉的 7');
+    await P.shot('plate'); await P.close();
+    // 對同一個物品組合：要有回應
+    await P.item('letter'); await page.click('[data-detail=combine]'); await P.item('letter');
+    await P.said(/另一個物品/);
+    await page.keyboard.press('Escape');
     await P.room('門廳');
     await P.said(/電話突然響了/);
     await P.obj('老電話');

@@ -24,7 +24,7 @@
     introStep: 0,
   };
   function freshUi() {
-    return { locks: {}, dial: ['lamp', 'lamp', 'lamp'], clock: { h: 12, m: 0 }, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: '' };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: '' };
   }
 
   /* ================= 畫面切換 ================= */
@@ -149,6 +149,11 @@
   }
 
   function onItem(id) {
+    if (app.combining && app.selected === id) {
+      say([{ text: `要把「${E.itemName(app.s, id)}」和另一樣東西組合——請點物品欄裡的另一個物品，或按「取消組合」。`, kind: 'note' }]);
+      render();
+      return;
+    }
     if (app.combining && app.selected && app.selected !== id) {
       const a = app.selected;
       app.selected = null; app.combining = false;
@@ -219,7 +224,7 @@
 
   function renderObjects() {
     const hs = E.visibleHotspots(app.s);
-    $('objects').innerHTML = `<span class="label">${app.selected ? '用在：' : '查看：'}</span>` +
+    $('objects').innerHTML = `<span class="label ${app.selected ? 'holding-label' : ''}">${app.selected ? `把「${esc(E.itemName(app.s, app.selected))}」用在：` : '查看：'}</span>` +
       hs.map(h => `<button class="btn obj-btn" type="button" data-obj="${h.id}">${esc(h.name)}</button>`).join('');
   }
 
@@ -332,7 +337,7 @@
         return pages.map(p => paper(G.docs[p], `<h3>${esc(G.docs[p].title)}</h3>`)).join('') +
           (pages.length < 4 ? `<p class="lead">日記還缺 ${4 - pages.length} 頁。</p>` : '<p class="lead">四頁都齊了。</p>');
       }
-      case 'plate': return `<div class="art-box">${Art.plate()}</div>`;
+      case 'plate': return `<div class="art-box narrow" style="max-width:440px">${Art.plate()}</div><p class="lead">紙套背面是陸觀當晚寫下的坐標：赤緯先寫成 −17，那個「7」被劃掉，改成了 6。</p>`;
       default: return '';
     }
   }
@@ -398,18 +403,18 @@
     },
 
     dial: () => {
-      const sel = app.ui.dial, rings = ['外環', '中環', '內環'], order = G.CONSTELLATION_ORDER;
+      const sel = app.s.puz.dial, rings = ['外環', '中環', '內環'], order = G.CONSTELLATION_ORDER;
       return {
         title: '星盤',
-        html: `<div class="art-box narrow">${Art.dialSvg(sel)}</div>
+        html: `<div class="split"><div class="art-box narrow">${Art.dialSvg(sel)}</div><div class="stack">
           ${paper(G.docs.dial_inscription)}
           <div class="picker">${sel.map((id, i) => `<div class="picker-row"><span class="lbl">${rings[i]}</span>
             <button class="btn" type="button" data-prev="${i}" aria-label="${rings[i]}：上一個星座">◀</button>
             <span class="name" aria-live="polite">${G.CONSTELLATIONS[id].name}</span>
             <button class="btn" type="button" data-next="${i}" aria-label="${rings[i]}：下一個星座">▶</button></div>`).join('')}</div>
-          ${center('<button class="btn primary" type="button" data-act="turn">轉動到位</button>')}${fb()}`,
+          ${center('<button class="btn primary" type="button" data-act="turn">轉動到位</button>')}${fb()}</div></div>`,
         bind(root) {
-          const step = (i, d) => { sel[i] = order[(order.indexOf(sel[i]) + d + order.length) % order.length]; app.ui.feedback = []; renderModal(); };
+          const step = (i, d) => { sel[i] = order[(order.indexOf(sel[i]) + d + order.length) % order.length]; app.ui.feedback = []; autosave(); renderModal(); };
           root.querySelectorAll('[data-prev]').forEach(b => { b.onclick = () => step(+b.dataset.prev, -1); });
           root.querySelectorAll('[data-next]').forEach(b => { b.onclick = () => step(+b.dataset.next, 1); });
           root.querySelector('[data-act=turn]').onclick = () => submit('dial', sel.slice());
@@ -499,19 +504,19 @@
     },
 
     clock: () => {
-      const c = app.ui.clock;
+      const c = app.s.puz.clock;
       return {
         title: '落地鐘',
-        html: `${paper(G.docs.clock_inscription)}
-          <div class="art-box narrow" style="max-width:280px">${Art.clockSvg(c.h, c.m)}</div>
+        html: `<div class="split"><div class="art-box narrow" style="max-width:280px">${Art.clockSvg(c.h, c.m)}</div><div class="stack">
+          ${paper(G.docs.clock_inscription)}
           <div class="picker">
             <div class="picker-row"><span class="lbl">時針</span><button class="btn" type="button" data-h="-1" aria-label="時針往回">◀</button><span class="name" aria-live="polite">${c.h} 點</span><button class="btn" type="button" data-h="1" aria-label="時針往前">▶</button></div>
             <div class="picker-row"><span class="lbl">分針</span><button class="btn" type="button" data-m="-5" aria-label="分針往回五分">◀</button><span class="name" aria-live="polite">${String(c.m).padStart(2, '0')} 分</span><button class="btn" type="button" data-m="5" aria-label="分針往前五分">▶</button></div>
           </div>
-          ${center('<button class="btn primary" type="button" data-act="set">就是這一刻</button>')}${fb()}`,
+          ${center('<button class="btn primary" type="button" data-act="set">就是這一刻</button>')}${fb()}</div></div>`,
         bind(root) {
-          root.querySelectorAll('[data-h]').forEach(b => { b.onclick = () => { c.h = ((c.h - 1 + +b.dataset.h + 12) % 12) + 1; app.ui.feedback = []; renderModal(); }; });
-          root.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { c.m = (c.m + +b.dataset.m + 60) % 60; app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-h]').forEach(b => { b.onclick = () => { c.h = ((c.h - 1 + +b.dataset.h + 12) % 12) + 1; app.ui.feedback = []; autosave(); renderModal(); }; });
+          root.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { c.m = (c.m + +b.dataset.m + 60) % 60; app.ui.feedback = []; autosave(); renderModal(); }; });
           root.querySelector('[data-act=set]').onclick = () => submit('clock', { h: c.h, m: c.m });
         },
       };
@@ -872,7 +877,13 @@
     $('item-detail').addEventListener('click', e => {
       const b = e.target.closest('[data-detail]');
       if (!b || !app.selected) return;
-      if (b.dataset.detail === 'view') openView({ view: 'item', id: app.selected });
+      if (b.dataset.detail === 'view') {
+        // 查看完就放下，避免下一次點擊變成「使用」
+        const id = app.selected;
+        app.selected = null; app.combining = false;
+        render();
+        openView({ view: 'item', id });
+      }
       if (b.dataset.detail === 'combine') { app.combining = !app.combining; render(); }
       if (b.dataset.detail === 'drop') { app.selected = null; app.combining = false; render(); }
     });

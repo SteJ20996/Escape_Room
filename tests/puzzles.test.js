@@ -90,6 +90,15 @@ test('顯影藥劑：24 種排列中只有一種同時滿足卡片四條規則',
   assert.deepEqual(G.DEVELOP_ANSWER, ['yellow', 'white', 'blue', 'red']);
 });
 
+test('被照抄的「7」：剪報的 −17、日記三的劃掉的 7、日記四提到紙套，三者一致', () => {
+  assert.ok(G.docs.clipping.body.join('').includes('−17'));
+  const p3 = G.docs.page3.body.join('');
+  assert.ok(p3.includes('−16') && p3.includes('−17') && p3.includes('「7」'));
+  assert.ok(G.docs.page4.body.join('').includes('紙套'));
+  assert.ok(G.items.plate.desc.includes('紙套'));
+  assert.ok(G.endings.B.text.join('').includes('「7」'));
+});
+
 test('每一份線索文件與物品文件都存在且非空', () => {
   for (const [id, d] of Object.entries(G.docs)) {
     assert.ok(d.title, id);

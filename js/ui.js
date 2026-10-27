@@ -376,7 +376,7 @@
       const name = G.DIRECTIONS.find(d => d.id === dir).name;
       return {
         title: '望遠鏡目鏡',
-        html: `<p class="lead">觀測窗朝向：<strong>${name}方</strong>。你湊近目鏡，視野裡有三團明亮的星群。</p>
+        html: `<p class="lead">觀測窗朝向：<strong>${name}方</strong>。你湊近目鏡，視野裡有三團明亮的星群；視野邊緣還看得到地平線上的山稜和樹影。</p>
           <div class="eyepiece">${Art.eyepiece(dir)}</div>
           ${center('<button class="btn" type="button" data-act="dome">轉動穹頂…</button>')}`,
         bind(root) { root.querySelector('[data-act=dome]').onclick = () => { app.stack.pop(); openView({ view: 'dome' }); }; },
@@ -403,12 +403,12 @@
     },
 
     dial: () => {
-      const sel = app.s.puz.dial, rings = ['外環', '中環', '內環'], order = G.CONSTELLATION_ORDER;
+      const sel = app.s.puz.dial, rings = ['外環', '中環', '內環'], heights = ['最高', '居中', '最低'], order = G.CONSTELLATION_ORDER;
       return {
         title: '星盤',
         html: `<div class="split"><div class="art-box narrow">${Art.dialSvg(sel)}</div><div class="stack">
           ${paper(G.docs.dial_inscription)}
-          <div class="picker">${sel.map((id, i) => `<div class="picker-row"><span class="lbl">${rings[i]}</span>
+          <div class="picker">${sel.map((id, i) => `<div class="picker-row"><span class="lbl">${rings[i]}<small>天空中${heights[i]}</small></span>
             <button class="btn" type="button" data-prev="${i}" aria-label="${rings[i]}：上一個星座">◀</button>
             <span class="name" aria-live="polite">${G.CONSTELLATIONS[id].name}</span>
             <button class="btn" type="button" data-next="${i}" aria-label="${rings[i]}：下一個星座">▶</button></div>`).join('')}</div>

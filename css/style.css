@@ -215,7 +215,7 @@ body.holding .hs { cursor: crosshair; }
 .art { width: 100%; height: auto; display: block; max-width: 100%; border-radius: 8px; }
 .art-box { max-width: 560px; margin: 0 auto; width: 100%; }
 .art-box.narrow { max-width: 380px; }
-.eyepiece { max-width: 400px; margin: 0 auto; }
+.eyepiece { max-width: 420px; width: 100%; margin: 0 auto; }
 
 /* 紙本文件 */
 .paper {
@@ -247,9 +247,10 @@ body.holding .hs { cursor: crosshair; }
 
 /* 選擇器（星盤、時鐘） */
 .picker { display: grid; gap: 8px; justify-items: center; }
-.picker-row { display: grid; grid-template-columns: 4.5em 44px minmax(6em, auto) 44px; align-items: center; gap: 8px; }
+.picker-row { display: grid; grid-template-columns: 5em 44px minmax(6em, auto) 44px; align-items: center; gap: 8px; }
 .picker-row .name { text-align: center; font-size: 1.2rem; font-weight: 700; color: var(--brass-hi); }
-.picker-row .lbl { color: var(--dim); text-align: right; }
+.picker-row .lbl { color: var(--dim); text-align: right; line-height: 1.25; }
+.picker-row .lbl small { display: block; font-size: .72rem; color: var(--brass); letter-spacing: .05em; }
 
 /* 花盆 */
 .pots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }

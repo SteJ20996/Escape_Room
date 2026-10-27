@@ -49,7 +49,7 @@ docs/TEST_REPORT.md 測試報告
 需要 Node.js 18 以上。
 
 ```bash
-npm test            # 邏輯測試 50 項：謎題唯一解、五個結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示（約 1 分鐘）
+npm test            # 邏輯測試 51 項：謎題唯一解、五個結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示（約 1 分鐘）
 npm run test:e2e    # 打包後用 Playwright 只透過點擊介面玩完五個結局（開發版與單檔版各一次）
 npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 ```

@@ -64,6 +64,27 @@ test('倒立的星空：八個星座星數各不相同，可以靠數星辨認�
   for (const c of Object.values(G.CONSTELLATIONS)) for (const [a, b] of c.lines) assert.ok(c.stars[a] && c.stars[b]);
 });
 
+test('目鏡畫面：八個方位的星都在視野內、不被地平線遮住，三個星群分屬上中下三個高度帶', () => {
+  const prev = global.self;
+  global.self = { GAME_DATA: G };
+  delete require.cache[require.resolve('../js/art.js')];
+  require('../js/art.js');
+  const Art = global.self.Art;
+  global.self = prev;
+  for (const d of G.DIRECTIONS) {
+    const stars = Art.eyepieceStars(d.id);
+    assert.equal(stars.length, G.SKY_FIELDS[d.id].reduce((n, id) => n + G.CONSTELLATIONS[id].stars.length, 0));
+    for (const st of stars) {
+      assert.ok(Math.hypot(st.x - 200, st.y - 200) < 172, `${d.name}：星落在目鏡邊緣外`);
+      assert.ok(st.realY + 7 < Art.EYE_GROUND_CLEAR, `${d.name}：星被地平線遮住`);
+    }
+    // 真實天空最高的（rank 0）倒像後在最下方；三個高度帶之間至少隔 30px，不會混在一起
+    const band = r => { const ys = stars.filter(st => st.rank === r).map(st => st.y); return [Math.min(...ys), Math.max(...ys)]; };
+    const [hi, mid, lo] = [band(0), band(1), band(2)];
+    assert.ok(hi[0] - mid[1] >= 30 && mid[0] - lo[1] >= 30, `${d.name}：星群高度帶太接近`);
+  }
+});
+
 test('撕開的便條：密碼與沖洗順序都橫跨撕口，單看任一半都讀不出來', () => {
   const left = G.NOTE_LINES.map(l => l[0]).join('\n');
   const right = G.NOTE_LINES.map(l => l[1]).join('\n');

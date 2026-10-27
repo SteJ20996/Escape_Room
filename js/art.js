@@ -367,35 +367,55 @@
     return `<svg viewBox="0 0 660 400" class="art" role="img" aria-label="手繪星座圖：八個星座">${G.CONSTELLATION_ORDER.map(cell).join('')}</svg>`;
   }
 
-  const EYE_CENTERS = [[165, 80], [240, 200], [160, 320]]; // 真實天空由高到低三個星座的位置（各相隔約 48px）
-  function eyepiece(dir) {
-    const field = G.SKY_FIELDS[dir];
-    const flip = ([x, y]) => [400 - x, 400 - y];
-    const boxes = [];
-    let stars = '';
-    field.forEach((id, i) => {
-      const c = G.CONSTELLATIONS[id];
+  // 真實天空中由高到低三個星座的位置（各自分在上、中、下三個高度帶，間距約 40px）
+  const EYE_CENTERS = [[160, 86], [235, 194], [165, 300]];
+  const EYE_SCALE = 0.66;
+  // 地平線（以真實天空的座標畫在下方，整組旋轉 180° 後就出現在目鏡上方，成為倒掛的山稜與樹影）
+  // 地面在最低星座（x 125–205）正下方是山谷，兩側是山丘；樹只長在山丘上，不會擋到星星
+  const EYE_GROUND = 'M0 340 Q60 330 110 346 Q165 360 210 350 Q260 334 300 340 T400 330 L400 400 L0 400 Z';
+  const EYE_TREES = [[92, 344, 6, 18], [108, 347, 7, 24], [232, 344, 9, 34], [252, 340, 7, 26], [272, 338, 11, 42], [296, 341, 8, 28]];
+  const EYE_GROUND_CLEAR = 344; // 最低星座下方地面的最高點（真實座標）
+  const eyeFlip = ([x, y]) => [400 - x, 400 - y];
+  // 目鏡中每顆星的位置（已倒像）；與真實天空的座標一起回傳，供測試檢查
+  function eyepieceStars(dir) {
+    const half = 50 * EYE_SCALE;
+    const out = [];
+    G.SKY_FIELDS[dir].forEach((id, i) => {
       const [cx, cy] = EYE_CENTERS[i];
-      boxes.push([cx - 44, cy - 44, cx + 44, cy + 44]);
-      for (const [sx, sy] of c.stars) {
-        const [px, py] = flip([cx - 36 + sx * 0.72, cy - 36 + sy * 0.72]);
-        stars += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="7" fill="#fff6d8" opacity=".18"/><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.4" fill="#fffaf0"/>`;
+      for (const [sx, sy] of G.CONSTELLATIONS[id].stars) {
+        const real = [cx - half + sx * EYE_SCALE, cy - half + sy * EYE_SCALE];
+        const [x, y] = eyeFlip(real);
+        out.push({ id, rank: i, x, y, realX: real[0], realY: real[1] });
       }
     });
-    // 背景暗星：避開星座範圍
+    return out;
+  }
+  function eyepiece(dir) {
+    const flip = eyeFlip;
+    const half = 50 * EYE_SCALE;
+    const boxes = EYE_CENTERS.map(([cx, cy]) => [cx - half - 8, cy - half - 8, cx + half + 8, cy + half + 8]);
+    const stars = eyepieceStars(dir).map(({ x, y }) =>
+      `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#fff6d8" opacity=".18"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="#fffaf0"/>`).join('');
+    // 背景暗星：避開星座範圍與地面
     const r = rng(dir.split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7));
     let faint = '';
     for (let n = 0; n < 70; n++) {
       const x = 20 + r() * 360, y = 20 + r() * 360;
       const [fx, fy] = flip([x, y]);
-      if (boxes.some(([a, b, c, d]) => x > a && x < c && y > b && y < d)) continue;
-      faint += `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="${(0.5 + r() * 0.6).toFixed(2)}" fill="#c8cfe6" opacity="${(0.25 + r() * 0.3).toFixed(2)}"/>`;
+      const rad = (0.5 + r() * 0.6).toFixed(2), op = (0.25 + r() * 0.3).toFixed(2);
+      if (y > 326 || boxes.some(([a, b, c, d]) => x > a && x < c && y > b && y < d)) continue;
+      faint += `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="${rad}" fill="#c8cfe6" opacity="${op}"/>`;
     }
-    return `<svg viewBox="0 0 400 400" class="art eyepiece" role="img" aria-label="望遠鏡目鏡中的星空">
+    const trees = EYE_TREES.map(([x, y, w, h]) => `<path d="M${x - w} ${y + 2} L${x} ${y - h} L${x + w} ${y + 2} Z"/><path d="M${x - w * 0.7} ${y - h * 0.45} L${x} ${y - h - 6} L${x + w * 0.7} ${y - h * 0.45} Z"/>`).join('');
+    return `<svg viewBox="0 0 400 400" class="art eyepiece" role="img" aria-label="望遠鏡目鏡中的星空：三團明亮的星群上下排開；視野上方看得到倒掛的山稜與樹影">
       <defs><clipPath id="eye-clip"><circle cx="200" cy="200" r="180"/></clipPath>
-      <radialGradient id="eye-bg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#0d1430"/><stop offset="1" stop-color="#03050c"/></radialGradient></defs>
+      <radialGradient id="eye-bg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#0d1430"/><stop offset="1" stop-color="#03050c"/></radialGradient>
+      <linearGradient id="eye-glow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f86b8" stop-opacity="0"/><stop offset="1" stop-color="#8f86b8" stop-opacity=".32"/></linearGradient></defs>
       <rect width="400" height="400" fill="#000"/>
-      <g clip-path="url(#eye-clip)"><rect width="400" height="400" fill="url(#eye-bg)"/>${faint}${stars}
+      <g clip-path="url(#eye-clip)"><rect width="400" height="400" fill="url(#eye-bg)"/>
+        <g transform="rotate(180 200 200)"><rect x="0" y="286" width="400" height="74" fill="url(#eye-glow)"/></g>
+        ${faint}${stars}
+        <g transform="rotate(180 200 200)" fill="#04060b"><path d="${EYE_GROUND}" stroke="#3a4266" stroke-width="1.5"/>${trees}</g>
         <line x1="200" y1="20" x2="200" y2="380" stroke="#3a4a7a" stroke-width=".6" opacity=".5"/><line x1="20" y1="200" x2="380" y2="200" stroke="#3a4a7a" stroke-width=".6" opacity=".5"/></g>
       <circle cx="200" cy="200" r="182" fill="none" stroke="#a5783a" stroke-width="8"/><circle cx="200" cy="200" r="190" fill="none" stroke="#5a3d16" stroke-width="6"/>
     </svg>`;
@@ -627,5 +647,5 @@
     return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/></svg>`;
   }
 
-  root.Art = { scene, poster, eyepiece, bookshelf, gridSvg, note, plate, valvesSvg, mirrorsSvg, clockSvg, dialSvg, bottleSvg, esc };
+  root.Art = { scene, poster, eyepiece, eyepieceStars, EYE_GROUND_CLEAR, bookshelf, gridSvg, note, plate, valvesSvg, mirrorsSvg, clockSvg, dialSvg, bottleSvg, esc };
 }(typeof self !== 'undefined' ? self : this));

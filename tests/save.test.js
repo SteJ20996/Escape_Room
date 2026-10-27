@@ -89,3 +89,39 @@ test('本機儲存不可用時退回記憶體，讀寫與結局圖鑑仍可運�
   assert.deepEqual(Store.addEnding('A'), ['A']);
   assert.deepEqual(Store.addEnding('B'), ['A', 'B']);
 });
+
+test('難度跟著存檔走：資深模式的進度匯出再匯入仍是資深模式，可以繼續玩到結局', () => {
+  const { vetMainPath } = require('./helpers');
+  const P = makeGame('veteran');
+  vetMainPath(P);
+  const back = Store.decode(Store.encode(P.s));
+  const { s, errs } = load(back);
+  assert.deepEqual(errs, []);
+  assert.equal(s.mode, 'veteran');
+  assert.ok(E.visibleHotspots(Object.assign(E.clone(s), { room: 'foyer' })).some(h => h.id === 'f_hatch'));
+  assert.equal(E.move(s, 'foyer').ok, true);
+  for (const e of G.EMBLEMS) assert.equal(E.useItem(s, e, 'f_door').ok, true);
+  assert.equal(E.submit(s, 'exit', 'leave').ending, 'A');
+});
+
+test('加入難度之前的舊存檔（沒有 mode 欄位）一律以新手模式讀取', () => {
+  const old = E.newState();
+  delete old.mode;
+  delete old.puz.balance;
+  const { s, errs } = load(old);
+  assert.deepEqual(errs, []);
+  assert.equal(s.mode, 'novice');
+  assert.deepEqual(Object.keys(s.puz.mirrors).sort(), G.MIRROR_GRID.mirrors.map(m => m.id).sort());
+});
+
+test('不存在的難度、或新手存檔裡出現資深房間，都會被拒絕', () => {
+  const a = Object.assign(E.newState(), { mode: 'nightmare' });
+  assert.ok(E.validate(E.normalize(a)).length > 0);
+  const b = Object.assign(E.newState('novice'), { room: 'storeroom' });
+  b.flags.storeroomOpen = true;
+  assert.ok(E.validate(E.normalize(b)).length > 0, '新手模式進不了儲物間');
+  const c = E.newState('veteran');
+  assert.equal(c.mode, 'veteran');
+  assert.deepEqual(Object.keys(c.puz.mirrors).length, 16);
+  assert.deepEqual(E.validate(c), []);
+});

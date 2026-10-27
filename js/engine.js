@@ -23,14 +23,18 @@
       hotspotById[h.id] = h;
     }
 
-    function newState() {
+    // mode：'novice'（新手）或 'veteran'（資深）。舊存檔沒有這個欄位，讀取時一律視為新手。
+    function newState(mode) {
+      const m = mode === 'veteran' ? 'veteran' : 'novice';
+      const grid = m === 'veteran' ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       return {
         v: G.saveVersion,
+        mode: m,
         room: G.startRoom,
         inv: G.startItems.slice(),
         flags: {},
         notes: ['letter'],
-        puz: { dome: 'N', valves: {}, mirrors: Object.assign({}, G.MIRROR_GRID.initial), dial: ['lamp', 'lamp', 'lamp'], clock: { h: 12, m: 0 } },
+        puz: { dome: 'N', valves: {}, mirrors: Object.assign({}, grid.initial), dial: ['lamp', 'lamp', 'lamp'], clock: { h: 12, m: 0 }, balance: {} },
         hints: {},
         visited: { [G.startRoom]: true },
         stats: { actions: 0, wrong: 0, hints: 0, playMs: 0 },
@@ -39,6 +43,8 @@
     }
 
     const NOT_HERE = L('這裡沒有那樣東西。', 'That isn\'t here.');
+    // 資深模式答錯時的回應：只說「不對」，不說錯在哪
+    const WRONG = L('不對。', 'That\'s not right.');
     const NOT_HELD = L('你身上沒有那樣東西。', 'You don\'t have that.');
 
     /* ---------- 結果與上下文 ---------- */
@@ -58,7 +64,7 @@
           if (!quiet) { const n = itemName(s, id); out.messages.push({ text: L('獲得：' + n.zh, 'Obtained: ' + n.en), kind: 'item', item: id }); }
         },
         take(id) { const i = s.inv.indexOf(id); if (i >= 0) s.inv.splice(i, 1); },
-        say(text, kind) { out.messages.push({ text, kind: kind || 'info' }); },
+        say(text, kind, data) { out.messages.push(Object.assign({ text, kind: kind || 'info' }, data)); },
         open(view) { out.open = view; },
         note(id) {
           if (!G.docs[id]) throw new Error('不存在的線索：' + id);
@@ -70,7 +76,7 @@
         },
         goto(room) { enterRoom(s, room, out, ctx); },
         end(id) { s.ending = id; out.ending = id; },
-        wrong() { s.stats.wrong++; },
+        wrong() { s.stats.wrong++; if (out.wrongAt == null) out.wrongAt = out.messages.length; },
       };
       return ctx;
     }
@@ -87,9 +93,15 @@
     }
 
     /* ---------- 查詢 ---------- */
-    function isVisible(s, h) { return h.room === s.room && (!h.visible || !!h.visible(s)); }
+    function isVisible(s, h) { return h.room === s.room && (!h.mode || h.mode === s.mode) && (!h.visible || !!h.visible(s)); }
     function visibleHotspots(s) { return G.hotspots.filter(h => isVisible(s, h)); }
     function canEnter(s, room) { return !!G.rooms[room] && G.rooms[room].accessible(s); }
+    // 房間按鈕要不要出現在畫面上（還沒發現的房間不顯示）
+    function roomShown(s, room) {
+      const R = G.rooms[room];
+      if (!R || (R.mode && R.mode !== s.mode)) return false;
+      return R.navVisible ? !!R.navVisible(s) : true;
+    }
     function itemName(s, id) {
       const n = G.items[id] ? G.items[id].name : L(id, id);
       if (id === 'diary') { const k = (s.flags.diaryPages || []).length; return L(`${n.zh}（${k}/4）`, `${n.en} (${k}/4)`); }
@@ -172,23 +184,39 @@
       const solved = p.check(makeCtx(s, out), answer);
       if (solved === null) return fail(L('這個選項現在不能用。', 'That option isn\'t available right now.')); // 不合法的輸入：不改變任何狀態
       out.solved = !!solved;
+      // 資深模式：答錯時把「錯在哪」的說明換成一句簡短的回應（前置條件不足的說明，例如沒有鏟子，照樣保留）
+      if (!solved && s.mode === 'veteran' && out.wrongAt != null && !p.vetKeep) {
+        out.messages = out.messages.slice(0, out.wrongAt).concat([{ text: p.vetWrong || WRONG, kind: 'bad' }]);
+      }
+      delete out.wrongAt;
       if (p.silent && !out.messages.length) return out; // 純介面狀態（閥門開關、鏡子角度）不計入行動次數
       return done(s, out);
     }
 
-    /* ---------- 提示 ---------- */
+    /* ---------- 階段與提示 ---------- */
+    // 目前的主線階段（第一個還沒完成的階段）
+    function stage(s) { return G.stageInfo(s); }
+    // 資深模式：第一階段不開放提示
+    function hintsLocked(s) { return s.mode === 'veteran' && stage(s).index === 0; }
+    function hintOpen(s, h) { return (!h.mode || h.mode === s.mode) && h.avail(s) && !h.done(s); }
+    // 回傳目前可用的提示；group 是 'current'（目前階段）、'side'（支線）、'explore' 或 'other'（已發現、但屬於之後的階段）
     function hintList(s) {
-      return G.hints.filter(h => h.avail(s) && !h.done(s)).map(h => {
+      if (hintsLocked(s)) return [];
+      const st = stage(s);
+      const rank = { explore: 0, current: 1, earlier: 1, side: 2, other: 3 };
+      return G.hints.filter(h => hintOpen(s, h)).map(h => {
         const level = s.hints[h.id] || 0;
+        const at = h.stage == null ? -1 : st.ids.indexOf(h.stage);
+        const group = h.stage == null ? 'explore' : h.stage === 'truth' ? 'side' : at === st.index ? 'current' : at < st.index ? 'earlier' : 'other';
         return {
-          id: h.id, title: h.title, level, max: h.texts.length,
+          id: h.id, title: h.title, level, max: h.texts.length, stage: h.stage, group,
           texts: h.texts.slice(0, level).map(t => typeof t === 'function' ? t(s) : t),
         };
-      });
+      }).sort((a, b) => rank[a.group] - rank[b.group]);
     }
     function revealHint(s, id) {
       const h = G.hints.find(x => x.id === id);
-      if (!h || !h.avail(s) || h.done(s)) return false;
+      if (!h || hintsLocked(s) || !hintOpen(s, h)) return false;
       const level = s.hints[id] || 0;
       if (level >= h.texts.length) return false;
       s.hints[id] = level + 1;
@@ -215,6 +243,7 @@
       const errs = [];
       if (!s || typeof s !== 'object') return [L('不是有效的存檔資料', 'not valid save data')];
       if (s.v !== G.saveVersion) errs.push(L('存檔版本不符', 'wrong save version'));
+      if (!G.MODES.includes(s.mode)) errs.push(L('難度無效', 'invalid difficulty'));
       if (!G.rooms[s.room]) errs.push(L('房間無效', 'invalid room'));
       if (!Array.isArray(s.inv) || s.inv.some(i => !G.items[i])) errs.push(L('物品無效', 'invalid items'));
       if (!s.flags || typeof s.flags !== 'object') errs.push(L('旗標無效', 'invalid flags'));
@@ -232,6 +261,8 @@
       // 補上舊存檔可能缺少的欄位，並把純顯示用的欄位修正到合法範圍（不影響遊戲邏輯）
       if (!s || typeof s !== 'object') return s;
       const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+      if (s.mode === undefined) s.mode = 'novice'; // 加入難度之前的存檔都是新手模式
+      const grid = s.mode === 'veteran' ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       s.hints = obj(s.hints);
       s.visited = obj(s.visited);
       s.visited[s.room] = true;
@@ -240,16 +271,19 @@
       const valves = {};
       for (const v of G.VALVES) valves[v.id] = !!obj(puz.valves)[v.id];
       const mirrors = {};
-      for (const m of G.MIRROR_GRID.mirrors) {
+      for (const m of grid.mirrors) {
         const d = obj(puz.mirrors)[m.id];
-        mirrors[m.id] = d === '/' || d === '\\' ? d : G.MIRROR_GRID.initial[m.id];
+        mirrors[m.id] = d === '/' || d === '\\' ? d : grid.initial[m.id];
       }
+      // 天平兩邊放的東西（純顯示）
+      const balance = {};
+      for (const t of G.BALANCE_THINGS) { const side = obj(puz.balance)[t.id]; if (side === 'L' || side === 'R') balance[t.id] = side; }
       // 星盤三環與落地鐘指針的位置（純顯示，存檔後重新讀取時保留）
       const dialIn = Array.isArray(puz.dial) ? puz.dial : [];
       const dial = [0, 1, 2].map(i => G.CONSTELLATIONS[dialIn[i]] ? dialIn[i] : 'lamp');
       const ck = obj(puz.clock);
       const clock = { h: Number.isInteger(ck.h) && ck.h >= 1 && ck.h <= 12 ? ck.h : 12, m: Number.isInteger(ck.m) && ck.m >= 0 && ck.m < 60 && ck.m % 5 === 0 ? ck.m : 0 };
-      s.puz = { dome, valves, mirrors, dial, clock };
+      s.puz = { dome, valves, mirrors, dial, clock, balance };
       const st = obj(s.stats);
       s.stats = {};
       for (const k of ['actions', 'wrong', 'hints', 'playMs']) s.stats[k] = Number.isFinite(+st[k]) && +st[k] >= 0 ? +st[k] : 0;
@@ -258,7 +292,7 @@
 
     return {
       G, newState, interact, useItem, combine, move, submit,
-      hintList, revealHint, progress, visibleHotspots, canEnter, itemName, pageCount,
+      hintList, revealHint, hintsLocked, stage, progress, visibleHotspots, canEnter, roomShown, itemName, pageCount,
       validate, normalize, findRecipe,
       hotspot: id => hotspotById[id],
       clone: s => JSON.parse(JSON.stringify(s)),

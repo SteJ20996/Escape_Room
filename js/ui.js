@@ -71,7 +71,7 @@
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = T(el.dataset.i18nTitle); });
     document.querySelectorAll('[data-game-title]').forEach(el => { el.textContent = tr(G.title); });
     $('title-sub').textContent = tr(G.subtitle);
-    $('btn-new').textContent = T(app.confirmNew ? 'confirmNew' : 'newGame');
+    $('btn-new').textContent = T('newGame');
     const other = LANG === 'en' ? 'zh' : 'en';
     const lb = $('btn-lang');
     lb.textContent = other === 'zh' ? '中文' : 'EN';
@@ -103,10 +103,13 @@
     introStep: 0,
     endingId: null,
     lastRoom: null,
-    confirmNew: false,
+    tut: null,            // 教學進行到第幾步（null＝沒有在教學）
+    tutPending: false,    // 開場的信關上之後才開始教學
+    hintPulse: false,     // 完成一個階段後，提示按鈕會亮起來，直到玩家打開它
+    modeTut: null,
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false };
   }
 
   /* ================= 畫面切換 ================= */
@@ -225,8 +228,11 @@
   function stopSky() { cancelAnimationFrame(skyRaf); }
 
   /* ================= 開場 ================= */
-  function newGame() {
-    app.s = E.newState();
+  function newGame(mode, withTutorial) {
+    app.s = E.newState(mode);
+    app.tut = null;
+    app.tutPending = !!withTutorial;
+    app.hintPulse = false;
     app.selected = null; app.combining = false;
     app.ui = freshUi();
     app.log = []; app.latest = [];
@@ -255,6 +261,91 @@
     openView({ view: 'item', id: 'letter' });
   }
 
+  /* ================= 操作教學（可跳過） ================= */
+  // 每一步指向畫面上的一個東西；有 until 的步驟要玩家真的做到才會前進
+  const TUT = [
+    { key: 'tut1', target: () => $('scene').querySelector('[data-hs="f_coat"]'), until: s => !!s.flags.coatSearched },
+    { key: 'tut2', target: () => $('inventory') },
+    { key: 'tut3', target: () => $('objects') },
+    { key: 'tut4', target: () => $('nav') },
+    { key: 'tut5', target: () => $('btn-hints') },
+    { key: 'tut6', target: () => $('btn-notes') },
+  ];
+  function startTutorial() { app.tut = 0; renderTutorial(true); }
+  function endTutorial() {
+    app.tut = null;
+    Store.setSetting('tutorialSeen', '1');
+    $('tutorial').hidden = true;
+  }
+  function renderTutorial(scroll) {
+    const el = $('tutorial');
+    if (app.tut == null || app.screen !== 'game' || !app.s || app.stack.length) { el.hidden = true; return; }
+    let step = TUT[app.tut];
+    while (step && step.until && step.until(app.s)) { app.tut++; step = TUT[app.tut]; scroll = true; }
+    if (!step) { endTutorial(); return; }
+    const target = step.target();
+    if (!target) { el.hidden = true; return; }
+    if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'nearest' });
+    el.hidden = false;
+    $('tut-count').textContent = T('tutStep', { i: app.tut + 1, n: TUT.length });
+    $('tut-text').textContent = T(step.key) + (step.key === 'tut5' && app.s.mode === 'veteran' ? (LANG === 'en' ? ' ' : '') + T('tut5v') : '');
+    $('tut-next').hidden = !!step.until;
+    $('tut-next').textContent = T(app.tut === TUT.length - 1 ? 'tutDone' : 'tutNext');
+    $('tut-skip').textContent = T('tutSkip');
+    // 圈出目標，把說明框放在目標下方（放不下就放上方），左右不超出畫面
+    const r = target.getBoundingClientRect(), pad = 6;
+    const ring = $('tut-ring');
+    Object.assign(ring.style, { left: (r.left - pad) + 'px', top: (r.top - pad) + 'px', width: (r.width + pad * 2) + 'px', height: (r.height + pad * 2) + 'px' });
+    const bubble = $('tut-bubble');
+    const bw = Math.min(360, window.innerWidth - 32);
+    bubble.style.width = bw + 'px';
+    const bh = bubble.offsetHeight || 140;
+    const below = r.bottom + 14 + bh < window.innerHeight;
+    const top = below ? r.bottom + 14 : Math.max(16, r.top - 14 - bh);
+    const left = Math.max(16, Math.min(window.innerWidth - bw - 16, r.left + r.width / 2 - bw / 2));
+    Object.assign(bubble.style, { left: left + 'px', top: top + 'px' });
+  }
+
+  /* ================= 音樂盒的聲音（沒有音效也能玩） ================= */
+  let audio = null;
+  const TINE_HZ = [523.25, 587.33, 659.25, 698.46, 783.99, 880, 987.77, 1046.5, 1174.66, 1318.51];
+  function tone(n, when = 0) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audio.currentTime + when;
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'triangle';
+      o.frequency.value = TINE_HZ[n - 1];
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
+      o.connect(g); g.connect(audio.destination);
+      o.start(t0); o.stop(t0 + 1.3);
+    } catch (e) { /* 瀏覽器不支援或被禁止播放聲音 */ }
+  }
+  const melody = seq => seq.forEach((n, i) => tone(n, i * 0.34));
+
+  // 周伯的燈號動畫：· 亮 0.3 秒、— 亮 0.9 秒，字與字之間暗 0.8 秒；尊重「減少動態效果」
+  let flashTimers = [];
+  function flashReply(root, codes) {
+    flashTimers.forEach(clearTimeout); flashTimers = [];
+    const house = root.querySelector('.zhou-house');
+    if (!house || !codes || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    let t = 500;
+    const set = on => () => house.classList.toggle('dark', !on);
+    flashTimers.push(setTimeout(set(false), 0));
+    for (const code of codes) {
+      for (const ch of code) {
+        flashTimers.push(setTimeout(set(true), t));
+        t += ch === '-' ? 900 : 300;
+        flashTimers.push(setTimeout(set(false), t));
+        t += 300;
+      }
+      t += 500;
+    }
+    flashTimers.push(setTimeout(set(true), t));
+  }
+
   /* ================= 動作 ================= */
   function say(msgs) {
     if (!msgs || !msgs.length) return;
@@ -265,10 +356,21 @@
 
   function act(fn, opts = {}) {
     if (!app.s || app.s.ending) return null;
+    const before = E.stage(app.s).index, sideBefore = G.SIDE_STAGE.done(app.s);
     let r;
     try { r = fn(); } catch (e) {
       console.error(e);
       r = { ok: false, messages: [{ text: TL('errorAction', { msg: e.message }), kind: 'bad' }] };
+    }
+    if (!r.ending && app.s) {
+      // 完成一個階段：告訴玩家下一個階段的目標，提示按鈕亮起來
+      const st = E.stage(app.s);
+      if (st.index > before) {
+        const done = G.STAGE_DEFS[st.ids[st.index - 1]];
+        r.messages = r.messages.concat([{ text: TL('stageDone', { done: done.title, next: st.stage.title, goal: st.stage.goal }), kind: 'stage' }]);
+        app.hintPulse = true;
+      }
+      if (!sideBefore && G.SIDE_STAGE.done(app.s)) r.messages = r.messages.concat([{ text: TL('stageSide', { done: G.SIDE_STAGE.title }), kind: 'stage' }]);
     }
     say(r.messages);
     if (r.ending) { finishGame(r.ending); return r; }
@@ -338,6 +440,13 @@
     $('chip-plate').hidden = !p.plate;
     $('chip-plate').classList.toggle('on', p.plate);
     $('chip-time').textContent = fmtTime(s.stats.playMs);
+    $('chip-mode').textContent = T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice');
+    $('chip-mode').title = T('modeChip', { mode: T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice') });
+    $('chip-mode').classList.toggle('vet', s.mode === 'veteran');
+    const st = E.stage(s), locked = E.hintsLocked(s);
+    $('hint-label').textContent = locked ? T('hintsBtnLocked') : T('hintsBtn', { n: st.index + 1, total: st.total });
+    $('btn-hints').classList.toggle('locked', locked);
+    $('btn-hints').classList.toggle('pulse', app.hintPulse && !locked);
     document.body.classList.toggle('holding', !!app.selected);
     renderScene();
     renderObjects();
@@ -345,6 +454,7 @@
     renderInventory();
     renderLog();
     $('narration').innerHTML = app.latest.map(m => msgHtml(m)).join('');
+    renderTutorial();
   }
 
   function visible(id) {
@@ -385,7 +495,7 @@
   function renderNav() {
     const s = app.s;
     $('nav').innerHTML = G.roomOrder.map(r => {
-      if (r === 'darkroom' && !s.flags.trapdoorFound) return '';
+      if (!E.roomShown(s, r)) return '';
       const open = E.canEnter(s, r), here = s.room === r;
       return `<button class="btn ${here ? 'here' : ''}" type="button" data-room="${r}" ${!open || here ? 'disabled' : ''} ${here ? 'aria-current="true"' : ''}>${esc(tr(G.rooms[r].name))}${open ? '' : tx('lockedRoom')}</button>`;
     }).join('');
@@ -419,7 +529,7 @@
 
   /* ================= 對話框 ================= */
   const fb = () => `<div class="feedback" aria-live="polite">${app.ui.feedback.map(m => msgHtml(m)).join('')}</div>`;
-  const paper = (d, extra = '') => `<div class="paper ${d.style || 'plain'}">${extra}${tr(d.body).map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
+  const paper = (d, extra = '') => `<div class="paper ${d.style || 'plain'}">${extra}${tr(G.docBody(d, app.s && app.s.mode)).map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
   const center = html => `<div class="row" style="justify-content:center">${html}</div>`;
 
   function openView(view) {
@@ -455,8 +565,11 @@
       // 原本的焦點若已隱藏（例如開場按鈕），改把焦點交給房間裡的第一個物件
       if (lf && document.contains(lf) && lf !== document.body && lf.offsetParent !== null) lf.focus();
       else if (app.screen === 'game') { const first = $('objects').querySelector('button'); if (first) first.focus(); }
+      if (app.tutPending && app.screen === 'game') { app.tutPending = false; startTutorial(); }
+      renderTutorial();
       return;
     }
+    $('tutorial').hidden = true;
     const keep = fresh ? null : focusKey(document.activeElement);
     const V = VIEWS[view.view];
     const out = V ? V(view) : { title: '?', html: `<p>${tx('missingView')}</p>` };
@@ -496,6 +609,11 @@
           `<p class="lead">${pages.length < 4 ? tx('diaryMissing', { n: 4 - pages.length }) : tx('diaryComplete')}</p>`;
       }
       case 'plate': return `<div class="art-box narrow" style="max-width:440px">${Art.plate()}</div><p class="lead">${tx('plateLead')}</p>`;
+      case 'photos':
+      case 'photo_comet': {
+        const ids = it.view === 'photos' ? G.PHOTOS_IN_BOX : ['ph_e'];
+        return `<div class="photo-pairs">${ids.map(id => { const p = G.PHOTOS.find(x => x.id === id), label = T('photoCard', { desc: id.slice(3).toUpperCase() }); return `<figure class="photo-pair"><figcaption>${esc(label)}</figcaption>${Art.photoSvg(p, { label: label + ' — ' + T('photoFront') })}${Art.photoSvg(p, { back: true, label: label + ' — ' + T('photoBack') })}</figure>`; }).join('')}</div>`;
+      }
       default: return `<div class="item-hero k-${it.kind}">${Art.icon(id)}</div>`;
     }
   }
@@ -608,11 +726,12 @@
 
     pots: () => {
       const trowel = app.s.inv.includes('trowel');
-      const rule = G.docs.pots_rule;
+      const vet = app.s.mode === 'veteran';
+      const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'];
       return {
         title: T('potsTitle'),
         html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, 2), en: rule.body.en.slice(0, 2) } }) +
-          `<div class="pots">${G.POTS.map(p => `<div class="pot pot-${p.id}"><h3>${tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
+          `<div class="pots ${vet ? 'eight' : ''}">${G.variant(app.s).pots.map(p => `<div class="pot pot-${p.id}"><h3>${vet ? tx('potNum', { n: p.n, name: cap(tr(p.name)) }) : tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
             <button class="btn small" type="button" data-pot="${p.id}">${tx('digHere')}</button></div>`).join('')}</div>
           ${trowel ? '' : `<p class="notice">${tx('needTool')}</p>`}${fb()}`,
         bind(root) { root.querySelectorAll('[data-pot]').forEach(b => { b.onclick = () => submit('pots', b.dataset.pot); }); },
@@ -641,17 +760,24 @@
     },
 
     mirrors: () => {
-      const cfg = Object.assign({}, G.MIRROR_GRID.initial, app.s.puz.mirrors);
-      const hit = G.traceBeam(cfg).hit;
+      const vet = app.s.mode === 'veteran';
+      const grid = vet ? G.MIRROR_GRID_V : G.MIRROR_GRID;
+      const cfg = Object.assign({}, grid.initial, app.s.puz.mirrors);
+      const hit = G.traceBeam(cfg, grid).hit;
+      const lit = !!app.s.flags.lightOk;
+      const showBeam = !vet || !!app.ui.mirrorReveal || !!lit;
       return {
         title: T('mirrorsTitle'),
-        html: `<p class="lead">${tx('mirrorsLead')}</p>
-          <div class="art-box">${Art.mirrorsSvg(cfg)}</div>
-          ${hit ? `<p class="m-good" style="margin:0;text-align:center">${tx('mirrorsLit')}</p>` : ''}${fb()}`,
+        html: `<p class="lead">${tx(vet ? 'mirrorsLeadV' : 'mirrorsLead')}</p>
+          <div class="art-box">${Art.mirrorsSvg(cfg, { grid, beam: showBeam })}</div>
+          ${(!vet && hit) || lit ? `<p class="m-good" style="margin:0;text-align:center">${tx('mirrorsLit')}</p>` : ''}
+          ${vet && !lit ? center(`<button class="btn primary" type="button" data-act="skylight">${tx('skylightOpen')}</button>`) + (app.ui.mirrorReveal ? `<p class="lead" style="text-align:center;font-size:.88rem">${tx('mirrorsShown')}</p>` : '') : ''}${fb()}`,
         bind(root) {
           root.querySelectorAll('[data-mirror]').forEach(g => {
             const flip = () => {
+              if (lit) return;
               cfg[g.dataset.mirror] = cfg[g.dataset.mirror] === '/' ? '\\' : '/';
+              app.ui.mirrorReveal = false;
               const r = act(() => E.submit(app.s, 'mirrors', cfg), { noOpen: true });
               app.ui.feedback = r && r.solved && r.messages.length ? r.messages : [];
               renderModal();
@@ -659,6 +785,11 @@
             g.addEventListener('click', flip);
             g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
           });
+          const sky = root.querySelector('[data-act=skylight]');
+          if (sky) sky.onclick = () => {
+            const r = submit('skylight', cfg);
+            if (r && !r.solved && !r.ending) { app.ui.mirrorReveal = true; renderModal(); }
+          };
         },
       };
     },
@@ -684,20 +815,21 @@
 
     develop: () => {
       const seq = app.ui.dev;
-      const name = id => tr(G.BOTTLES.find(b => b.id === id).name);
+      const V = G.variant(app.s), steps = V.developAnswer.length;
+      const name = id => tr(V.bottles.find(b => b.id === id).name);
       const hasNote = app.s.inv.includes('note_full');
       return {
         title: T('devTitle'),
-        html: `<p class="lead">${tx('devLead')}</p>
-          <div class="bottles">${G.BOTTLES.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= 4 ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
-          <div class="slots">${[0, 1, 2, 3].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
-          ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < 4 ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
+        html: `<p class="lead">${tx(steps > 4 ? 'devLeadV' : 'devLead')}</p>
+          <div class="bottles ${steps > 4 ? 'eight' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
+          <div class="slots">${[...Array(steps).keys()].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
+          ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
           ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}`)}`,
         bind(root) {
-          root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < 4) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
           root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
-          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: 'bottle_card' });
+          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: app.s.mode === 'veteran' ? 'bottle_card_v' : 'bottle_card' });
           const n = root.querySelector('[data-note]');
           if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
         },
@@ -769,15 +901,164 @@
     },
 
     hints: () => {
+      const st = E.stage(app.s);
+      const head = `<div class="stage-head"><p class="stage-n">${tx('hintsStage', { n: st.index + 1, total: st.total, title: st.stage.title })}</p>
+        <p class="stage-goal">${tx('hintsGoal', { goal: st.stage.goal })}</p>
+        <div class="stage-bar" aria-hidden="true">${st.ids.map((id, i) => `<span class="${i < st.index ? 'done' : i === st.index ? 'cur' : ''}"></span>`).join('')}</div></div>`;
+      if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked')}</p>` };
       const list = E.hintList(app.s);
+      const card = h => `<div class="hint ${h.group}"><h4>${esc(tr(h.title))}</h4>
+        ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(tr(t))}</li>`).join('')}</ol>` : ''}
+        <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div></div>`;
+      const groups = [['current', 'hintGroupCurrent'], ['earlier', 'hintGroupEarlier'], ['explore', 'hintGroupExplore'], ['side', 'hintGroupSide'], ['other', 'hintGroupOther']];
+      const body = groups.map(([g, key]) => { const hs = list.filter(h => h.group === g); return hs.length ? `<h3 class="hint-group">${tx(key)}</h3>${hs.map(card).join('')}` : ''; }).join('');
       return {
         title: T('hintsTitle'),
-        html: `<p class="lead">${tx('hintsLead')}</p>
-          ${list.map(h => `<div class="hint"><h3>${esc(tr(h.title))}</h3>
-            ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(tr(t))}</li>`).join('')}</ol>` : ''}
-            <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div></div>`).join('') || `<p>${tx('hintNone')}</p>`}`,
+        html: `${head}<p class="lead">${tx('hintsLead')}</p>${body || `<p>${tx('hintNone')}</p>`}`,
         bind(root) {
           root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { if (E.revealHint(app.s, b.dataset.hint)) autosave(); renderModal(); }; });
+        },
+      };
+    },
+
+    // 選擇難度（標題畫面「新遊戲」）
+    mode: () => {
+      const auto = Store.read('auto');
+      const live = auto && auto.state && !auto.state.ending;
+      const tut = app.modeTut != null ? app.modeTut : Store.getSetting('tutorialSeen') !== '1';
+      const card = m => `<div class="mode-card mode-${m}"><h3>${tx(m === 'veteran' ? 'modeVeteran' : 'modeNovice')}</h3><p>${tx(m === 'veteran' ? 'modeVeteranDesc' : 'modeNoviceDesc')}</p>
+        <button class="btn ${m === 'novice' ? 'primary' : 'vet'}" type="button" data-mode="${m}" ${m === 'novice' ? 'data-autofocus' : ''}>${tx('modeStart', { mode: T(m === 'veteran' ? 'modeVeteran' : 'modeNovice') })}</button></div>`;
+      return {
+        title: T('modeTitle'),
+        html: `<div class="modes">${card('novice')}${card('veteran')}</div>
+          <label class="check"><input type="checkbox" id="tut-toggle" ${tut ? 'checked' : ''}> ${tx('tutorialToggle')}</label>
+          ${live ? `<p class="notice warn">${tx('confirmNew')}</p>` : ''}`,
+        bind(root) {
+          const box = root.querySelector('#tut-toggle');
+          box.onchange = () => { app.modeTut = box.checked; };
+          root.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { const withTut = box.checked; closeAll(); newGame(b.dataset.mode, withTut); }; });
+        },
+      };
+    },
+
+    // 資深・天平
+    balance: () => {
+      const place = Object.assign({}, app.s.puz.balance);
+      const things = G.BALANCE_THINGS.filter(th => !th.item || app.s.inv.includes(th.item));
+      const sideOf = id => place[id] || '';
+      return {
+        title: T('balanceTitle'),
+        html: `<p class="lead">${tx('balanceLead')}</p><div class="art-box">${Art.balanceSvg(place)}</div>
+          <div class="pan-list">${things.map(th => `<div class="pan-row"><span class="pan-name">${esc(cap(tr(th.name)))}</span><div class="seg" role="group" aria-label="${esc(cap(tr(th.name)))}">${['L', '', 'R'].map(side => `<button class="btn small ${sideOf(th.id) === side ? 'cur' : ''}" type="button" data-pan="${th.id}:${side}" aria-pressed="${sideOf(th.id) === side}">${tx(side === 'L' ? 'panLeft' : side === 'R' ? 'panRight' : 'panOff')}</button>`).join('')}</div></div>`).join('')}</div>
+          ${app.s.inv.includes('paperweight') ? '' : `<p class="notice">${tx('w5Missing')}</p>`}
+          ${center(`<button class="btn small" type="button" data-act="clear">${tx('balanceEmpty')}</button>${app.s.flags.cabinetOpen ? '' : `<button class="btn small" type="button" data-act="cabinet">${tx('openCabinet')}</button>`}<button class="btn small" type="button" data-doc="weight_box">${tx('readWeightBox')}</button>`)}`,
+        bind(root) {
+          root.querySelectorAll('[data-pan]').forEach(b => {
+            b.onclick = () => {
+              const [id, side] = b.dataset.pan.split(':');
+              if (side) place[id] = side; else delete place[id];
+              E.submit(app.s, 'balance_set', place); autosave(); renderModal();
+            };
+          });
+          root.querySelector('[data-act=clear]').onclick = () => { E.submit(app.s, 'balance_set', {}); autosave(); renderModal(); };
+          const cab = root.querySelector('[data-act=cabinet]');
+          if (cab) cab.onclick = () => openView({ view: 'lock', id: 'seedlock' });
+          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: 'weight_box' });
+        },
+      };
+    },
+
+    // 資深・相框牆
+    photos: () => {
+      const s = app.s;
+      const have = (s.inv.includes('photos') ? G.PHOTOS_IN_BOX : []).concat(s.inv.includes('photo_comet') ? ['ph_e'] : []);
+      const order = app.ui.photoOrder = (app.ui.photoOrder || Array(6).fill(null)).map(id => (have.includes(id) ? id : null));
+      const tray = have.filter(id => !order.includes(id));
+      const ready = have.length === 6;
+      const backs = app.ui.photoBacks;
+      const photo = id => G.PHOTOS.find(p => p.id === id);
+      const label = id => T('photoCard', { desc: id.slice(3).toUpperCase() });
+      return {
+        title: T('photosTitle'),
+        html: `<p class="lead">${tx('photosLead')}</p>
+          <div class="frames">${order.map((id, i) => `<button class="frame ${id ? 'filled' : ''}" type="button" data-slot="${i}" aria-label="${esc(T('photoSlot', { i: i + 1 }) + (id ? (LANG === 'en' ? ': ' : '：') + label(id) : ''))}">${id ? Art.photoSvg(photo(id), { back: backs, label: label(id) }) : `<span>${i + 1}</span>`}</button>`).join('')}</div>
+          <p class="frames-axis">${tx('photosAxis')}</p>
+          <div class="tray">${tray.map(id => `<button class="photo-card" type="button" data-photo="${id}" aria-label="${esc(label(id))}">${Art.photoSvg(photo(id), { back: backs, label: label(id) })}<span>${esc(id.slice(3).toUpperCase())}</span></button>`).join('')}</div>
+          ${ready ? '' : `<p class="notice">${tx('photosNeed')}</p>`}
+          ${center(`<button class="btn small" type="button" data-act="flip">${tx(backs ? 'photosFront' : 'photosFlip')}</button><button class="btn small" type="button" data-act="clear">${tx('photosClear')}</button><button class="btn primary" type="button" data-act="hang" ${ready && order.every(Boolean) ? '' : 'disabled'}>${tx('photosHang')}</button>`)}${fb()}`,
+        bind(root) {
+          root.querySelectorAll('[data-slot]').forEach(b => { b.onclick = () => { order[+b.dataset.slot] = null; app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-photo]').forEach(b => { b.onclick = () => { const i = order.indexOf(null); if (i >= 0) order[i] = b.dataset.photo; app.ui.feedback = []; renderModal(); }; });
+          root.querySelector('[data-act=flip]').onclick = () => { app.ui.photoBacks = !backs; renderModal(); };
+          root.querySelector('[data-act=clear]').onclick = () => { app.ui.photoOrder = null; app.ui.feedback = []; renderModal(); };
+          root.querySelector('[data-act=hang]').onclick = () => submit('photos', order.slice());
+        },
+      };
+    },
+
+    // 資深・音樂盒
+    musicbox: () => {
+      const seq = app.ui.music;
+      // 奏完一遍之後，畫面保留剛才的音，直到撥下一個音時才重新開始一段
+      const fresh = () => { if (app.ui.musicDone) { seq.length = 0; app.ui.musicDone = false; } };
+      const hasLetter = app.s.inv.includes('qing_letter');
+      return {
+        title: T('musicTitle'),
+        html: `<p class="lead">${tx('musicLead')}</p><div class="art-box">${Art.musicBoxSvg(app.ui.musicLit)}</div>
+          <p class="played">${tx('musicPlayed')} <strong>${seq.length ? seq.join(' · ') : tx('musicNone')}</strong></p>
+          ${center(`<button class="btn small" type="button" data-act="clear">${tx('musicClear')}</button><button class="btn primary" type="button" data-act="play" ${seq.length ? '' : 'disabled'}>${tx('musicPlay')}</button>${hasLetter ? `<button class="btn small" type="button" data-act="letter">${tx('readLetter')}</button>` : ''}`)}${fb()}`,
+        bind(root) {
+          const pluck = n => { fresh(); if (seq.length >= 16) seq.shift(); seq.push(n); tone(n); app.ui.musicLit = n; app.ui.feedback = []; renderModal(); };
+          root.querySelectorAll('[data-tine]').forEach(g => {
+            g.addEventListener('click', () => pluck(+g.dataset.tine));
+            g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pluck(+g.dataset.tine); } });
+          });
+          root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.musicLit = 0; app.ui.feedback = []; renderModal(); };
+          root.querySelector('[data-act=play]').onclick = () => { melody(seq); app.ui.musicLit = 0; app.ui.musicDone = true; submit('musicbox', seq.slice()); };
+          const letter = root.querySelector('[data-act=letter]');
+          if (letter) letter.onclick = () => openView({ view: 'doc', id: 'qing_letter' });
+        },
+        keys(e) {
+          if (/^[0-9]$/.test(e.key) && !(e.target && e.target.tagName === 'INPUT')) {
+            const n = e.key === '0' ? 10 : +e.key;
+            fresh();
+            if (seq.length >= 16) seq.shift();
+            seq.push(n); tone(n); app.ui.musicLit = n; renderModal(); return true;
+          }
+          return false;
+        },
+      };
+    },
+
+    // 資深・小窗的燈號
+    signal: () => {
+      const toks = app.ui.sig;
+      const show = code => code.replace(/\./g, '·').replace(/-/g, '—');
+      const composed = toks.filter(Boolean).length ? toks.map(c => c ? show(c) : '…').join(' / ') : null;
+      const reply = app.ui.sigReply;
+      const hasCard = app.s.inv.includes('code_card');
+      return {
+        title: T('signalTitle'),
+        html: `<p class="lead">${tx('signalLead')}</p><div class="art-box">${Art.signalSvg()}</div>
+          <p class="sig-line">${tx('sigYours')} ${composed ? `<strong class="sig-code">${esc(composed)}</strong>` : `<strong>${tx('sigNone')}</strong>`}</p>
+          ${center(`<button class="btn" type="button" data-sig="." ${toks[toks.length - 1].length >= 6 ? 'disabled' : ''}>${tx('sigShort')}</button><button class="btn" type="button" data-sig="-" ${toks[toks.length - 1].length >= 6 ? 'disabled' : ''}>${tx('sigLong')}</button><button class="btn" type="button" data-act="next" ${toks[toks.length - 1] ? '' : 'disabled'}>${tx('sigNext')}</button>`)}
+          ${center(`<button class="btn small" type="button" data-act="clear">${tx('sigClear')}</button><button class="btn primary" type="button" data-act="send" ${toks.some(Boolean) ? '' : 'disabled'}>${tx('sigSend')}</button>${hasCard ? `<button class="btn small" type="button" data-act="card">${tx('readCodeCard')}</button>` : ''}`)}
+          ${reply ? `<p class="sig-line reply">${tx('sigReply')} <strong class="sig-code">${esc(reply.map(show).join(' / '))}</strong></p>` : ''}${fb()}`,
+        bind(root) {
+          root.querySelectorAll('[data-sig]').forEach(b => { b.onclick = () => { toks[toks.length - 1] += b.dataset.sig; app.ui.feedback = []; renderModal(); }; });
+          root.querySelector('[data-act=next]').onclick = () => { if (toks[toks.length - 1]) toks.push(''); renderModal(); };
+          root.querySelector('[data-act=clear]').onclick = () => { app.ui.sig = ['']; app.ui.feedback = []; renderModal(); };
+          root.querySelector('[data-act=send]').onclick = () => {
+            const words = toks.filter(Boolean);
+            app.ui.sig = [''];
+            const r = submit('signal', words, { closeOnSolve: false });
+            const m = r && r.messages && r.messages.find(x => x.signal);
+            app.ui.sigReply = m ? m.signal : null;
+            renderModal();
+            if (m) flashReply($('modal-body'), m.signal);
+          };
+          const card = root.querySelector('[data-act=card]');
+          if (card) card.onclick = () => openView({ view: 'doc', id: 'code_card' });
         },
       };
     },
@@ -792,6 +1073,7 @@
           <button class="btn" type="button" data-go="save">${tx('saveLoad')}</button>
           <button class="btn" type="button" data-go="help">${tx('helpTitle')}</button>
           <button class="btn" type="button" data-go="gallery">${tx('galleryTitle')}</button>
+          ${app.screen === 'game' ? `<button class="btn" type="button" data-act="tutorial">${tx('replayTutorial')}</button>` : ''}
           ${app.ui.confirm === 'title'
             ? `<div class="confirm"><p style="margin:0">${tx('toTitleConfirm')}</p><div class="row"><button class="btn primary" type="button" data-act="title-yes">${tx('toTitleYes')}</button><button class="btn" type="button" data-act="title-no">${tx('cancel')}</button></div></div>`
             : `<button class="btn" type="button" data-act="title">${tx('toTitle')}</button>`}
@@ -801,6 +1083,7 @@
         root.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => openView({ view: b.dataset.go }); });
         const on = (a, f) => { const b = root.querySelector(`[data-act=${a}]`); if (b) b.onclick = f; };
         on('title', () => { app.ui.confirm = 'title'; renderModal(); });
+        on('tutorial', () => { closeAll(); startTutorial(); });
         on('title-no', () => { app.ui.confirm = null; renderModal(); });
         on('title-yes', () => { autosave(); closeAll(); show('title'); });
       },
@@ -813,6 +1096,7 @@
 
     gallery: () => {
       const got = Store.getEndings();
+      const vet = Store.getEndings('veteran');
       const excerpt = s => {
         if (LANG !== 'en') return s.slice(0, 26) + '……';
         if (s.length <= 90) return s;
@@ -824,7 +1108,7 @@
         html: `<p class="lead">${tx('galleryCount', { n: got.length, total: G.ENDING_ORDER.length })}</p>
           <div class="gallery">${G.ENDING_ORDER.map(id => {
             const e = G.endings[id], ok = got.includes(id);
-            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(e.text)[0]))}` : tx('galleryLocked')}</span></div>`;
+            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(e.text)[0]))}` : tx('galleryLocked')}</span>${vet.includes(id) ? `<span class="badge-vet" title="${tx('galleryVeteranTip')}">${tx('galleryVeteran')}</span>` : ''}</div>`;
           }).join('')}</div>`,
       };
     },
@@ -950,7 +1234,8 @@
 
   /* ================= 結局 ================= */
   function finishGame(id) {
-    Store.addEnding(id);
+    Store.addEnding(id, app.s.mode);
+    app.tut = null; $('tutorial').hidden = true;
     Store.remove('auto');
     app.stack = []; renderModal();
     app.endingId = id;
@@ -964,12 +1249,12 @@
     const got = Store.getEndings();
     const stats = [
       [fmtTime(s.stats.playMs), 'statTime'], [s.stats.actions, 'statActions'], [s.stats.wrong, 'statWrong'],
-      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'],
+      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice'), 'statMode'],
     ];
     $('ending-card').innerHTML = `
       <p class="ending-rank">${esc(tr(e.rank))}</p>
       <h1 class="ending-title">${esc(tr(e.title))}</h1>
-      <div class="ending-text">${tr(e.text).map(t => `<p>${esc(t)}</p>`).join('')}</div>
+      <div class="ending-text">${tr(G.endingText(e, s.mode)).map(t => `<p>${esc(t)}</p>`).join('')}</div>
       <div class="stats">${stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${tx(l)}</span></div>`).join('')}</div>
       <p class="lead">${tx('endUnlocked', { n: got.length, total: G.ENDING_ORDER.length })}${tx(got.length < G.ENDING_ORDER.length ? 'endMore' : 'endAll')}</p>
       <div class="row">
@@ -987,17 +1272,7 @@
 
   /* ================= 事件繫結 ================= */
   function bindStatic() {
-    $('btn-new').onclick = () => {
-      const auto = Store.read('auto');
-      if (auto && auto.state && !auto.state.ending && !app.confirmNew) {
-        app.confirmNew = true;
-        $('btn-new').textContent = T('confirmNew');
-        return;
-      }
-      app.confirmNew = false;
-      $('btn-new').textContent = T('newGame');
-      newGame();
-    };
+    $('btn-new').onclick = () => openView({ view: 'mode' });
     $('btn-continue').onclick = () => {
       const rec = Store.read('auto');
       const err = rec && rec.state ? loadState(rec.state, I.UI.slotAuto) : I.UI.noContinue;
@@ -1009,7 +1284,11 @@
     $('btn-intro-next').onclick = nextIntro;
     $('btn-intro-skip').onclick = () => { app.introStep = tr(G.intro).length; beginGame(); };
 
-    $('btn-hints').onclick = () => openView({ view: 'hints' });
+    $('btn-hints').onclick = () => { app.hintPulse = false; render(); openView({ view: 'hints' }); };
+    $('tut-next').onclick = () => { if (app.tut == null) return; app.tut++; if (app.tut >= TUT.length) endTutorial(); else renderTutorial(true); };
+    $('tut-skip').onclick = () => endTutorial();
+    window.addEventListener('resize', () => renderTutorial());
+    window.addEventListener('scroll', () => renderTutorial(), { passive: true });
     $('btn-notes').onclick = () => openView({ view: 'notes' });
     $('btn-save').onclick = () => { app.ui.saveNote = null; openView({ view: 'save' }); };
     $('btn-menu').onclick = () => openView({ view: 'menu' });

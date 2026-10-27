@@ -52,13 +52,15 @@
   function getSetting(key) { return rawGet('setting.' + key); }
   function setSetting(key, value) { return rawSet('setting.' + key, String(value)); }
 
-  function getEndings() {
-    try { const v = JSON.parse(rawGet('endings') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  // 結局圖鑑：'endings' 記錄所有模式解鎖過的結局；資深模式另外記在 'endings.veteran'，讓圖鑑標出資深徽記
+  function listOf(key) {
+    try { const v = JSON.parse(rawGet(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
-  function addEnding(id) {
-    const list = getEndings();
-    if (!list.includes(id)) { list.push(id); rawSet('endings', JSON.stringify(list)); }
-    return list;
+  function getEndings(mode) { return listOf(mode === 'veteran' ? 'endings.veteran' : 'endings'); }
+  function addEnding(id, mode) {
+    const add = key => { const list = listOf(key); if (!list.includes(id)) { list.push(id); rawSet(key, JSON.stringify(list)); } return list; };
+    if (mode === 'veteran') add('endings.veteran');
+    return add('endings');
   }
 
   // 存檔碼：STAR1.<base64(UTF-8 JSON)>.<校驗碼>

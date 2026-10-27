@@ -29,6 +29,7 @@
   ];
   const COLOR_NAMES = {
     red: L('紅', 'red'), yellow: L('黃', 'yellow'), blue: L('藍', 'blue'), green: L('綠', 'green'), brown: L('棕', 'brown'),
+    white: L('白', 'white'), black: L('黑', 'black'), orange: L('橙', 'orange'), purple: L('紫', 'purple'),
   };
   const DRAWER_ORDER = ['red', 'yellow', 'blue', 'green'];
   const DRAWER_CODE = DRAWER_ORDER.map(c => BOOKS.find(b => b.color === c).vol).join('');
@@ -112,8 +113,8 @@
     '/': { right: 'up', up: 'right', left: 'down', down: 'left' },
     '\\': { right: 'down', down: 'right', left: 'up', up: 'left' },
   };
-  function traceBeam(config) {
-    const g = MIRROR_GRID;
+  function traceBeam(config, grid) {
+    const g = grid || MIRROR_GRID;
     let c = g.entry.c, r = g.entry.r, d = g.entry.d;
     const path = [{ c, r: -1 }];
     const seen = new Set();
@@ -137,13 +138,14 @@
   }
 
   // 窮舉所有鏡子組合，找出能照到月光花的解（提示文字由此產生，避免與謎面不一致）
-  function solveMirrors() {
-    const ids = MIRROR_GRID.mirrors.map(m => m.id);
+  function solveMirrors(grid) {
+    const g = grid || MIRROR_GRID;
+    const ids = g.mirrors.map(m => m.id);
     const sols = [];
     for (let mask = 0; mask < (1 << ids.length); mask++) {
       const cfg = {};
       ids.forEach((id, i) => { cfg[id] = (mask >> i) & 1 ? '\\' : '/'; });
-      if (traceBeam(cfg).hit) sols.push(cfg);
+      if (traceBeam(cfg, g).hit) sols.push(cfg);
     }
     return sols;
   }
@@ -207,7 +209,11 @@
     { id: 'yellow', name: L('黃蓋', 'Yellow cap'), content: 'developer' },
     { id: 'white', name: L('白蓋', 'White cap'), content: 'stop' },
   ];
-  const CHEM_NAMES = { developer: L('顯影液', 'developer'), stop: L('停影液', 'stop bath'), fixer: L('定影液', 'fixer'), water: L('清水', 'water') };
+  const CHEM_NAMES = {
+    developer: L('顯影液', 'developer'), stop: L('停影液', 'stop bath'), fixer: L('定影液', 'fixer'), water: L('清水', 'water'),
+    // 以下四種只出現在資深模式
+    presoak: L('預浸液', 'pre-soak'), toner: L('調色液', 'toner'), hypo: L('洗淨液', 'hypo clearing agent'), wetting: L('潤濕液', 'wetting agent'),
+  };
   const DEVELOP_SEQUENCE = ['developer', 'stop', 'fixer', 'water'];
   const DEVELOP_ANSWER = DEVELOP_SEQUENCE.map(ch => BOTTLES.find(b => b.content === ch).id);
 
@@ -216,9 +222,185 @@
   const PAGES = ['page1', 'page2', 'page3', 'page4'];
 
   /* ================================================================
+   * 一之二、資深模式的謎題資料（新手模式完全不使用）
+   * 這些數值都由程式搜尋產生，測試會逐一證明唯一解。
+   * ================================================================ */
+  const VET = s => !!s && s.mode === 'veteran';
+
+  // 資深・花盆：八個盆、盆上漆著編號 1～8；八句話裡有幾句為真，只有周伯知道（答案：兩句）。
+  // 不知道句數時，假設 2、3、4 句為真會分別指向三個不同的盆——所以一定要先問周伯。
+  const POTS_V = [
+    { id: 'rose', n: 1, name: L('玫瑰', 'rose'), says: L('鑰匙在編號是雙數的盆裡。', 'The key is in a pot with an even number.'), truth: k => k % 2 === 0 },
+    { id: 'lavender', n: 2, name: L('薰衣草', 'lavender'), says: L('鑰匙不在鼠尾草盆裡。', 'The key is not in the sage pot.'), truth: k => k !== 3 },
+    { id: 'sage', n: 3, name: L('鼠尾草', 'sage'), says: L('鑰匙不在我這裡。', 'The key is not in me.'), truth: k => k !== 3 },
+    { id: 'mint', n: 4, name: L('薄荷', 'mint'), says: L('鑰匙在我右邊的某一盆。', 'The key is in one of the pots to my right.'), truth: k => k > 4 },
+    { id: 'thyme', n: 5, name: L('百里香', 'thyme'), says: L('鑰匙和我之間，至少隔著兩盆。', 'There are at least two pots between the key and me.'), truth: k => Math.abs(k - 5) >= 3 },
+    { id: 'rosemary', n: 6, name: L('迷迭香', 'rosemary'), says: L('鑰匙在架子最左或最右的那一盆。', 'The key is in the pot at the far left or far right of the shelf.'), truth: k => k === 1 || k === 8 },
+    { id: 'basil', n: 7, name: L('羅勒', 'basil'), says: L('鑰匙在我左邊的某一盆。', 'The key is in one of the pots to my left.'), truth: k => k < 7 },
+    { id: 'chamomile', n: 8, name: L('洋甘菊', 'chamomile'), says: L('鑰匙在左邊四盆之中。', 'The key is in one of the four pots on the left.'), truth: k => k <= 4 },
+  ];
+  const POT_TRUE_COUNT_V = 2;
+  const POT_ANSWER_V = 'sage';
+
+  // 資深・月光折射：16 面鏡子。只有一條光路照得到月光花（經過其中 13 面），另外 3 面（A、D、G）是干擾。
+  const MIRROR_GRID_V = {
+    cols: 8, rows: 6,
+    entry: { c: 0, r: 0, d: 'down' },
+    target: { side: 'right', r: 5 },
+    mirrors: [
+      { id: 'A', c: 3, r: 0 }, { id: 'B', c: 4, r: 1 }, { id: 'C', c: 5, r: 1 }, { id: 'D', c: 7, r: 1 },
+      { id: 'E', c: 2, r: 2 }, { id: 'F', c: 5, r: 2 }, { id: 'G', c: 6, r: 2 }, { id: 'H', c: 0, r: 3 },
+      { id: 'J', c: 1, r: 3 }, { id: 'K', c: 1, r: 4 }, { id: 'L', c: 3, r: 4 }, { id: 'M', c: 4, r: 4 },
+      { id: 'N', c: 6, r: 4 }, { id: 'P', c: 2, r: 5 }, { id: 'Q', c: 3, r: 5 }, { id: 'R', c: 6, r: 5 },
+    ],
+    blocks: [{ c: 6, r: 0 }, { c: 3, r: 1 }, { c: 5, r: 3 }],
+    initial: { A: '\\', B: '\\', C: '/', D: '/', E: '\\', F: '\\', G: '/', H: '/', J: '/', K: '/', L: '/', M: '/', N: '/', P: '/', Q: '\\', R: '/' },
+  };
+  // 沿著光線做深度優先搜尋：只在光線碰到的鏡子上分岔，回傳每一條照得到花的光路（只含光路上的鏡子）
+  function beamPaths(grid) {
+    const out = [];
+    const at = new Map(grid.mirrors.map(m => [m.c + ',' + m.r, m.id]));
+    const blocked = new Set(grid.blocks.map(b => b.c + ',' + b.r));
+    (function walk(c, r, d, cfg, seen) {
+      for (;;) {
+        if (c < 0 || c >= grid.cols || r < 0 || r >= grid.rows) {
+          if (c >= grid.cols && r === grid.target.r) out.push(Object.assign({}, cfg));
+          return;
+        }
+        const key = c + ',' + r;
+        if (blocked.has(key)) return;
+        const id = at.get(key);
+        if (id) {
+          if (!cfg[id]) {
+            for (const o of ['/', '\\']) { cfg[id] = o; const nd = REFLECT[o][d]; walk(c + DIRS[nd][0], r + DIRS[nd][1], nd, cfg, new Set(seen)); delete cfg[id]; }
+            return;
+          }
+          d = REFLECT[cfg[id]][d];
+        }
+        if (seen.has(key + d)) return;
+        seen.add(key + d);
+        c += DIRS[d][0]; r += DIRS[d][1];
+      }
+    }(grid.entry.c, grid.entry.r, grid.entry.d, {}, new Set()));
+    return out;
+  }
+  const MIRROR_PATH_V = beamPaths(MIRROR_GRID_V)[0];
+  const MIRROR_SOLUTION_V = Object.assign({}, MIRROR_GRID_V.initial, MIRROR_PATH_V);
+
+  // 資深・顯影：八瓶藥劑（瓶蓋顏色由左到右固定）。內容物由藥瓶卡片的八條規則唯一決定。
+  const BOTTLES_V = [
+    { id: 'red', name: L('紅蓋', 'Red cap'), content: 'stop' },
+    { id: 'blue', name: L('藍蓋', 'Blue cap'), content: 'toner' },
+    { id: 'yellow', name: L('黃蓋', 'Yellow cap'), content: 'water' },
+    { id: 'white', name: L('白蓋', 'White cap'), content: 'fixer' },
+    { id: 'green', name: L('綠蓋', 'Green cap'), content: 'hypo' },
+    { id: 'black', name: L('黑蓋', 'Black cap'), content: 'developer' },
+    { id: 'orange', name: L('橙蓋', 'Orange cap'), content: 'wetting' },
+    { id: 'purple', name: L('紫蓋', 'Purple cap'), content: 'presoak' },
+  ];
+  // 卡片上的規則（同時供文件顯示與測試驗證唯一解）
+  const BOTTLE_RULES_V = [
+    { k: 'half', a: 'wetting', half: 'right' },
+    { k: 'notCaps', a: 'toner', caps: ['yellow', 'orange'] },
+    { k: 'notCaps', a: 'developer', caps: ['red', 'orange'] },
+    { k: 'adjacent', a: 'wetting', b: 'developer' },
+    { k: 'notAdjacent', a: 'stop', b: 'hypo' },
+    { k: 'immLeft', a: 'hypo', b: 'developer' },
+    { k: 'leftOf', a: 'fixer', b: 'presoak' },
+    { k: 'gap', a: 'fixer', b: 'stop', between: 2 },
+  ];
+  // 沖洗順序：便條給了「顯影→停影→定影→清水」，暗房牆上的流程表補上另外四種藥劑的位置
+  const PROCESS_RULES_V = [
+    { k: 'before', a: 'presoak', b: 'developer' },
+    { k: 'immAfter', a: 'toner', b: 'fixer' },
+    { k: 'between', a: 'hypo', after: 'toner', before: 'water' },
+    { k: 'last', a: 'wetting' },
+  ];
+  const DEVELOP_SEQUENCE_V = ['presoak', 'developer', 'stop', 'fixer', 'toner', 'hypo', 'water', 'wetting'];
+  const DEVELOP_ANSWER_V = DEVELOP_SEQUENCE_V.map(ch => BOTTLES_V.find(b => b.content === ch).id);
+
+  // 資深・天平：三個種子罐的重量（兩）只能用天平量出來；砝碼只有 2 兩一個，另一個 5 兩被借去當紙鎮。
+  const TINS = [
+    { id: 'tin_moon', bed: 'moon', name: L('月光花種子罐', 'moonflower seed tin'), w: 3 },
+    { id: 'tin_fern', bed: 'fern', name: L('蕨類孢子罐', 'fern spore tin'), w: 7 },
+    { id: 'tin_cactus', bed: 'cactus', name: L('仙人掌種子罐', 'cactus seed tin'), w: 4 },
+  ];
+  const WEIGHTS = [
+    { id: 'w2', name: L('2 兩砝碼', '2 oz weight'), w: 2 },
+    { id: 'w5', name: L('5 兩紙鎮', '5 oz paperweight'), w: 5, item: 'paperweight' },
+  ];
+  const BALANCE_THINGS = TINS.concat(WEIGHTS);
+  // 密碼照溫室園丁守則上的植物順序（月光花、蕨類、仙人掌）
+  const SEED_CODE = Object.keys(BEDS).map(b => TINS.find(t => t.bed === b).w).join('');
+
+  // 資深・燈號：晴和周伯的燈號卡。・＝短閃（.）、—＝長閃（-），每個字之間停一下。
+  const SIGNAL_CODE = {
+    '.-.': 'qing', '..': 'ok', '...': 'ask', '---': 'pot', '-.-': 'key', '.--': 'true', '-.-.': 'sayings',
+    '.-': '1', '..-': '2', '...-': '3', '....-': '4', '-': '5', '-.': '6', '-..': '7', '-...': '8', '-....': '9', '--': '0',
+  };
+  const SIGNAL_WORDS = {
+    qing: L('晴', 'QING'), ok: L('好', 'OK'), ask: L('？', '?'), pot: L('盆', 'POT'),
+    key: L('鑰', 'KEY'), true: L('真', 'TRUE'), sayings: L('句', 'SAYINGS'),
+  };
+  const SIGNAL_OF = Object.fromEntries(Object.entries(SIGNAL_CODE).map(([k, v]) => [v, k]));
+  const ZHOU_REPLY = {
+    call: ['ok'],
+    pot: ['pot', 'true', '2', 'sayings'],
+    key: ['key', 'pot'],
+    unknown: ['ask'],
+  };
+  // 燈號的文字寫法：·＝短閃、—＝長閃，字與字之間用「 / 」分開（兩種語言共用，不含全形符號）
+  const signalText = words => words.map(w => SIGNAL_OF[w].replace(/\./g, '·').replace(/-/g, '—')).join(' / ');
+
+  // 資深・相框：六張照片照時間先後掛好。每張照片的屋子、松樹與人物都透露時間。
+  // dome：0 沒有圓頂、1 搭鷹架、2 完工；gh：0 沒有溫室、1 只有骨架、2 完工；pine：松樹高度 1～5；
+  // age：照片裡晴的年紀（看得出身形，有些照片背面也寫了）；year：相機印在照片角落的日期。沒有的欄位代表照片看不出來。
+  const PHOTOS = [
+    { id: 'ph_a', dome: 1, gh: 0, pine: 2, age: 2, people: ['zhou_ladder', 'toddler'], back: null },
+    { id: 'ph_b', dome: 2, gh: 2, pine: 4, age: 7, people: ['girl7_telescope'], back: L('七歲生日。爸爸送的望遠鏡。', 'Seventh birthday. The telescope from Dad.') },
+    { id: 'ph_c', dome: 2, gh: 2, pine: 5, age: 13, year: 2003, people: ['teen_suitcase', 'zhou_grey'], stamp: '03 8 21', back: L('晴要出國念書了。', 'Qing is off to study abroad.') },
+    { id: 'ph_d', dome: 0, gh: 0, pine: 1, age: 0, people: ['luguan_baby'], back: L('晴，滿月。', 'Qing, one month old.') },
+    { id: 'ph_e', indoor: true, age: 9, year: 1999, people: ['girl9_window', 'luguan_window'], stamp: '99 12 08', back: L('1999.12.8　爸爸的彗星（晴九歲）', '8 Dec 1999 — Dad\'s comet (Qing, age 9)') },
+    { id: 'ph_f', dome: 2, gh: 1, pine: 3, people: [], back: null },
+  ];
+  const PHOTO_ORDER = ['ph_d', 'ph_a', 'ph_f', 'ph_b', 'ph_e', 'ph_c'];
+  const PHOTOS_IN_BOX = ['ph_a', 'ph_b', 'ph_c', 'ph_d', 'ph_f']; // 第六張（ph_e）在書桌抽屜裡
+
+  // 資深・音樂盒：晴用星座名字寫下的歌；「星座有幾顆星，就撥第幾根音齒」
+  const MUSIC_TINES = 10;
+  const MUSIC_SCORE = ['boat', 'fish', 'tower', 'crown', 'fish', 'key', 'boat', 'fish'];
+  const MUSIC_ANSWER = MUSIC_SCORE.map(id => CONSTELLATIONS[id].stars.length);
+
+  /* ================================================================
    * 二、線索文件（可在「線索筆記」中隨時重讀）
    * body 為 L([中文段落…], [English paragraphs…])
    * ================================================================ */
+
+  // 資深模式卡片與流程表的文字直接由規則資料產生，確保字面與測試驗證的規則一致
+  function bottleRuleText(r) {
+    const c = id => CHEM_NAMES[id];
+    const A = c(r.a), B = r.b && c(r.b);
+    switch (r.k) {
+      case 'half': return L(`${A.zh}放在架子的右半邊（右邊四瓶之中）。`, `The ${A.en} is in the right half of the shelf (one of the four on the right).`);
+      case 'notCaps': return L(`${A.zh}的瓶蓋既不是${COLOR_NAMES[r.caps[0]].zh}色，也不是${COLOR_NAMES[r.caps[1]].zh}色。`, `The ${A.en}'s cap is neither ${COLOR_NAMES[r.caps[0]].en} nor ${COLOR_NAMES[r.caps[1]].en}.`);
+      case 'adjacent': return L(`${A.zh}和${B.zh}緊挨在一起。`, `The ${A.en} and the ${B.en} stand side by side.`);
+      case 'notAdjacent': return L(`${A.zh}和${B.zh}沒有挨在一起。`, `The ${A.en} and the ${B.en} are not next to each other.`);
+      case 'immLeft': return L(`${A.zh}就在${B.zh}的緊左邊。`, `The ${A.en} stands immediately to the left of the ${B.en}.`);
+      case 'leftOf': return L(`${A.zh}在${B.zh}左邊的某處。`, `The ${A.en} is somewhere to the left of the ${B.en}.`);
+      case 'gap': return L(`${A.zh}和${B.zh}之間，正好隔著兩瓶。`, `There are exactly two bottles between the ${A.en} and the ${B.en}.`);
+    }
+    throw new Error('未知的藥瓶規則：' + r.k);
+  }
+  function processRuleText(r) {
+    const c = id => CHEM_NAMES[id];
+    switch (r.k) {
+      case 'before': return L(`${c(r.a).zh}要在${c(r.b).zh}之前。`, `The ${c(r.a).en} comes before the ${c(r.b).en}.`);
+      case 'immAfter': return L(`${c(r.a).zh}緊接在${c(r.b).zh}之後。`, `The ${c(r.a).en} comes immediately after the ${c(r.b).en}.`);
+      case 'between': return L(`${c(r.a).zh}在${c(r.after).zh}之後、${c(r.before).zh}之前。`, `The ${c(r.a).en} comes after the ${c(r.after).en} and before the ${c(r.before).en}.`);
+      case 'last': return L(`${c(r.a).zh}永遠是最後一步。`, `The ${c(r.a).en} is always the very last step.`);
+    }
+    throw new Error('未知的流程規則：' + r.k);
+  }
   const docs = {
     letter: {
       title: L('陸觀的信', 'Lu Guan\'s Letter'), style: 'hand',
@@ -234,6 +416,24 @@
         'Forgive me for welcoming you like this.',
         'The front door is locked by a mechanism I built. Three emblems are hidden in this house — the Sun, the Moon and the Star. Set them back into the door and it will open.',
         'Every lock in this house has its answer inside this house. You won\'t need any book or any other person. Just look closely and think slowly.',
+        'One more thing. The truth about that winter night twenty years ago is hidden "where the light cannot reach". Whether you carry it out through that door is up to you.',
+        '— Lu Guan',
+      ]),
+      // 資深模式的信多一段，介紹周伯與晴
+      bodyV: L([
+        '阿遙：',
+        '抱歉，用這種方式迎接你。',
+        '大門已經被我設下的機關鎖上了。屋裡藏著三枚徽章——日、月、星。把它們嵌回大門，門就會打開。',
+        '這屋子裡的每一道鎖，答案都在屋子裡。不必求助任何書本，只要仔細看、慢慢想。',
+        '如果卡住了，別忘了周伯。他就住在山谷對面；晴小時候常跟他打燈號玩，他一定還看得懂。',
+        '還有一件事。二十年前那個冬夜的真相，我藏在「光照不到的地方」。要不要把它帶出這扇門，由你決定。',
+        '—— 陸觀',
+      ], [
+        'Yao,',
+        'Forgive me for welcoming you like this.',
+        'The front door is locked by a mechanism I built. Three emblems are hidden in this house — the Sun, the Moon and the Star. Set them back into the door and it will open.',
+        'Every lock in this house has its answer inside this house. You won\'t need any book. Just look closely and think slowly.',
+        'If you get stuck, remember Old Zhou. He lives across the valley. When Qing was little she used to signal to him with a lamp for fun — he\'ll still understand.',
         'One more thing. The truth about that winter night twenty years ago is hidden "where the light cannot reach". Whether you carry it out through that door is up to you.',
         '— Lu Guan',
       ]),
@@ -410,6 +610,152 @@
         'Or you can let it go on sleeping. The choice is yours.',
       ]),
     },
+
+    /* ---------- 以下只出現在資深模式 ---------- */
+    pots_rule_v: {
+      title: L('花盆架上的木牌', 'Wooden Sign on the Pot Shelf'), style: 'plain',
+      body: L([
+        '八個花盆裡，只有一個埋著東西。盆身依序漆著編號 1～8。',
+        '盆上的八句話是周伯刻的——其中有幾句是真的，只有他知道。',
+        ...POTS_V.map(p => `${p.n} 號・${p.name.zh}盆：「${p.says.zh}」`),
+      ], [
+        'Only one of these eight pots has something buried in it. The pots are painted with the numbers 1 to 8.',
+        'Old Zhou carved the eight sayings on the pots — and only he knows how many of them are true.',
+        ...POTS_V.map(p => `No. ${p.n}, ${p.name.en} pot: "${p.says.en}"`),
+      ]),
+    },
+    weight_box: {
+      title: L('砝碼盒', 'The Weight Box'), style: 'hand',
+      body: L([
+        '（盒裡兩個凹槽，刻著「2 兩」和「5 兩」。只剩 2 兩的那一個。）',
+        '蓋子內側貼著周伯的字條：「5 兩的砝碼，老爺借去書房壓紙了。記得要回來。」',
+      ], [
+        '(Two hollows in the box, marked "2 oz" and "5 oz". Only the 2 oz weight is left.)',
+        'A note from Old Zhou is stuck inside the lid: "The master borrowed the 5 oz weight to hold down papers in the study. Remember to get it back."',
+      ]),
+    },
+    cabinet_note: {
+      title: L('種子櫃上的字條', 'Note on the Seed Cabinet'), style: 'hand',
+      body: L([
+        '種子櫃的密碼：三罐種子各有幾兩重。',
+        '照溫室守則上寫的順序。——周',
+      ], [
+        'The seed cabinet code: how many ounces each of the three seed tins weighs.',
+        'In the order they come in the greenhouse rules. — Zhou',
+      ]),
+    },
+    zhou_log: {
+      title: L('周伯的工作日誌（1999 年）', 'Old Zhou\'s Work Log (1999)'), style: 'hand',
+      body: L([
+        '12 月 8 日　晴。夜裡老爺帶晴丫頭在閣樓的圓窗看星星，兩個人鬧到半夜。',
+        '12 月 9 日　一早替老爺寄了一封掛號，厚厚的，寄給城裡的韓教授。老爺說是要緊的觀測報告。收據我夾在月曆後面。',
+        '12 月 12 日　老爺一整天沒說話，飯也沒吃。',
+      ], [
+        '8 December — clear. In the night the master and little Qing watched the stars from the attic\'s round window; the two of them were up past midnight.',
+        '9 December — first thing, I posted a registered letter for the master, a thick one, to Professor Han in the city. The master said it was an important observation report. I tucked the receipt behind the calendar.',
+        '12 December — the master didn\'t say a word all day, and didn\'t eat.',
+      ]),
+    },
+    calendar: {
+      title: L('1999 年 12 月的舊月曆', 'An Old Calendar: December 1999'), style: 'plain',
+      body: L([
+        '月曆停在 1999 年 12 月。9 日被紅筆圈起來，旁邊寫著「寄掛號」。',
+        '月曆背後夾著一張發黃的郵局收據：1999.12.09　掛號　寄件人：陸觀　收件人：韓嶽。',
+      ], [
+        'The calendar is still on December 1999. The 9th is circled in red, with "registered post" written beside it.',
+        'Tucked behind it is a yellowed post-office receipt: 1999.12.09 · registered · from: Lu Guan · to: Han Yue.',
+      ]),
+    },
+    code_card: {
+      title: L('晴和周伯的燈號卡', 'Qing and Old Zhou\'s Signal Card'), style: 'card',
+      body: L([
+        '（孩子的筆跡，旁邊有周伯工整的補充）',
+        '·＝短閃　—＝長閃　每個字之間要停一下。',
+        `晴 ${signalText(['qing'])}　好 ${signalText(['ok'])}　？ ${signalText(['ask'])}　盆 ${signalText(['pot'])}　鑰 ${signalText(['key'])}　真 ${signalText(['true'])}　句 ${signalText(['sayings'])}`,
+        ['1', '2', '3', '4', '5'].map(d => `${d} ${signalText([d])}`).join('　'),
+        ['6', '7', '8', '9', '0'].map(d => `${d} ${signalText([d])}`).join('　'),
+        '找周伯：先發「晴」，等他回「好」。想問什麼，就發那件事的字，再發「？」。',
+        '周伯家的燈，從儲物間的小窗看得最清楚。',
+      ], [
+        '(A child\'s handwriting, with neat additions by Old Zhou)',
+        '· = short flash   — = long flash   Pause between words.',
+        `QING ${signalText(['qing'])}   OK ${signalText(['ok'])}   ? ${signalText(['ask'])}   POT ${signalText(['pot'])}   KEY ${signalText(['key'])}   TRUE ${signalText(['true'])}   SAYINGS ${signalText(['sayings'])}`,
+        ['1', '2', '3', '4', '5'].map(d => `${d} ${signalText([d])}`).join('   '),
+        ['6', '7', '8', '9', '0'].map(d => `${d} ${signalText([d])}`).join('   '),
+        'To call Zhou: send QING first and wait for him to answer OK. To ask about something, send its word and then "?".',
+        'Zhou\'s lamp is easiest to see from the little window in the storeroom.',
+      ]),
+    },
+    zhou_call: {
+      title: L('周伯的燈號（一）', 'Old Zhou\'s Signal (1)'), style: 'card',
+      body: L(['山谷對面的燈閃了：', signalText(ZHOU_REPLY.call)], ['The light across the valley flashed:', signalText(ZHOU_REPLY.call)]),
+    },
+    zhou_pot: {
+      title: L('周伯的燈號（二）', 'Old Zhou\'s Signal (2)'), style: 'card',
+      body: L(['山谷對面的燈閃了：', signalText(ZHOU_REPLY.pot)], ['The light across the valley flashed:', signalText(ZHOU_REPLY.pot)]),
+    },
+    zhou_key: {
+      title: L('周伯的燈號（三）', 'Old Zhou\'s Signal (3)'), style: 'card',
+      body: L(['山谷對面的燈閃了：', signalText(ZHOU_REPLY.key)], ['The light across the valley flashed:', signalText(ZHOU_REPLY.key)]),
+    },
+    photobox_note: {
+      title: L('相片盒蓋上的字', 'Writing on the Photo Box Lid'), style: 'hand',
+      body: L([
+        '爸爸：照片我照時間先後排好、掛在牆上了，結果你又全拿下來！',
+        '這次換你掛回去。最舊的在最左邊喔。——晴',
+      ], [
+        'Dad — I hung the photos on the wall in the order they were taken, and you took them all down again!',
+        'Your turn to hang them back. Oldest on the left. — Qing',
+      ]),
+    },
+    height_marks: {
+      title: L('柱子上的刻痕', 'Height Marks on the Post'), style: 'plain',
+      body: L([
+        '木柱上刻著一道道橫線，一道比一道高：',
+        '晴 3 歲　／　5 歲　／　7 歲　／　9 歲　／　13 歲（最後一道旁邊寫著：出國前一天）',
+      ], [
+        'Lines are cut into the wooden post, each one higher than the last:',
+        'Qing, age 3  /  5  /  7  /  9  /  13 (beside the last one: "the day before she went abroad")',
+      ]),
+    },
+    qing_letter: {
+      title: L('晴寫給爸爸的信', 'Qing\'s Letter to Her Father'), style: 'hand',
+      body: L([
+        '爸爸：',
+        '你說，音樂盒的每一根音齒都對應一個星座——星座有幾顆星，就撥第幾根。',
+        '我把我們的歌寫成了星星譜，只有我們兩個看得懂：',
+        MUSIC_SCORE.map(id => CONSTELLATIONS[id].name.zh).join('、'),
+        '晴　1999 年 12 月',
+      ], [
+        'Dad —',
+        'You said every tine of the music box belongs to a constellation: as many stars as it has, that\'s the tine you pluck.',
+        'I\'ve written our song in star notation, so only the two of us can read it:',
+        MUSIC_SCORE.map(id => CONSTELLATIONS[id].name.en).join(', '),
+        '— Qing, December 1999',
+      ]),
+    },
+    process_chart: {
+      title: L('牆上的沖洗流程表', 'Developing Chart on the Wall'), style: 'hand',
+      body: L([
+        '玻璃底片沖洗流程（陸觀手寫）',
+        '基本的四步，寫在給阿遙的便條上。其餘四種藥劑：',
+        ...PROCESS_RULES_V.map((r, i) => `${'一二三四'[i]}、${processRuleText(r).zh}`),
+      ], [
+        'Developing a glass plate (in Lu Guan\'s hand)',
+        'The four basic steps are on my note to Yao. The other four chemicals:',
+        ...PROCESS_RULES_V.map((r, i) => `${i + 1}. ${processRuleText(r).en}`),
+      ]),
+    },
+    bottle_card_v: {
+      title: L('藥瓶架上的卡片', 'Card on the Bottle Shelf'), style: 'hand',
+      body: L([
+        `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
+        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六七八'[i]}、${bottleRuleText(r).zh}`),
+      ], [
+        `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
+        ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+      ]),
+    },
   };
 
   /* ================================================================
@@ -441,6 +787,15 @@
     emblem_moon: { name: L('月徽', 'Moon Emblem'), kind: 'emblem', desc: L('一枚銀白色的徽章，刻著一彎新月。', 'A silvery emblem engraved with a crescent moon.') },
     emblem_star: { name: L('星徽', 'Star Emblem'), kind: 'emblem', desc: L('一枚深藍色的琺瑯徽章，嵌著一顆八角星。', 'A deep-blue enamel emblem set with an eight-pointed star.') },
     plate: { name: L('玻璃底片', 'Glass Plate'), kind: 'evidence', desc: L('剛沖洗出來的玻璃底片，裝在陸觀手寫的紙套裡。群星之間，一顆拖著短尾的彗星清清楚楚。片角刻著：1999.12.08　陸觀。', 'The freshly developed glass plate, in a paper sleeve written in Lu Guan\'s hand. Among the stars, a comet with a short tail is perfectly clear. Etched in the corner: 1999.12.08 Lu Guan.'), view: 'plate' },
+    // 以下只出現在資深模式
+    storeroom_key: { name: L('儲物間鑰匙', 'Storeroom Key'), kind: 'key', desc: L('一把被煙燻黑的鐵鑰匙，鑰匙牌上寫著「儲物間」。', 'A soot-blackened iron key. Its tag reads "Storeroom".') },
+    paperweight: { name: L('黃銅紙鎮', 'Brass Paperweight'), kind: 'tool', desc: L('沉甸甸的黃銅紙鎮，底部刻著「5 兩」。看起來不像紙鎮，倒像一個砝碼。', 'A heavy brass paperweight stamped "5 oz" on the bottom. It looks less like a paperweight than a weight from a scale.') },
+    hook_pole: { name: L('鉤桿', 'Hook Pole'), kind: 'tool', desc: L('一根長長的木桿，一端裝著鐵鉤。', 'A long wooden pole with an iron hook on one end.') },
+    code_card: { name: L('燈號卡', 'Signal Card'), kind: 'paper', desc: L('晴小時候和周伯打燈號用的對照卡。', 'The card Qing and Old Zhou used when she was little, to signal to each other with lamps.'), doc: 'code_card' },
+    photos: { name: L('舊照片（五張）', 'Old Photos (5)'), kind: 'paper', desc: L('相片盒裡的五張舊照片。背面有的寫了字，有的沒有。', 'Five old photos from the photo box. Some have writing on the back; some don\'t.'), view: 'photos' },
+    photo_comet: { name: L('窗邊的照片', 'Photo by the Window'), kind: 'paper', desc: L('書桌抽屜深處的一張照片：小女孩和陸觀站在圓窗邊，窗外的夜空裡有一團拖著尾巴的光。', 'A photo from the back of the desk drawer: a little girl and Lu Guan by a round window, and in the night sky outside, a smudge of light with a tail.'), view: 'photo_comet' },
+    crank: { name: L('發條鑰匙', 'Winding Key'), kind: 'tool', desc: L('小小的黃銅發條鑰匙，柄上刻著一顆星。', 'A small brass winding key with a star engraved on its handle.') },
+    qing_letter: { name: L('晴的信', 'Qing\'s Letter'), kind: 'paper', desc: L('相框後面藏著的一封信，是晴小時候寫給爸爸的。', 'A letter hidden behind the photo frames, written by Qing to her father when she was small.'), doc: 'qing_letter' },
   };
 
   /* ================================================================
@@ -480,6 +835,7 @@
     darkroom: {
       name: L('暗房', 'Darkroom'),
       accessible: s => !!s.flags.trapdoorOpen,
+      navVisible: s => !!s.flags.trapdoorFound,
       enterText: s => s.flags.darkroomLit
         ? L('紅色的安全燈把暗房染成一片暗紅。', 'The red safelight bathes the darkroom in a deep crimson glow.')
         : L('你沿著梯子爬下去，四周伸手不見五指。', 'You climb down the ladder into pitch darkness.'),
@@ -490,6 +846,23 @@
           ctx.note('darkroom_warning');
         }
       },
+    },
+    // 以下兩個房間只出現在資深模式
+    storeroom: {
+      name: L('儲物間', 'Storeroom'),
+      mode: 'veteran',
+      accessible: s => VET(s) && !!s.flags.storeroomOpen,
+      navVisible: s => VET(s) && (!!s.flags.storeroomOpen || !!s.flags.storeDoorSeen),
+      enterText: () => L('儲物間在屋子的最邊上，是用木板搭成的斜頂小屋。農具、柴薪、一排排種子罐——這裡是周伯的地方。小窗外，山谷對面亮著一點燈火。',
+        'The storeroom sits on the very edge of the house, a lean-to of wooden boards. Farm tools, firewood, rows of seed tins — this is Old Zhou\'s place. Through the little window, a single light burns on the far side of the valley.'),
+    },
+    attic: {
+      name: L('閣樓', 'Attic'),
+      mode: 'veteran',
+      accessible: s => VET(s) && !!s.flags.atticOpen,
+      navVisible: s => VET(s) && (!!s.flags.atticOpen || !!s.flags.hatchSeen),
+      enterText: () => L('你爬上摺疊梯。閣樓低矮的屋梁下堆滿了箱子，圓窗透進月光，照著牆上一排空相框和一個小小的音樂盒——這裡曾經是晴的天地。',
+        'You climb the folding ladder. Boxes are piled under the low rafters. Moonlight through a round window falls on a row of empty picture frames and a small music box — this was once Qing\'s little world.'),
     },
   };
 
@@ -605,6 +978,23 @@
       },
     },
 
+    {
+      id: 'f_hatch', room: 'foyer', mode: 'veteran', name: L('閣樓活門', 'Attic Hatch'),
+      examine(ctx) {
+        if (ctx.flag('atticOpen')) { ctx.goto('attic'); return; }
+        ctx.set('hatchSeen');
+        ctx.say(L('樓梯轉角上方的天花板有一扇活門，門邊垂著一個鐵環——太高了，伸手搆不著。', 'In the ceiling above the turn of the stairs is a hatch with an iron ring hanging from it — far too high to reach.'));
+      },
+      use: {
+        hook_pole(ctx) {
+          ctx.take('hook_pole');
+          ctx.set('atticOpen');
+          ctx.set('hatchSeen');
+          ctx.say(L('你用鉤桿鉤住鐵環往下一拉，活門打開，一架摺疊梯「嘩啦」一聲滑了下來。', 'You catch the iron ring with the hook pole and pull. The hatch swings open and a folding ladder clatters down.'), 'good');
+        },
+      },
+    },
+
     /* ---------------- 書房 ---------------- */
     {
       id: 's_shelf', room: 'study', name: L('書架', 'Bookshelf'),
@@ -628,6 +1018,10 @@
           ctx.set('gridTaken');
           ctx.say(L('桌面的玻璃墊下壓著一張寫滿數字的方格紙。你把它抽了出來。', 'A sheet of grid paper covered in digits is pressed under the desk\'s glass top. You slide it out.'));
           ctx.give('grid_paper');
+          if (VET(ctx.s)) {
+            ctx.say(L('桌角壓著一個沉甸甸的黃銅紙鎮，底部刻著「5 兩」。你把它也收了起來。', 'A heavy brass paperweight holds down the corner of the desk, stamped "5 oz" on the bottom. You take that too.'));
+            ctx.give('paperweight');
+          }
         } else ctx.say(L('桌上攤著幾本星表，墨水早就乾了。', 'A few star catalogs lie open on the desk, the ink long dry.'));
       },
     },
@@ -665,6 +1059,11 @@
         flashlight(ctx) {
           if (ctx.flag('chimneySearched')) { ctx.say(L('煙囪裡只有煤灰。', 'Nothing but soot in the chimney.')); return; }
           ctx.set('chimneySearched');
+          if (VET(ctx.s)) {
+            ctx.say(L('手電筒的光照進煙囪——磚縫裡卡著一把被燻黑的鐵鑰匙，鑰匙牌上寫著「儲物間」。', 'The flashlight beam reaches up the chimney — a soot-blackened iron key is wedged between the bricks. Its tag reads "Storeroom".'), 'good');
+            ctx.give('storeroom_key');
+            return;
+          }
           ctx.say(L('手電筒的光照進煙囪——磚縫裡夾著一張捲起來的紙。你小心地把它抽了出來。', 'The flashlight beam reaches up the chimney — a rolled-up sheet of paper is wedged between the bricks. You carefully pull it free.'), 'good');
           ctx.give('page2');
         },
@@ -704,8 +1103,13 @@
     {
       id: 'g_pots', room: 'greenhouse', name: L('花盆架', 'Pot Shelf'),
       examine(ctx) {
-        if (ctx.flag('keyDug')) { ctx.say(L('玫瑰盆的土被翻過了。其餘三盆安安靜靜地立著。', 'The soil in the rose pot has been turned over. The other three pots stand quietly.')); return; }
-        ctx.note('pots_rule');
+        if (ctx.flag('keyDug')) {
+          ctx.say(VET(ctx.s)
+            ? L('鼠尾草盆的土被翻過了。其餘七盆安安靜靜地立著。', 'The soil in the sage pot has been turned over. The other seven pots stand quietly.')
+            : L('玫瑰盆的土被翻過了。其餘三盆安安靜靜地立著。', 'The soil in the rose pot has been turned over. The other three pots stand quietly.'));
+          return;
+        }
+        ctx.note(VET(ctx.s) ? 'pots_rule_v' : 'pots_rule');
         ctx.open({ view: 'pots' });
       },
     },
@@ -774,6 +1178,22 @@
       examine(ctx) {
         if (ctx.flag('trapdoorOpen')) { ctx.goto('darkroom'); return; }
         ctx.open({ view: 'lock', id: 'trapdoor' });
+      },
+    },
+    {
+      id: 'g_storedoor', room: 'greenhouse', mode: 'veteran', name: L('儲物間的門', 'Storeroom Door'),
+      examine(ctx) {
+        if (ctx.flag('storeroomOpen')) { ctx.goto('storeroom'); return; }
+        ctx.set('storeDoorSeen');
+        ctx.say(L('溫室最裡面有一扇窄窄的木門，通往屋子最邊上的儲物間。門鎖著，門上的牌子寫著：「閒人勿進——周」。', 'At the far end of the greenhouse is a narrow wooden door to the storeroom on the very edge of the house. It\'s locked. A sign on it reads: "Keep out — Zhou".'));
+      },
+      use: {
+        storeroom_key(ctx) {
+          ctx.take('storeroom_key');
+          ctx.set('storeroomOpen');
+          ctx.set('storeDoorSeen');
+          ctx.say(L('鑰匙牌上的字沒騙人。門開了，一股泥土和機油的味道撲面而來。', 'The tag on the key didn\'t lie. The door opens, and a smell of soil and machine oil rolls out.'), 'good');
+        },
       },
     },
     {
@@ -849,6 +1269,8 @@
     {
       id: 'o_cabinet', room: 'observatory', name: L('地圖櫃', 'Map Cabinet'),
       examine(ctx) {
+        ctx.set('cabinetSearched');
+        if (VET(ctx.s)) { ctx.say(L('地圖櫃的淺抽屜裡收著一疊疊手繪星圖，每一張都標著日期。', 'The shallow drawers of the map cabinet hold stacks of hand-drawn star charts, each one dated.')); return; }
         if (!ctx.flag('transparencyTaken')) {
           ctx.set('transparencyTaken');
           ctx.say(L('地圖櫃的淺抽屜裡收著一疊星圖。最上面是一張透明膠片。', 'The shallow drawers of the map cabinet hold a stack of star charts. On top lies a sheet of clear film.'));
@@ -899,7 +1321,7 @@
     {
       id: 'd_shelf', room: 'darkroom', name: L('藥瓶架', 'Bottle Shelf'),
       visible: s => !!s.flags.darkroomLit,
-      examine(ctx) { ctx.note('bottle_card'); ctx.open({ view: 'doc', id: 'bottle_card' }); },
+      examine(ctx) { const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card'; ctx.note(id); ctx.open({ view: 'doc', id }); },
     },
     {
       id: 'd_tray', room: 'darkroom', name: L('顯影台', 'Developing Bench'),
@@ -925,6 +1347,116 @@
       visible: s => !!s.flags.darkroomLit,
       examine(ctx) { ctx.say(L('牆角高處有一扇小氣窗，被黑布遮著，可是黑布有一角翹了起來。這盞紅燈，從外面看得見嗎？', 'High in the corner is a small vent covered with black cloth, but one corner of the cloth has curled up. Could this red light be seen from outside?')); },
     },
+    {
+      id: 'd_chart', room: 'darkroom', mode: 'veteran', name: L('牆上的流程表', 'Developing Chart'),
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) { ctx.note('process_chart'); ctx.open({ view: 'doc', id: 'process_chart' }); },
+    },
+
+    /* ---------------- 儲物間（資深） ---------------- */
+    {
+      id: 't_balance', room: 'storeroom', name: L('天平', 'Balance Scale'),
+      examine(ctx) { ctx.note('weight_box'); ctx.open({ view: 'balance' }); },
+    },
+    {
+      id: 't_weights', room: 'storeroom', name: L('砝碼盒', 'Weight Box'),
+      examine(ctx) { ctx.note('weight_box'); ctx.open({ view: 'doc', id: 'weight_box' }); },
+    },
+    {
+      id: 't_cabinet', room: 'storeroom', name: L('種子櫃', 'Seed Cabinet'),
+      examine(ctx) {
+        if (ctx.flag('cabinetOpen')) { ctx.say(L('種子櫃開著，一格格的抽屜裡都是種子包。', 'The seed cabinet stands open; every little drawer is full of seed packets.')); return; }
+        ctx.note('cabinet_note');
+        ctx.open({ view: 'lock', id: 'seedlock' });
+      },
+    },
+    {
+      id: 't_window', room: 'storeroom', name: L('小窗', 'Small Window'),
+      examine(ctx) {
+        if (!ctx.has('flashlight')) {
+          ctx.say(L('小窗正對著山谷。對面的山腰上亮著一點燈火——應該是周伯家。外面一片漆黑；想讓對面看見你，你也得有一盞燈。', 'The little window looks straight across the valley. On the far slope a single light is burning — Old Zhou\'s house, surely. It\'s pitch black outside; for him to see you, you\'d need a light of your own.'));
+          return;
+        }
+        ctx.open({ view: 'signal' });
+      },
+      use: {
+        flashlight(ctx) { ctx.open({ view: 'signal' }); },
+        flashlight_dead(ctx) { ctx.say(DEAD_LIGHT); },
+      },
+    },
+    {
+      id: 't_calendar', room: 'storeroom', name: L('舊月曆', 'Old Calendar'),
+      examine(ctx) { ctx.note('calendar'); ctx.open({ view: 'doc', id: 'calendar' }); },
+    },
+    {
+      id: 't_shelf', room: 'storeroom', name: L('雜物架', 'Shelves'),
+      examine(ctx) { ctx.say(L('鋤頭、麻繩、一捆捆竹竿，每樣東西都擺得整整齊齊。周伯是個仔細的人。', 'Hoes, twine, bundles of bamboo canes — everything is put away neatly. Old Zhou is a careful man.')); },
+    },
+    {
+      id: 't_exit', room: 'storeroom', name: L('回到溫室', 'Back to the Greenhouse'),
+      examine(ctx) { ctx.goto('greenhouse'); },
+    },
+
+    /* ---------------- 閣樓（資深） ---------------- */
+    {
+      id: 'a_chest', room: 'attic', name: L('玩具箱', 'Toy Chest'),
+      examine(ctx) {
+        if (!ctx.flag('cardTaken')) {
+          ctx.set('cardTaken');
+          ctx.say(L('玩具箱裡有布偶、萬花筒，還有一張護貝過的小卡片，上面畫滿了點和線。', 'In the toy chest are rag dolls, a kaleidoscope, and a small laminated card covered in dots and dashes.'));
+          ctx.give('code_card');
+        } else ctx.say(L('布偶和萬花筒安安靜靜地躺在箱底。', 'The rag dolls and the kaleidoscope lie quietly at the bottom of the chest.'));
+      },
+    },
+    {
+      id: 'a_photobox', room: 'attic', name: L('相片盒', 'Photo Box'),
+      examine(ctx) {
+        ctx.note('photobox_note');
+        if (!ctx.flag('photosTaken')) {
+          ctx.set('photosTaken');
+          ctx.say(L('鐵皮相片盒裡有五張舊照片。盒蓋內側寫著一行孩子氣的字。', 'The tin photo box holds five old photographs. A line of childish writing runs inside the lid.'));
+          ctx.give('photos');
+        }
+        ctx.open({ view: 'doc', id: 'photobox_note' });
+      },
+    },
+    {
+      id: 'a_frame', room: 'attic', name: L('相框牆', 'Picture Frames'),
+      examine(ctx) {
+        if (ctx.flag('photosSolved')) { ctx.say(L('六張照片整整齊齊地掛在牆上，從晴滿月，一直到她出國那天。', 'Six photographs hang neatly on the wall, from Qing at one month old to the day she went abroad.')); return; }
+        ctx.open({ view: 'photos' });
+      },
+    },
+    {
+      id: 'a_musicbox', room: 'attic', name: L('音樂盒', 'Music Box'),
+      examine(ctx) {
+        if (ctx.flag('musicSolved')) { ctx.say(L('音樂盒的小抽屜開著，裡面已經空了。', 'The music box\'s little drawer stands open. It\'s empty now.')); return; }
+        if (!ctx.flag('crankInserted')) {
+          ctx.say(L('一個木製音樂盒，蓋子上鑲著星星。掀開蓋子，裡面是一排長短不一的金屬音齒，從左到右刻著 1 到 10。側面的發條孔是空的。', 'A wooden music box with stars inlaid on the lid. Inside is a row of metal tines of different lengths, numbered 1 to 10 from left to right. The winding hole on the side is empty.'));
+          return;
+        }
+        ctx.open({ view: 'musicbox' });
+      },
+      use: {
+        crank(ctx) {
+          ctx.take('crank');
+          ctx.set('crankInserted');
+          ctx.say(L('發條鑰匙正好插進音樂盒側面的孔。你轉了幾圈，裡面的齒輪輕輕響了起來。', 'The winding key fits the hole in the side of the music box. You give it a few turns, and the gears inside begin to tick softly.'), 'good');
+        },
+      },
+    },
+    {
+      id: 'a_marks', room: 'attic', name: L('柱子上的刻痕', 'Height Marks'),
+      examine(ctx) { ctx.note('height_marks'); ctx.open({ view: 'doc', id: 'height_marks' }); },
+    },
+    {
+      id: 'a_window', room: 'attic', name: L('圓窗', 'Round Window'),
+      examine(ctx) { ctx.say(L('圓窗朝著東南方的夜空。周伯家在山谷的另一頭，從這裡看不到——屋子最邊上那間儲物間的小窗才正對著那邊。', 'The round window faces the southeastern sky. Old Zhou\'s house is on the other side of the valley and can\'t be seen from here — only the little window of the storeroom, on the edge of the house, looks that way.')); },
+    },
+    {
+      id: 'a_exit', room: 'attic', name: L('下梯子回門廳', 'Down the Ladder'),
+      examine(ctx) { ctx.goto('foyer'); },
+    },
   ];
   const hotspotById = {};
   for (const h of hotspots) hotspotById[h.id] = h;
@@ -938,6 +1470,7 @@
       pair: ['flashlight_dead', 'battery'],
       run(ctx) {
         ctx.take('flashlight_dead'); ctx.take('battery');
+        ctx.set('flashlightFixed');
         ctx.say(L('你把電池塞進手電筒，按下開關——一道白光射了出去。', 'You slot the batteries into the flashlight and press the switch — a beam of white light shoots out.'), 'good');
         ctx.give('flashlight');
       },
@@ -978,9 +1511,15 @@
    * 七、謎題的判定（UI 只負責輸入，對錯一律在這裡判定）
    * ================================================================ */
   const inRoom = room => s => s.room === room;
+  function cleanMirrors(cfg, grid) {
+    const clean = {};
+    for (const m of grid.mirrors) clean[m.id] = (cfg && cfg[m.id] === '/') ? '/' : (cfg && cfg[m.id] === '\\') ? '\\' : grid.initial[m.id];
+    return clean;
+  }
   const LOCK_STUCK = L('鎖紋絲不動。', 'The lock doesn\'t budge.');
   const lockPuzzle = (opts) => ({
     available: opts.available,
+    vetWrong: LOCK_STUCK, // 資深模式不提示錯在哪（例如不點破「數成了位置」）
     check(ctx, answer) {
       const code = String(answer == null ? '' : answer).replace(/\D/g, '');
       if (code === opts.code) { opts.success(ctx); return true; }
@@ -999,6 +1538,10 @@
         ctx.say(L('「喀」——抽屜彈開了。', 'Click — the drawer springs open.'), 'good');
         ctx.say(L('裡面有一把葉子形狀的鑰匙、一捆電池，還有一頁撕下來的日記。', 'Inside are a leaf-shaped key, a bundle of batteries, and a page torn from a diary.'));
         ctx.give('greenhouse_key'); ctx.give('battery'); ctx.give('page1');
+        if (VET(ctx.s)) {
+          ctx.say(L('抽屜最裡面還壓著一張相片。', 'Pressed flat at the very back of the drawer is a photograph.'));
+          ctx.give('photo_comet');
+        }
       },
       wrongText: code => code === DRAWER_TRAP
         ? L('鎖紋絲不動。你數的好像是書在架上的位置——便條問的是「第幾卷」。', 'The lock doesn\'t budge. It looks like you counted the books\' positions on the shelf — the note asks which volume each one is.')
@@ -1035,11 +1578,13 @@
 
     pots: {
       available: s => inRoom('greenhouse')(s) && !s.flags.keyDug,
+      vetKeep: true, // 「挖開了，什麼也沒有」本身就只說「不對」，不透露錯在哪
       check(ctx, potId) {
-        const pot = POTS.find(p => p.id === potId);
+        const list = VET(ctx.s) ? POTS_V : POTS;
+        const pot = list.find(p => p.id === potId);
         if (!pot) return null;
         if (!ctx.has('trowel')) { ctx.say(L('花盆裡的土壓得很實，徒手挖不動。得找把工具。', 'The soil in the pots is packed hard — you can\'t dig it with your bare hands. You need a tool.'), 'bad'); return false; }
-        if (potId === POT_ANSWER) {
+        if (potId === (VET(ctx.s) ? POT_ANSWER_V : POT_ANSWER)) {
           ctx.set('keyDug');
           ctx.say(L(`你用小鏟子挖開${pot.name.zh}盆的土，鏟尖「叮」地碰到了金屬——一把黃銅鑰匙。`, `You dig into the ${pot.name.en} pot with the trowel, and the blade clinks against metal — a brass key.`), 'good');
           ctx.give('brass_key');
@@ -1053,6 +1598,7 @@
 
     clock: {
       available: s => inRoom('foyer')(s) && !s.flags.clockSolved,
+      vetWrong: L('你撥好指針，等了一會兒。落地鐘毫無反應。', 'You set the hands and wait. The grandfather clock does nothing.'),
       check(ctx, ans) {
         const h = Number(ans && ans.h), m = Number(ans && ans.m);
         if (h === CLOCK_ANSWER.h && m === CLOCK_ANSWER.m) {
@@ -1080,6 +1626,7 @@
     },
     valves: {
       available: s => inRoom('greenhouse')(s) && !s.flags.waterOk,
+      vetWrong: L('你轉開總閘，水管裡傳出一陣怪聲——不對。你趕緊把總閘關上。', 'You open the main valve and the pipes groan — not right. You shut it again quickly.'),
       check(ctx, cfg) {
         if (!ctx.flag('wheelInstalled')) { ctx.say(L('總閘上只剩一根光禿禿的閥桿——手輪不見了，轉不動。', 'Only a bare stem is left on the main valve — the handwheel is missing, and it won\'t turn.'), 'bad'); return false; }
         const clean = {};
@@ -1104,16 +1651,36 @@
       available: s => inRoom('greenhouse')(s),
       silent: true,
       check(ctx, cfg) {
-        const clean = {};
-        for (const m of MIRROR_GRID.mirrors) clean[m.id] = (cfg && cfg[m.id] === '/') ? '/' : (cfg && cfg[m.id] === '\\') ? '\\' : MIRROR_GRID.initial[m.id];
+        const grid = VET(ctx.s) ? MIRROR_GRID_V : MIRROR_GRID;
+        const clean = cleanMirrors(cfg, grid);
         ctx.s.puz.mirrors = clean;
         if (ctx.flag('lightOk')) return true;
+        if (VET(ctx.s)) return true; // 資深：天窗的遮光簾拉上時看不到光，只記錄角度
         if (traceBeam(clean).hit) {
           ctx.set('lightOk');
           ctx.say(L('月光在鏡面間折了幾折，終於落在月光花上。花苞微微發亮。', 'The moonlight bends from mirror to mirror and finally falls on the moonflower. The bud glows faintly.'), 'good');
           if (ctx.flag('waterOk')) ctx.say(L('月光花的花苞輕輕顫動了一下。', 'The moonflower bud trembles slightly.'), 'event');
           return true;
         }
+        return false;
+      },
+    },
+
+    // 資深：拉開天窗的遮光簾，讓月光照一次——照到月光花才算解開，否則只看得到這一次的光路
+    skylight: {
+      available: s => VET(s) && inRoom('greenhouse')(s) && !s.flags.lightOk,
+      vetWrong: L('月光落在別處，月光花依舊暗著。不對。', 'The moonlight lands somewhere else; the moonflower stays dark. Not right.'),
+      check(ctx, cfg) {
+        const clean = cleanMirrors(cfg || ctx.s.puz.mirrors, MIRROR_GRID_V);
+        ctx.s.puz.mirrors = clean;
+        if (traceBeam(clean, MIRROR_GRID_V).hit) {
+          ctx.set('lightOk');
+          ctx.say(L('你拉開天窗的遮光簾。月光在十幾面鏡子之間折來折去，終於落在月光花上。花苞微微發亮。', 'You draw back the skylight blind. Moonlight zigzags between more than a dozen mirrors and finally falls on the moonflower. The bud glows faintly.'), 'good');
+          if (ctx.flag('waterOk')) ctx.say(L('月光花的花苞輕輕顫動了一下。', 'The moonflower bud trembles slightly.'), 'event');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say(L('月光落在別處，月光花依舊暗著。不對。', 'The moonlight lands somewhere else; the moonflower stays dark. Not right.'), 'bad');
         return false;
       },
     },
@@ -1132,6 +1699,7 @@
 
     dial: {
       available: s => inRoom('observatory')(s) && !s.flags.starDialSolved,
+      vetWrong: L('星盤紋絲不動。', 'The dial doesn\'t budge.'),
       check(ctx, ans) {
         const pick = Array.isArray(ans) ? ans.slice(0, 3) : [];
         if (pick.join() === DIAL_ANSWER.join()) {
@@ -1151,17 +1719,111 @@
 
     develop: {
       available: s => inRoom('darkroom')(s) && s.flags.darkroomLit && !s.flags.plateDeveloped,
+      vetWrong: L('你先拿一張廢片試了試——一片模糊。不對。', 'You try it on a scrap of film first — just a blur. Not right.'),
       check(ctx, seq) {
-        const pick = Array.isArray(seq) ? seq.slice(0, 4) : [];
-        if (pick.join() === DEVELOP_ANSWER.join()) {
+        const answer = VET(ctx.s) ? DEVELOP_ANSWER_V : DEVELOP_ANSWER;
+        const pick = Array.isArray(seq) ? seq.slice(0, answer.length) : [];
+        if (pick.join() === answer.join()) {
           ctx.set('plateDeveloped');
           ctx.say(L('你先用一張廢片試了一次——影像清清楚楚地浮現出來。順序對了。', 'First you try a scrap of film — the image comes up crisp and clear. The order is right.'), 'good');
-          ctx.say(L('你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過四個藥盤。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。', 'You open the light-tight box, take out the glass plate sealed away for twenty years, and pass it through the four trays in turn. Under the red light the stars appear one by one — and among them, a comet with a short tail.'), 'event');
+          ctx.say(L(`你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過${VET(ctx.s) ? '八' : '四'}個藥盤。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。`, `You open the light-tight box, take out the glass plate sealed away for twenty years, and pass it through the ${VET(ctx.s) ? 'eight' : 'four'} trays in turn. Under the red light the stars appear one by one — and among them, a comet with a short tail.`), 'event');
           ctx.give('plate');
           return true;
         }
         ctx.wrong();
         ctx.say(L('你先拿一張廢片試了試——片子上一片模糊。順序不對。幸好沒有直接用那張底片。', 'You try it on a scrap of film first — the result is a blur. Wrong order. Good thing you didn\'t use the real plate.'), 'bad');
+        return false;
+      },
+    },
+
+    /* ---------- 資深模式 ---------- */
+    seedlock: Object.assign(lockPuzzle({
+      code: SEED_CODE,
+      available: s => VET(s) && inRoom('storeroom')(s) && !s.flags.cabinetOpen,
+      success(ctx) {
+        ctx.set('cabinetOpen');
+        ctx.say(L('「喀」——種子櫃的門彈開了。一格格抽屜裡都是種子包，櫃子側面掛著一根長長的鉤桿，底層壓著周伯的工作日誌。', 'Click — the seed cabinet door springs open. Every little drawer is full of seed packets; a long hook pole hangs inside the side panel, and Old Zhou\'s work log lies on the bottom shelf.'), 'good');
+        ctx.give('hook_pole');
+        ctx.note('zhou_log');
+      },
+    }), {
+      digits: 3, title: L('種子櫃', 'Seed Cabinet'),
+      prompt: L('三位數字鎖。字條上寫著：「三罐種子各有幾兩重——照溫室守則上寫的順序。」', 'A three-digit lock. The note says: "How many ounces each of the three seed tins weighs — in the order they come in the greenhouse rules."'),
+    }),
+
+    // 天平兩邊放了什麼（純顯示；真正的判定在種子櫃的密碼鎖）
+    balance_set: {
+      available: s => VET(s) && inRoom('storeroom')(s),
+      silent: true,
+      check(ctx, place) {
+        const clean = {};
+        for (const t of BALANCE_THINGS) {
+          const side = place && place[t.id];
+          if ((side === 'L' || side === 'R') && (!t.item || ctx.has(t.item))) clean[t.id] = side;
+        }
+        ctx.s.puz.balance = clean;
+        return true;
+      },
+    },
+
+    signal: {
+      available: s => VET(s) && inRoom('storeroom')(s) && s.inv.includes('flashlight'),
+      vetKeep: true, // 只出現在資深模式；回應本身就只是「沒反應」或「？」
+      check(ctx, tokens) {
+        if (!Array.isArray(tokens) || !tokens.length || tokens.some(t => typeof t !== 'string' || !/^[.-]{1,6}$/.test(t))) return null;
+        const words = tokens.map(t => SIGNAL_CODE[t] || '?');
+        const said = words.join(' ');
+        const reply = (words2, note, kind) => {
+          ctx.say(L(`你用手電筒對著山谷打出燈號。過了一會兒，對面的燈閃了起來：${signalText(words2)}`, `You flash your signal across the valley with the flashlight. After a moment, the light on the far side answers: ${signalText(words2)}`), kind || 'event', { signal: words2.map(w => SIGNAL_OF[w]) });
+          if (note) ctx.note(note);
+        };
+        if (!ctx.flag('zhouCalled')) {
+          if (said === 'qing') { ctx.set('zhouCalled'); reply(ZHOU_REPLY.call, 'zhou_call'); return true; }
+          ctx.wrong();
+          ctx.say(L('你對著山谷打了一陣燈號。對面的燈一動也不動。', 'You flash a signal across the valley. The far light doesn\'t stir.'), 'bad');
+          return false;
+        }
+        if (said === 'qing') { reply(ZHOU_REPLY.call, 'zhou_call'); return true; }
+        if (said === 'pot ask') { const first = !ctx.flag('zhouReplied'); ctx.set('zhouReplied'); reply(ZHOU_REPLY.pot, 'zhou_pot', first ? 'good' : 'event'); return true; }
+        if (said === 'key ask') { reply(ZHOU_REPLY.key, 'zhou_key'); return true; }
+        ctx.wrong();
+        ctx.say(L(`山谷對面的燈閃了一下：${signalText(ZHOU_REPLY.unknown)}——周伯沒看懂。`, `The light across the valley flashes once: ${signalText(ZHOU_REPLY.unknown)} — Zhou didn't understand.`), 'bad', { signal: ZHOU_REPLY.unknown.map(w => SIGNAL_OF[w]) });
+        return false;
+      },
+    },
+
+    photos: {
+      available: s => VET(s) && inRoom('attic')(s) && !s.flags.photosSolved && s.inv.includes('photos') && s.inv.includes('photo_comet'),
+      vetWrong: L('你把照片一張張掛上去，相框毫無動靜。不對。', 'You hang the photos one by one. The frames don\'t react. Not right.'),
+      check(ctx, order) {
+        if (!Array.isArray(order) || order.length !== PHOTO_ORDER.length || new Set(order).size !== order.length || order.some(id => !PHOTOS.some(p => p.id === id))) return null;
+        if (order.join() === PHOTO_ORDER.join()) {
+          ctx.take('photos'); ctx.take('photo_comet');
+          ctx.set('photosSolved');
+          ctx.say(L('最後一張照片掛上去的瞬間，相框牆後面「喀」地一響，最右邊的相框向外彈開——後面藏著一把小小的發條鑰匙，和一封摺好的信。', 'As the last photo goes up, something clicks behind the wall and the right-hand frame swings out — behind it are a small winding key and a folded letter.'), 'good');
+          ctx.give('crank'); ctx.give('qing_letter');
+          ctx.note('qing_letter');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say(L('你把照片一張張掛上去，相框毫無動靜。不對。', 'You hang the photos one by one. The frames don\'t react. Not right.'), 'bad');
+        return false;
+      },
+    },
+
+    musicbox: {
+      available: s => VET(s) && inRoom('attic')(s) && s.flags.crankInserted && !s.flags.musicSolved,
+      vetWrong: L('音樂盒叮叮咚咚地響完，什麼也沒發生。不對。', 'The music box tinkles to the end, and nothing happens. Not right.'),
+      check(ctx, notes) {
+        if (!Array.isArray(notes) || !notes.length || notes.some(n => !Number.isInteger(n) || n < 1 || n > MUSIC_TINES)) return null;
+        if (notes.join() === MUSIC_ANSWER.join()) {
+          ctx.set('musicSolved');
+          ctx.say(L('熟悉的旋律在閣樓裡響起。最後一個音落下，音樂盒的底座「喀」地彈出一個小抽屜：裡面是一張畫著星星的透明膠片，和一頁折起來的日記。', 'A familiar tune fills the attic. As the last note fades, a little drawer clicks out of the music box\'s base: inside are a sheet of clear film with stars drawn on it, and a folded diary page.'), 'good');
+          ctx.give('transparency'); ctx.give('page2');
+          return true;
+        }
+        ctx.wrong();
+        ctx.say(L('音樂盒叮叮咚咚地響完，什麼也沒發生。不對。', 'The music box tinkles to the end, and nothing happens. Not right.'), 'bad');
         return false;
       },
     },
@@ -1221,6 +1883,17 @@
         'The comet is officially renamed Comet Lu Guan.',
         'On the night of the announcement, you return to the old house, set up the telescope in the observatory and turn the dome to the southeast. The sky in the eyepiece is upside down. You smile — this time, you know how to read it.',
       ]),
+      textV: L([
+        '你把底片和那本拼完整的日記一起帶出了大門。天剛亮，周伯開著小貨車沿山路上來了。',
+        '三個月後，天文學會公布了調查結果：底片上彗星與群星的相對位置，精確對應 1999 年 12 月 8 日的夜空——比韓嶽宣稱的發現早了整整兩天；韓嶽發表的坐標裡那個照抄的「7」，只可能來自陸觀的原始紀錄。周伯也站了出來，交出那張夾在舊月曆後面的掛號收據：1999 年 12 月 9 日，陸觀寄給韓嶽。',
+        '那顆彗星被正式更名為「陸觀彗星」。晴從國外趕了回來，把閣樓的音樂盒和那張窗邊的照片一起帶走了。',
+        '公布的那天晚上，你回到老宅，在天文台架起望遠鏡，把穹頂轉向東南。目鏡裡的星空是倒過來的。你笑了——這一次，你知道該怎麼看。',
+      ], [
+        'You carry the plate and the completed diary out through the front door together. Just after dawn, Old Zhou\'s little truck comes grinding up the mountain road.',
+        'Three months later, the Astronomical Society publishes its findings: the comet\'s position against the stars on the plate matches the sky of 8 December 1999 exactly — two full days before Han Yue\'s claimed discovery. And the miscopied "7" in Han Yue\'s published coordinates could only have come from Lu Guan\'s original records. Old Zhou comes forward too, with the registered-post receipt he had kept behind the old calendar: 9 December 1999, from Lu Guan to Han Yue.',
+        'The comet is officially renamed Comet Lu Guan. Qing flies home from abroad, and takes the attic\'s music box and the photo by the window away with her.',
+        'On the night of the announcement, you return to the old house, set up the telescope in the observatory and turn the dome to the southeast. The sky in the eyepiece is upside down. You smile — this time, you know how to read it.',
+      ]),
     },
     A: {
       title: L('破曉', 'Daybreak'), rank: L('普通結局', 'Normal Ending'),
@@ -1246,6 +1919,17 @@
       ], [
         'You hand the plate to the Astronomical Society. The comet on it is perfectly clear — but Han Yue\'s lawyers insist: an old plate of unknown origin — who can prove it wasn\'t forged after the fact?',
         'You can\'t offer more details. You found only part of Lu Guan\'s diary, and the missing pages may hold exactly what would have made the plate undeniable.',
+        'The dispute drags on for two years and quietly fizzles out.',
+        '(There are diary pages in the house you never found.)',
+      ]),
+      textV: L([
+        '你把底片交給了天文學會。底片上的彗星清清楚楚，可韓嶽的律師一口咬定：一張來歷不明的舊底片，誰能證明它不是事後偽造的？',
+        '周伯說他當年替陸觀寄過一封掛號給韓嶽——可一張收據，證明不了信封裡裝的是什麼。陸觀的日記你只找到了一部分，缺掉的那幾頁裡，也許正寫著讓這一切無可辯駁的關鍵。',
+        '爭論拖了兩年，最後不了了之。',
+        '（屋子裡還有你沒找到的日記殘頁。）',
+      ], [
+        'You hand the plate to the Astronomical Society. The comet on it is perfectly clear — but Han Yue\'s lawyers insist: an old plate of unknown origin — who can prove it wasn\'t forged after the fact?',
+        'Old Zhou says he posted a registered letter from Lu Guan to Han Yue back then — but a receipt can\'t prove what was in the envelope. You found only part of Lu Guan\'s diary, and the missing pages may hold exactly what would have made it all undeniable.',
         'The dispute drags on for two years and quietly fizzles out.',
         '(There are diary pages in the house you never found.)',
       ]),
@@ -1282,8 +1966,40 @@
   const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D'];
 
   /* ================================================================
-   * 九、提示（每個目標三段：方向 → 線索位置 → 答案）
+   * 九、階段與提示
+   *   階段：遊戲的主線是一段一段的。每完成一個階段，介面會告訴玩家下一個階段的目標，提示也會跟著更新。
+   *   提示：每個目標三段——方向 → 線索在哪 → 答案。mode 標明只屬於某個模式；stage 標明屬於哪個階段。
    * ================================================================ */
+  const F = (s, k) => !!s.flags[k];
+  const has = (s, id) => s.inv.includes(id);
+  const seen = (s, note) => s.notes.includes(note);
+  const roomOpen = (s, r) => rooms[r].accessible(s);
+  const emblemsFound = s => F(s, 'safeOpen') && F(s, 'moonTaken') && F(s, 'starDialSolved');
+
+  const STAGE_DEFS = {
+    drawer: { title: L('書房的抽屜', 'The Study Drawer'), goal: L('找一盞能用的燈，打開書房的書桌抽屜。', 'Get a working light, and open the desk drawer in the study.'), done: s => F(s, 'drawerOpen') && F(s, 'flashlightFixed') },
+    greenhouse: { title: L('溫室', 'The Greenhouse'), goal: L('打開門廳右邊的溫室門。', 'Open the greenhouse door on the right side of the foyer.'), done: s => F(s, 'greenhouseOpen') },
+    storeroom: { title: L('屋子的邊緣', 'The Edge of the House'), goal: L('打開溫室深處那扇上鎖的門。', 'Open the locked door at the far end of the greenhouse.'), done: s => F(s, 'storeroomOpen') },
+    attic: { title: L('天花板上的活門', 'The Hatch in the Ceiling'), goal: L('想辦法上到閣樓。', 'Find a way up into the attic.'), done: s => F(s, 'atticOpen') },
+    gate: { title: L('樓梯鐵門', 'The Stair Gate'), goal: L('找到樓梯鐵門的鑰匙，上天文台。', 'Find the key to the stair gate and go up to the observatory.'), done: s => F(s, 'gateOpen') },
+    emblems: { title: L('日、月、星', 'Sun, Moon and Star'), goal: L('找齊日、月、星三枚徽章。', 'Find all three emblems: Sun, Moon and Star.'), done: emblemsFound },
+    door: { title: L('大門', 'The Front Door'), goal: L('把三枚徽章嵌回門廳的大門。', 'Set the three emblems into the front door in the foyer.'), done: s => allInserted(s) },
+    leave: { title: L('離開之前', 'Before You Go'), goal: L('決定要帶走什麼，然後離開。', 'Decide what to take with you, and leave.'), done: s => !!s.ending },
+  };
+  const STAGES = {
+    novice: ['drawer', 'greenhouse', 'gate', 'emblems', 'door', 'leave'],
+    veteran: ['drawer', 'greenhouse', 'storeroom', 'attic', 'gate', 'emblems', 'door', 'leave'],
+  };
+  // 支線：不在主線階段裡，但有自己的目標與提示
+  const SIDE_STAGE = { id: 'truth', title: L('光照不到的地方（選擇性）', 'Where the Light Cannot Reach (Optional)'), goal: L('信裡說，二十年前的真相藏在「光照不到的地方」。', 'The letter says the truth from twenty years ago is hidden "where the light cannot reach".'), done: s => F(s, 'plateDeveloped') };
+  const modeOf = s => (VET(s) ? 'veteran' : 'novice');
+  function stageInfo(s) {
+    const ids = STAGES[modeOf(s)];
+    const index = ids.findIndex(id => !STAGE_DEFS[id].done(s));
+    const i = index < 0 ? ids.length - 1 : index;
+    return { index: i, total: ids.length, id: ids[i], stage: STAGE_DEFS[ids[i]], ids };
+  }
+
   function mirrorHint() {
     const sol = MIRROR_SOLUTIONS[0];
     const back = MIRROR_GRID.mirrors.filter(m => sol[m.id] === '\\').map(m => m.id);
@@ -1296,14 +2012,22 @@
     return L(`${back.join('、')} 設成「\\」，${fwd.join('、')} 設成「/」。光線依序經過 ${order.join('→')}，從右側照進月光花。`,
       `Set ${back.join(', ')} to "\\" and ${fwd.join(', ')} to "/". The beam then passes ${order.join(' → ')} and enters the moonflower from the right.`);
   }
-  const F = (s, k) => !!s.flags[k];
-  const has = (s, id) => s.inv.includes(id);
-  const seen = (s, note) => s.notes.includes(note);
-  const roomOpen = (s, r) => rooms[r].accessible(s);
+  function mirrorHintV() {
+    const g = MIRROR_GRID_V, sol = MIRROR_PATH_V;
+    const order = [];
+    for (const p of traceBeam(MIRROR_SOLUTION_V, g).path) {
+      const m = g.mirrors.find(x => x.c === p.c && x.r === p.r);
+      if (m && !order.includes(m.id)) order.push(m.id);
+    }
+    const back = order.filter(id => sol[id] === '\\').sort(), fwd = order.filter(id => sol[id] === '/').sort();
+    const decoys = g.mirrors.map(m => m.id).filter(id => !(id in sol));
+    return L(`光線依序經過 ${order.join('→')}。其中 ${back.join('、')} 設成「\\」，${fwd.join('、')} 設成「/」；${decoys.join('、')} 不在光路上，怎麼擺都可以。設好之後拉開天窗。`,
+      `The beam passes ${order.join(' → ')}. Of these, set ${back.join(', ')} to "\\" and ${fwd.join(', ')} to "/". ${decoys.join(', ')} aren't on the path and can face either way. Then draw back the skylight blind.`);
+  }
 
   // 「還沒仔細看過的地方」：依常見的探索順序，列出玩家可以到達、卻還沒調查過的重要物件。
   // 提示的標題與內容只會提到玩家已經能看見的東西，不會預告還沒發現的機關或獎勵。
-  const DISCOVERIES = [
+  const DISCOVERY_LIST = [
     { hs: 'f_coat', done: s => F(s, 'coatSearched') },
     { hs: 's_shelf', done: s => seen(s, 'bookshelf') },
     { hs: 's_drawer', done: s => seen(s, 'drawer_note') || F(s, 'drawerOpen') },
@@ -1311,35 +2035,47 @@
     { hs: 's_desk', done: s => F(s, 'gridTaken') },
     { hs: 's_painting', done: s => F(s, 'paintingMoved') },
     { hs: 's_waste', done: s => F(s, 'wasteSearched') },
+    { hs: 's_fireplace', mode: 'veteran', done: s => F(s, 'chimneySearched') || !has(s, 'flashlight') },
     { hs: 'f_clock', done: s => seen(s, 'clock_inscription') || F(s, 'clockSolved') },
+    { hs: 'f_hatch', mode: 'veteran', done: s => F(s, 'hatchSeen') },
     { hs: 'g_tools', done: s => F(s, 'trowelTaken') },
-    { hs: 'g_pots', done: s => seen(s, 'pots_rule') || F(s, 'keyDug') },
+    { hs: 'g_pots', done: s => seen(s, 'pots_rule') || seen(s, 'pots_rule_v') || F(s, 'keyDug') },
     { hs: 'g_valves', done: s => seen(s, 'garden_rules') },
+    { hs: 'g_storedoor', mode: 'veteran', done: s => F(s, 'storeDoorSeen') },
+    { hs: 't_balance', mode: 'veteran', done: s => seen(s, 'weight_box') },
+    { hs: 't_cabinet', mode: 'veteran', done: s => seen(s, 'cabinet_note') || F(s, 'cabinetOpen') },
+    { hs: 't_calendar', mode: 'veteran', done: s => seen(s, 'calendar') },
+    { hs: 'a_chest', mode: 'veteran', done: s => F(s, 'cardTaken') },
+    { hs: 'a_photobox', mode: 'veteran', done: s => F(s, 'photosTaken') },
+    { hs: 'a_marks', mode: 'veteran', done: s => seen(s, 'height_marks') },
     { hs: 'o_telescope', done: s => seen(s, 'telescope_note') },
     { hs: 'o_dial', done: s => seen(s, 'dial_inscription') },
     { hs: 'o_poster', done: s => seen(s, 'poster') },
     { hs: 'o_log', done: s => F(s, 'logBookmark') },
     { hs: 'o_almanac', done: s => seen(s, 'almanac') },
-    { hs: 'o_cabinet', done: s => F(s, 'transparencyTaken') },
+    { hs: 'o_cabinet', done: s => F(s, 'cabinetSearched') || F(s, 'transparencyTaken') },
     { hs: 'o_lamp', done: s => F(s, 'bulbTaken') },
-    { hs: 'd_shelf', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card') },
+    { hs: 'd_shelf', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card') || seen(s, 'bottle_card_v') },
+    { hs: 'd_chart', mode: 'veteran', done: s => !F(s, 'darkroomLit') || seen(s, 'process_chart') },
     { hs: 'd_line', done: s => !F(s, 'darkroomLit') || F(s, 'p4Taken') },
-  ].map(d => Object.assign(d, { room: hotspotById[d.hs].room, name: hotspotById[d.hs].name }));
-  const nextDiscovery = s => DISCOVERIES.find(d => roomOpen(s, d.room) && !d.done(s));
+  ];
+  const DISCOVERIES = DISCOVERY_LIST.map(d => Object.assign(d, { room: hotspotById[d.hs].room, name: hotspotById[d.hs].name }));
+  const nextDiscovery = s => DISCOVERIES.find(d => (!d.mode || d.mode === modeOf(s)) && roomOpen(s, d.room) && !d.done(s));
   const ALL_SEEN = L('你已經把能到的地方都看過了。', 'You\'ve already looked at everything you can reach.');
+  const roomIn = id => L(rooms[id].name.zh, rooms[id].name.en.toLowerCase());
 
   const hints = [
     {
-      id: 'explore', title: L('還沒仔細看過的地方', 'Places You Haven\'t Examined'),
+      id: 'explore', stage: null, title: L('還沒仔細看過的地方', 'Places You Haven\'t Examined'),
       avail: s => !!nextDiscovery(s), done: s => !nextDiscovery(s),
       texts: [
         L('有些已經能到達的地方，你還沒仔細看過。每個房間裡的物件都點點看，讀過的文件會記進線索筆記。', 'There are places you can already reach that you haven\'t looked at closely. Try every object in each room; anything you read goes into your notebook.'),
-        s => { const d = nextDiscovery(s); return d ? L(`去${rooms[d.room].name.zh}再看看。`, `Take another look around the ${rooms[d.room].name.en.toLowerCase()}.`) : ALL_SEEN; },
-        s => { const d = nextDiscovery(s); return d ? L(`${rooms[d.room].name.zh}的「${d.name.zh}」。`, `The ${d.name.en} in the ${rooms[d.room].name.en.toLowerCase()}.`) : ALL_SEEN; },
+        s => { const d = nextDiscovery(s); return d ? L(`去${roomIn(d.room).zh}再看看。`, `Take another look around the ${roomIn(d.room).en}.`) : ALL_SEEN; },
+        s => { const d = nextDiscovery(s); return d ? L(`${roomIn(d.room).zh}的「${d.name.zh}」。`, `The ${d.name.en} in the ${roomIn(d.room).en}.`) : ALL_SEEN; },
       ],
     },
     {
-      id: 'drawer', title: L('書桌抽屜的鎖', 'The Desk Drawer Lock'),
+      id: 'drawer', stage: 'drawer', title: L('書桌抽屜的鎖', 'The Desk Drawer Lock'),
       avail: s => seen(s, 'drawer_note'), done: s => F(s, 'drawerOpen'),
       texts: [
         L('鎖旁的便條提到四種顏色，還問「第幾卷」。屋裡哪裡有分卷的東西？', 'The note by the lock names four colors and asks "which volume". What in this house comes in volumes?'),
@@ -1348,8 +2084,8 @@
       ],
     },
     {
-      id: 'flashlight', title: L('沒電的手電筒', 'The Dead Flashlight'),
-      avail: s => has(s, 'flashlight_dead'), done: s => has(s, 'flashlight'),
+      id: 'flashlight', stage: 'drawer', title: L('沒電的手電筒', 'The Dead Flashlight'),
+      avail: s => has(s, 'flashlight_dead'), done: s => has(s, 'flashlight') || F(s, 'flashlightFixed'),
       texts: [
         L('屋裡有好幾個太暗、看不清的角落。這支手電筒需要電。', 'Several corners of this house are too dark to see into. This flashlight needs power.'),
         L('書桌抽屜裡有一捆電池。', 'There\'s a bundle of batteries in the desk drawer.'),
@@ -1357,7 +2093,7 @@
       ],
     },
     {
-      id: 'greenhouse', title: L('打開溫室', 'Opening the Greenhouse'),
+      id: 'greenhouse', stage: 'greenhouse', title: L('打開溫室', 'Opening the Greenhouse'),
       avail: s => has(s, 'greenhouse_key'), done: s => F(s, 'greenhouseOpen'),
       texts: [
         L('抽屜裡那把鑰匙的握柄是葉子形狀。', 'The key from the drawer has a leaf-shaped bow.'),
@@ -1366,7 +2102,43 @@
       ],
     },
     {
-      id: 'pots', title: L('四個花盆', 'The Four Pots'),
+      id: 'storeroom', mode: 'veteran', stage: 'storeroom', title: L('溫室深處的門', 'The Door at the Back of the Greenhouse'),
+      avail: s => F(s, 'storeDoorSeen'), done: s => F(s, 'storeroomOpen'),
+      texts: [
+        L('那扇門鎖著，你身上沒有它的鑰匙。屋裡還有你沒照過的暗處。', 'That door is locked, and you don\'t have its key. There are still dark places in the house you haven\'t lit up.'),
+        L('書房壁爐的煙囪裡太黑，看不清裡面卡著什麼。', 'It\'s too dark up the study chimney to see what\'s wedged in there.'),
+        L('用能亮的手電筒照書房的壁爐，拿到儲物間鑰匙，再用在溫室的「儲物間的門」上。', 'Use the working flashlight on the study fireplace to get the storeroom key, then use it on the Storeroom Door in the greenhouse.'),
+      ],
+    },
+    {
+      id: 'balance', mode: 'veteran', stage: 'attic', title: L('種子櫃的密碼', 'The Seed Cabinet Code'),
+      avail: s => seen(s, 'cabinet_note'), done: s => F(s, 'cabinetOpen'),
+      texts: [
+        L('字條說，密碼是三罐種子各有幾兩重。儲物間有天平，可是砝碼不齊。', 'The note says the code is how many ounces each seed tin weighs. There\'s a balance in the storeroom, but the weights aren\'t all there.'),
+        L('砝碼盒的字條說，5 兩的砝碼被借去書房壓紙了——書桌上的黃銅紙鎮就是它。天平兩邊都能放東西，種子罐自己也能當砝碼。順序照溫室的園丁守則：月光花、蕨類、仙人掌。', 'The weight box note says the 5 oz weight was borrowed to hold down papers in the study — that\'s the brass paperweight on the desk. You can put things on both pans, and the tins themselves can serve as weights. The order follows the gardener\'s rules in the greenhouse: moonflower, ferns, cactus.'),
+        L(`月光花罐＋2 兩＝5 兩，所以是 3 兩；蕨類罐＝5 兩＋2 兩＝7 兩；仙人掌罐＋月光花罐＝蕨類罐，所以是 4 兩。密碼 ${SEED_CODE}。`, `Moonflower tin + 2 oz balances 5 oz, so it\'s 3 oz; the fern tin balances 5 oz + 2 oz, so 7 oz; cactus tin + moonflower tin balances the fern tin, so 4 oz. The code is ${SEED_CODE}.`),
+      ],
+    },
+    {
+      id: 'attic', mode: 'veteran', stage: 'attic', title: L('閣樓的活門', 'The Attic Hatch'),
+      avail: s => F(s, 'hatchSeen') || has(s, 'hook_pole'), done: s => F(s, 'atticOpen'),
+      texts: [
+        L('活門上的鐵環太高了，需要一根夠長的東西把它鉤下來。', 'The ring on the hatch is too high. You need something long enough to hook it down.'),
+        s => has(s, 'hook_pole') ? L('你身上的鉤桿正是拉活門用的。', 'The hook pole you\'re carrying is made for exactly that.') : L('儲物間上鎖的種子櫃裡，掛著一根鉤桿。', 'A hook pole hangs inside the locked seed cabinet in the storeroom.'),
+        L('選中鉤桿，再點門廳的「閣樓活門」。', 'Select the hook pole, then click the Attic Hatch in the foyer.'),
+      ],
+    },
+    {
+      id: 'signal', mode: 'veteran', stage: 'gate', title: L('問周伯', 'Asking Old Zhou'),
+      avail: s => seen(s, 'pots_rule_v') && F(s, 'atticOpen'), done: s => F(s, 'zhouReplied'),
+      texts: [
+        L('木牌說，盆上的話有幾句是真的，只有周伯知道。陸觀的信說，晴小時候常跟周伯打燈號。', 'The sign says only Old Zhou knows how many of the sayings are true. Lu Guan\'s letter says Qing used to signal to Zhou with a lamp.'),
+        L('閣樓玩具箱裡的燈號卡教你怎麼呼叫周伯；卡片說從儲物間的小窗看他家的燈最清楚。打燈號要有一盞能亮的燈。', 'The signal card in the attic toy chest explains how to call Zhou, and says his lamp is easiest to see from the storeroom\'s little window. You\'ll need a working light to signal.'),
+        L(`拿著手電筒到儲物間的小窗：先發「晴」（${signalText(['qing'])}），等周伯回「好」；再發「盆」（${signalText(['pot'])}）和「？」（${signalText(['ask'])}）。周伯會回「盆、真、2、句」——盆上的話有兩句是真的。`, `Take the flashlight to the storeroom window. Send QING (${signalText(['qing'])}) and wait for OK, then send POT (${signalText(['pot'])}) and ? (${signalText(['ask'])}). Zhou answers POT, TRUE, 2, SAYINGS — two of the sayings are true.`),
+      ],
+    },
+    {
+      id: 'pots', mode: 'novice', stage: 'gate', title: L('四個花盆', 'The Four Pots'),
       avail: s => seen(s, 'pots_rule'), done: s => F(s, 'keyDug'),
       texts: [
         L('木牌說：四句話裡只有一句是真的。挖土需要工具——看看溫室的工具架。', 'The sign says only one of the four sentences is true. You\'ll need a tool to dig — check the greenhouse tool rack.'),
@@ -1375,7 +2147,16 @@
       ],
     },
     {
-      id: 'gate', title: L('樓梯鐵門', 'The Stair Gate'),
+      id: 'pots_v', mode: 'veteran', stage: 'gate', title: L('八個花盆', 'The Eight Pots'),
+      avail: s => seen(s, 'pots_rule_v'), done: s => F(s, 'keyDug'),
+      texts: [
+        L('八句話裡有幾句是真的，周伯知道——先想辦法問他。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first. You\'ll need a tool to dig.'),
+        L('知道真話的句數之後，逐一假設鑰匙在 1～8 號盆，數數每種假設下有幾句成立。', 'Once you know how many are true, suppose the key is in pot 1, 2, … 8 in turn and count how many sayings hold each time.'),
+        L('周伯說有兩句是真的。只有鑰匙在 3 號鼠尾草盆時恰好兩句成立（羅勒和洋甘菊那兩句）。挖開鼠尾草盆。', 'Zhou says two are true. Only with the key in pot 3, the sage, are exactly two true (the basil\'s and the chamomile\'s). Dig up the sage pot.'),
+      ],
+    },
+    {
+      id: 'gate', stage: 'gate', title: L('樓梯鐵門', 'The Stair Gate'),
       avail: s => has(s, 'brass_key'), done: s => F(s, 'gateOpen'),
       texts: [
         L('黃銅鑰匙的匙柄刻著樓梯。', 'A staircase is engraved on the brass key\'s bow.'),
@@ -1384,7 +2165,7 @@
       ],
     },
     {
-      id: 'eyepiece', title: L('望遠鏡的目鏡', 'The Telescope Eyepiece'),
+      id: 'eyepiece', stage: 'emblems', title: L('望遠鏡的目鏡', 'The Telescope Eyepiece'),
       avail: s => seen(s, 'eyepiece_box'), done: s => F(s, 'eyepieceInstalled'),
       texts: [
         L('目鏡盒蓋內側寫著目鏡滾到哪裡去了。', 'The inside of the eyepiece box lid says where the eyepiece rolled.'),
@@ -1393,7 +2174,7 @@
       ],
     },
     {
-      id: 'dial', title: L('星盤', 'The Star Dial'),
+      id: 'dial', stage: 'emblems', title: L('星盤', 'The Star Dial'),
       avail: s => seen(s, 'dial_inscription'), done: s => F(s, 'starDialSolved'),
       texts: [
         L('星盤要你對準「彗星初次現身的方位」上的三個星座。哪些文件提到過彗星出現在哪個方向？', 'The dial wants the three constellations in the direction where the comet first appeared. Which documents mention the direction the comet appeared in?'),
@@ -1404,16 +2185,38 @@
       ],
     },
     {
-      id: 'safe', title: L('牆裡的保險箱', 'The Wall Safe'),
+      id: 'photos', mode: 'veteran', stage: 'emblems', title: L('相框牆', 'The Picture Frames'),
+      avail: s => F(s, 'photosTaken'), done: s => F(s, 'photosSolved'),
+      texts: [
+        L('相片盒蓋上，晴說她把照片照時間先後掛過，最舊的在最左邊。', 'On the photo box lid Qing says she hung the photos in the order they were taken, oldest on the left.'),
+        s => has(s, 'photo_comet') || F(s, 'photosSolved')
+          ? L('看照片裡的屋子：天文台的圓頂和溫室是什麼時候蓋好的？松樹長了多高？照片背面也寫了字。', 'Look at the house in each photo: when were the dome and the greenhouse finished? How tall is the pine tree? The backs have writing too.')
+          : L('相框有六格，相片盒裡只有五張——第六張在書房的書桌抽屜裡。', 'There are six frames but only five photos in the box — the sixth is in the study\'s desk drawer.'),
+        L('由舊到新：抱著嬰兒、還沒有圓頂 → 圓頂搭著鷹架 → 圓頂完工、溫室只有骨架 → 七歲生日（溫室已完工）→ 1999 年窗邊的彗星 → 2003 年出國。', 'Oldest to newest: the baby, no dome yet → the dome under scaffolding → the dome finished, the greenhouse only a frame → the seventh birthday (greenhouse finished) → the comet by the window, 1999 → leaving to study abroad, 2003.'),
+      ],
+    },
+    {
+      id: 'musicbox', mode: 'veteran', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
+      avail: s => has(s, 'crank') || F(s, 'crankInserted') || seen(s, 'qing_letter'), done: s => F(s, 'musicSolved'),
+      texts: [
+        s => F(s, 'crankInserted') ? L('晴的信裡有一首用星座寫成的歌。', 'Qing\'s letter has a song written in constellations.') : L('發條鑰匙要插進閣樓的音樂盒。晴的信裡有一首用星座寫成的歌。', 'The winding key goes into the music box in the attic. Qing\'s letter has a song written in constellations.'),
+        L('晴說：星座有幾顆星，就撥第幾根音齒。天文台的星座圖標著每個星座的星數。', 'Qing says: as many stars as a constellation has, that\'s the tine to pluck. The constellation chart in the observatory gives each one\'s star count.'),
+        L(`${MUSIC_SCORE.map(id => CONSTELLATIONS[id].name.zh + ' ' + CONSTELLATIONS[id].stars.length).join('、')}。依序撥 ${MUSIC_ANSWER.join('、')}。`, `${MUSIC_SCORE.map(id => CONSTELLATIONS[id].name.en + ' ' + CONSTELLATIONS[id].stars.length).join(', ')}. Pluck ${MUSIC_ANSWER.join(', ')} in that order.`),
+      ],
+    },
+    {
+      id: 'safe', stage: 'emblems', title: L('牆裡的保險箱', 'The Wall Safe'),
       avail: s => F(s, 'paintingMoved'), done: s => F(s, 'safeOpen'),
       texts: [
         L('畫框背面寫著：「星星會告訴你數字。」保險箱要三位數。', 'The back of the frame says: "The stars will tell you the numbers." The safe needs three digits.'),
-        L('書桌上的數字方格紙和天文台地圖櫃裡的星圖膠片，四個角都有小十字——試著把它們組合。', 'The number grid from the desk and the star-chart film from the observatory\'s map cabinet both have small crosses in their corners — try combining them.'),
+        s => VET(s)
+          ? L('書桌上的數字方格紙，要和一張畫著星星的透明膠片疊在一起，四個角的十字對齊。那張膠片藏在閣樓的音樂盒裡。', 'The number grid from the desk needs to be laid under a clear sheet of film with stars on it, corner crosses aligned. That film is hidden in the attic music box.')
+          : L('書桌上的數字方格紙和天文台地圖櫃裡的星圖膠片，四個角都有小十字——試著把它們組合。', 'The number grid from the desk and the star-chart film from the observatory\'s map cabinet both have small crosses in their corners — try combining them.'),
         L(`疊合後，①②③ 依序落在 ${SAFE_CODE.split('').join('、')} 上。保險箱密碼是 ${SAFE_CODE}。`, `Overlaid, ①②③ fall on ${SAFE_CODE.split('').join(', ')}. The safe code is ${SAFE_CODE}.`),
       ],
     },
     {
-      id: 'clock', title: L('落地鐘', 'The Grandfather Clock'),
+      id: 'clock', stage: 'emblems', title: L('落地鐘', 'The Grandfather Clock'),
       avail: s => seen(s, 'clock_inscription'), done: s => F(s, 'clockSolved'),
       texts: [
         L('鐘上刻著：「讓指針回到我最後一次觀測開始的那一刻。」陸觀的觀測紀錄會放在哪裡？', 'The clock reads: "Turn the hands back to the moment my last observation began." Where would Lu Guan keep his observing records?'),
@@ -1422,7 +2225,7 @@
       ],
     },
     {
-      id: 'wheel', title: L('溫室的總閘', 'The Greenhouse Main Valve'),
+      id: 'wheel', stage: 'emblems', title: L('溫室的總閘', 'The Greenhouse Main Valve'),
       avail: s => seen(s, 'garden_rules') && !has(s, 'valve_wheel'), done: s => F(s, 'wheelInstalled') || has(s, 'valve_wheel'),
       texts: [
         L('總閘少了手輪，轉不動。陸觀把它藏起來了。', 'The main valve is missing its handwheel and won\'t turn. Lu Guan hid it.'),
@@ -1431,7 +2234,7 @@
       ],
     },
     {
-      id: 'wheel_use', title: L('閥門手輪', 'The Valve Handwheel'),
+      id: 'wheel_use', stage: 'emblems', title: L('閥門手輪', 'The Valve Handwheel'),
       avail: s => has(s, 'valve_wheel'), done: s => F(s, 'wheelInstalled'),
       texts: [
         L('手輪背面貼著紙條：「溫室總閘」。', 'The slip on the back of the handwheel reads "Greenhouse main valve".'),
@@ -1440,7 +2243,7 @@
       ],
     },
     {
-      id: 'valves', title: L('灌溉管線', 'The Irrigation Pipes'),
+      id: 'valves', stage: 'emblems', title: L('灌溉管線', 'The Irrigation Pipes'),
       avail: s => F(s, 'wheelInstalled'), done: s => F(s, 'waterOk'),
       texts: [
         L('牆上的園丁守則寫著三種植物各需要什麼水。', 'The gardener\'s rules on the wall say what water each plant needs.'),
@@ -1449,7 +2252,7 @@
       ],
     },
     {
-      id: 'mirrors', title: L('天窗反光鏡', 'The Skylight Mirrors'),
+      id: 'mirrors', mode: 'novice', stage: 'emblems', title: L('天窗反光鏡', 'The Skylight Mirrors'),
       avail: s => seen(s, 'garden_rules') || F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
       texts: [
         L('園丁守則說月光花只在月光照到時開花。天窗下的反光鏡可以轉動。', 'The gardener\'s rules say the moonflower only blooms in moonlight. The mirrors under the skylight can be turned.'),
@@ -1458,7 +2261,16 @@
       ],
     },
     {
-      id: 'moon', title: L('月光花', 'The Moonflower'),
+      id: 'mirrors_v', mode: 'veteran', stage: 'emblems', title: L('十六面反光鏡', 'The Sixteen Mirrors'),
+      avail: s => F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
+      texts: [
+        L('遮光簾拉上時看不到月光——只有拉開天窗的那一刻，才看得到一次光路。先在腦中把光路想清楚。', 'With the blind drawn there\'s no moonlight to see — only when you open the skylight do you get to see the beam, once. Work the path out in your head first.'),
+        L('月光從左上角的天窗往下射入。每碰到一面鏡子就轉九十度，「/」和「\\」決定往哪邊轉；花盆擋住的格子光過不去。也可以從月光花往回推：光要從最下面一列的右邊出去。不是每面鏡子都在光路上。', 'Moonlight enters from the skylight at the top left, heading down. Each mirror turns it ninety degrees — "/" or "\\" decides which way — and the pots block their squares. You can also work backward from the moonflower: the beam must leave the bottom row on the right. Not every mirror is on the path.'),
+        mirrorHintV(),
+      ],
+    },
+    {
+      id: 'moon', stage: 'emblems', title: L('月光花', 'The Moonflower'),
       avail: s => F(s, 'waterOk') && F(s, 'lightOk'), done: s => F(s, 'moonTaken'),
       texts: [
         L('月光花有了雨水，也有了月光。', 'The moonflower has rainwater and moonlight now.'),
@@ -1467,7 +2279,7 @@
       ],
     },
     {
-      id: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
+      id: 'door', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
       avail: s => EMBLEMS.some(e => has(s, e)), done: s => allInserted(s),
       texts: [
         L('大門的黃銅面板上有日、月、星三個凹槽。', 'The brass panel on the front door has three sockets: Sun, Moon and Star.'),
@@ -1476,7 +2288,7 @@
       ],
     },
     {
-      id: 'exit', title: L('離開之前', 'Before You Leave'),
+      id: 'exit', stage: 'leave', title: L('離開之前', 'Before You Leave'),
       avail: s => allInserted(s), done: () => false,
       texts: [
         s => {
@@ -1489,7 +2301,7 @@
       ],
     },
     {
-      id: 'darkroom', title: L('光照不到的地方（選擇性）', 'Where the Light Cannot Reach (Optional)'),
+      id: 'darkroom', stage: 'truth', title: L('光照不到的地方（選擇性）', 'Where the Light Cannot Reach (Optional)'),
       avail: s => F(s, 'drawerOpen'), done: s => F(s, 'trapdoorOpen'),
       texts: [
         L('信裡說，二十年前的真相藏在「光照不到的地方」。哪裡又暗、又沒人會去看？', 'The letter says the truth from twenty years ago is hidden "where the light cannot reach". Where is it dark, and where would no one think to look?'),
@@ -1500,7 +2312,7 @@
       ],
     },
     {
-      id: 'bulb', title: L('暗房的燈（選擇性）', 'Lighting the Darkroom (Optional)'),
+      id: 'bulb', stage: 'truth', title: L('暗房的燈（選擇性）', 'Lighting the Darkroom (Optional)'),
       avail: s => F(s, 'trapdoorOpen'), done: s => F(s, 'darkroomLit'),
       texts: [
         L('暗房只准開紅燈，手電筒的白光不行。', 'The darkroom allows red light only — not the flashlight\'s white beam.'),
@@ -1509,7 +2321,7 @@
       ],
     },
     {
-      id: 'develop', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      id: 'develop', mode: 'novice', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
         L('拼好的便條寫了沖洗順序；藥瓶架上的卡片能推出每個瓶子裝的是什麼。', 'The mended note gives the developing order; the card on the bottle shelf tells you what is in each bottle.'),
@@ -1518,12 +2330,25 @@
       ],
     },
     {
-      id: 'diary', title: L('陸觀的日記（選擇性）', 'Lu Guan\'s Diary (Optional)'),
+      id: 'develop_v', mode: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
+      texts: [
+        L('要推兩件事：八種藥劑的先後順序，和八個瓶子各裝什麼。拼好的便條給了基本的四步，牆上的流程表補上另外四種；藥瓶架上的卡片有八條規則。', 'You need two things: the order of the eight chemicals, and what is in each of the eight bottles. The mended note gives the four basic steps, the chart on the wall places the other four, and the card on the bottle shelf has eight rules.'),
+        L(`順序是：${DEVELOP_SEQUENCE_V.map(c => CHEM_NAMES[c].zh).join('→')}。排瓶子時，先把「洗淨液—顯影液—潤濕液」當成連在一起的一組，再用「潤濕液在右半邊」「顯影液不是紅、橙蓋」和「定影液與停影液隔兩瓶」排除不可能的位置。`, `The order is: ${DEVELOP_SEQUENCE_V.map(c => CHEM_NAMES[c].en).join(' → ')}. For the bottles, treat "hypo clearing agent – developer – wetting agent" as one block, then use "wetting agent in the right half", "developer's cap not red or orange" and "two bottles between the fixer and the stop bath" to rule positions out.`),
+        L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+      ],
+    },
+    {
+      id: 'diary', stage: 'truth', title: L('陸觀的日記（選擇性）', 'Lu Guan\'s Diary (Optional)'),
       avail: s => countPages(s) > 0, done: s => countPages(s) >= 4,
       texts: [
         s => L(`日記一共四頁，你找到了 ${countPages(s)} 頁。殘頁散落在屋子各處，有的藏在很暗的地方。`, `The diary has four pages; you have found ${countPages(s)}. They are scattered around the house, some in very dark places.`),
-        L('還沒找到的頁面，可能在：書桌抽屜、落地鐘、書房壁爐的煙囪、暗房的晾片繩。', 'The pages are in: the desk drawer, the grandfather clock, the study\'s chimney, and the darkroom\'s drying line.'),
-        L('煙囪那一頁要用能亮的手電筒照壁爐；暗房那一頁要先點亮紅燈。', 'For the chimney page, use a working flashlight on the fireplace; for the darkroom page, light the red lamp first.'),
+        s => VET(s)
+          ? L('四頁分別在：書桌抽屜、閣樓的音樂盒、落地鐘、暗房的晾片繩。', 'The pages are in: the desk drawer, the attic music box, the grandfather clock, and the darkroom\'s drying line.')
+          : L('還沒找到的頁面，可能在：書桌抽屜、落地鐘、書房壁爐的煙囪、暗房的晾片繩。', 'The pages are in: the desk drawer, the grandfather clock, the study\'s chimney, and the darkroom\'s drying line.'),
+        s => VET(s)
+          ? L('音樂盒那一頁要先掛好閣樓的照片、拿到發條鑰匙；暗房那一頁要先點亮紅燈。', 'For the music box page, hang the attic photos to get the winding key first; for the darkroom page, light the red lamp first.')
+          : L('煙囪那一頁要用能亮的手電筒照壁爐；暗房那一頁要先點亮紅燈。', 'For the chimney page, use a working flashlight on the fireplace; for the darkroom page, light the red lamp first.'),
       ],
     },
   ];
@@ -1549,13 +2374,26 @@
     saveVersion: 1,
     startRoom: 'foyer',
     startItems: ['letter'],
-    roomOrder: ['foyer', 'study', 'greenhouse', 'observatory', 'darkroom'],
+    roomOrder: ['foyer', 'study', 'greenhouse', 'storeroom', 'observatory', 'attic', 'darkroom'],
+    MODES: ['novice', 'veteran'],
     rooms, items, docs, hotspots, recipes, puzzles, endings, ENDING_ORDER, hints, intro,
+    // 依模式取用的內容
+    docBody: (d, mode) => (mode === 'veteran' && d.bodyV) || d.body,
+    endingText: (e, mode) => (mode === 'veteran' && e.textV) || e.text,
+    variant: s => (VET(s)
+      ? { pots: POTS_V, potAnswer: POT_ANSWER_V, mirrorGrid: MIRROR_GRID_V, bottles: BOTTLES_V, developAnswer: DEVELOP_ANSWER_V }
+      : { pots: POTS, potAnswer: POT_ANSWER, mirrorGrid: MIRROR_GRID, bottles: BOTTLES, developAnswer: DEVELOP_ANSWER }),
+    STAGE_DEFS, STAGES, SIDE_STAGE, stageInfo,
     // 共用謎題資料（UI 繪圖與測試用）
     BOOKS, COLOR_NAMES, DRAWER_CODE, DRAWER_TRAP, GRID_DIGITS, TRANSPARENCY_STARS, SAFE_CODE, POTS, POT_ANSWER,
     MOONSET, CLOCK_ANSWER, VALVES, BEDS, evalValves, MIRROR_GRID, traceBeam, MIRROR_SOLUTIONS,
     CONSTELLATIONS, CONSTELLATION_ORDER, DIRECTIONS, SKY_FIELDS, COMET_DIRECTION, DIAL_ANSWER,
     NOTE_LINES, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
+    // 資深模式
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
+    BOTTLES_V, BOTTLE_RULES_V, PROCESS_RULES_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
+    TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
+    PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
   };
 }));

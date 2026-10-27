@@ -210,6 +210,13 @@
     ${[...Array(8)].map((_, i) => `<line x1="${790 + i * 21}" y1="${420 - i * 37}" x2="960" y2="${420 - i * 37}" stroke="#4a3220" stroke-width="3"/><line x1="${792 + i * 21}" y1="${417 - i * 37}" x2="960" y2="${417 - i * 37}" stroke="#6b4a2c" stroke-width="1" opacity=".6"/>`).join('')}
     ${balusters}
     <line x1="800" y1="260" x2="950" y2="80" stroke="#5a3d22" stroke-width="7"/><line x1="800" y1="257" x2="950" y2="77" stroke="#8a6a32" stroke-width="1.5" opacity=".6"/>
+    ${H(v, 'f_hatch', f.atticOpen
+      ? `<path d="M864 18 L950 18 L942 46 L872 46 Z" fill="#05060a" stroke="#4a3220" stroke-width="3"/>
+        <g stroke="#6b4a2c" stroke-width="4"><line x1="884" y1="46" x2="866" y2="190"/><line x1="932" y1="46" x2="914" y2="190"/></g>
+        ${[0, 1, 2, 3, 4, 5].map(i => `<line x1="${880 - i * 3}" y1="${70 + i * 22}" x2="${928 - i * 3}" y2="${70 + i * 22}" stroke="#6b4a2c" stroke-width="3"/>`).join('')}
+        ${exitPlaque(905, 104, '↑ ' + t(G.rooms.attic.name))}${hit(856, 12, 100, 184)}`
+      : `<path d="M864 18 L950 18 L942 44 L872 44 Z" fill="#2a1d12" stroke="#4a3220" stroke-width="3"/><path d="M880 22 L934 22" stroke="#4a3220" stroke-width="2"/>
+        <line x1="907" y1="44" x2="907" y2="56" stroke="#8a8f99" stroke-width="2"/><circle cx="907" cy="63" r="7" fill="none" stroke="#a9b2bc" stroke-width="2.5"/>${hit(856, 12, 100, 62)}`)}
     ${H(v, 'f_gate', f.gateOpen
       ? `<g opacity=".9">${[0, 1, 2, 3, 4].map(i => `<line x1="${788 + i * 6}" y1="${250 + i * 2}" x2="${788 + i * 6}" y2="${420 - i * 2}" stroke="#2a2a2e" stroke-width="4"/>`).join('')}</g>${exitPlaque(870, 296, '↑ ' + t(G.rooms.observatory.name))}${hit(780, 240, 140, 182)}`
       : `<rect x="785" y="245" width="110" height="175" fill="none" stroke="#2a2a2e" stroke-width="5"/>
@@ -305,7 +312,7 @@
     <polygon points="560,300 640,300 610,246 590,246" fill="url(#st-cone)"/>
     ${H(v, 's_desk', `<rect x="356" y="300" width="288" height="18" fill="url(#st-wood)"/><rect x="356" y="300" width="288" height="2" fill="#8a6a32" opacity=".6"/>
       <rect x="380" y="292" width="200" height="8" fill="#2f4a3a" opacity=".85"/>
-      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>`}
+      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>${v.s.mode === 'veteran' ? `<path d="M462 300 q0 -12 10 -12 q10 0 10 12 z" fill="url(#fy-brass)"/><circle cx="472" cy="286" r="2.5" fill="#c9a24f"/>` : ''}`}
       <rect x="500" y="288" width="40" height="12" fill="#c9bfa4" transform="skewX(-20)"/>
       <rect x="392" y="280" width="34" height="8" fill="#5b3a2a"/><rect x="394" y="272" width="30" height="8" fill="#3e4a5e"/>
       <path d="M548 300 l-4 -12 h14 l-4 12 z" fill="#1d1d22"/><path d="M552 290 l18 -30" stroke="#e8e1cc" stroke-width="2"/><path d="M566 262 q10 -6 8 4 q-6 6 -8 -4" fill="#e8e1cc"/>
@@ -325,6 +332,7 @@
   /* ---------------- 溫室 ---------------- */
   function greenhouse(v) {
     const f = v.s.flags;
+    const vet = v.s.mode === 'veteran';
     const bloom = f.moonTaken || (f.waterOk && f.lightOk);
     const r = rng(73);
     let drops = '';
@@ -353,7 +361,7 @@
     <rect width="960" height="540" fill="url(#gh-sky)"/>
     ${starfield(31, 60, 0, 0, 960, 260)}
     <circle cx="96" cy="44" r="46" fill="url(#gh-halo)"/><circle cx="96" cy="44" r="18" fill="#f2efe0"/><circle cx="90" cy="40" r="4" fill="#d8d4c2" opacity=".6"/>
-    ${bigLeaf(470, 430, 1.4, -12)}${bigLeaf(520, 430, 1.1, 18)}${bigLeaf(640, 300, 1.2, -20)}${bigLeaf(380, 420, 1, 10)}${bigLeaf(930, 300, 1.3, 15)}
+    ${bigLeaf(470, 430, 1.4, -12)}${bigLeaf(520, 430, 1.1, 18)}${vet ? '' : bigLeaf(640, 300, 1.2, -20)}${bigLeaf(380, 420, 1, 10)}${bigLeaf(930, 300, 1.3, 15)}
     ${drops}
     ${[...Array(13)].map((_, i) => `<line x1="${i * 80}" y1="0" x2="${i * 80}" y2="440" stroke="#2c3a3a" stroke-width="3"/>`).join('')}
     ${[120, 240].map(y => `<line x1="0" y1="${y}" x2="960" y2="${y}" stroke="#2c3a3a" stroke-width="3"/>`).join('')}
@@ -378,6 +386,10 @@
       <path d="M232 320 L250 320 L250 410" fill="none" stroke="#5c6670" stroke-width="5"/>${hit(26, 256, 210, 128)}`)}
     ${H(v, 'g_rules', `<rect x="196" y="176" width="3" height="90" fill="#4a3a22"/><rect x="176" y="168" width="44" height="54" fill="#e5dcc4" transform="rotate(3 198 195)"/>
       <g transform="rotate(3 198 195)"><rect x="182" y="174" width="32" height="5" fill="#7a6f58"/>${[184, 192, 200, 208].map(y => `<line x1="182" y1="${y}" x2="214" y2="${y}" stroke="#9a8f78" stroke-width="2"/>`).join('')}</g><circle cx="198" cy="170" r="2.5" fill="#8a929b"/>${hit(170, 160, 56, 70)}`)}
+    <!-- 儲物間的門（資深） -->
+    ${H(v, 'g_storedoor', `<rect x="598" y="222" width="52" height="178" fill="${f.storeroomOpen ? '#0a0806' : '#4a3220'}" stroke="#2a1c10" stroke-width="3"/>
+      ${f.storeroomOpen ? `<path d="M598 222 L578 230 L578 396 L598 400 Z" fill="#5a3d22"/>` : `${[612, 626, 640].map(x => `<line x1="${x}" y1="226" x2="${x}" y2="396" stroke="#3a2614" stroke-width="1.5"/>`).join('')}<rect x="606" y="236" width="36" height="16" fill="#e5dcc4"/><text x="624" y="248" text-anchor="middle" font-size="10" fill="#4a3a22">${esc(t(L('周', 'ZHOU')))}</text><rect x="636" y="306" width="10" height="14" rx="2" fill="#8a929b"/>`}
+      ${f.storeroomOpen ? exitPlaque(624, 214, t(G.rooms.storeroom.name) + ' →') : ''}${hit(592, 200, 64, 204)}`)}
     <!-- 花床 -->
     ${[[250, 130], [398, 112], [528, 100]].map(([x, w]) => `<rect x="${x}" y="400" width="${w}" height="44" fill="#3a2a1a"/><rect x="${x}" y="400" width="${w}" height="6" fill="#2a1d12"/><rect x="${x - 3}" y="396" width="${w + 6}" height="6" fill="#5a4630"/>`).join('')}
     ${[[408, 390], [430, 380], [452, 388], [474, 382], [492, 392]].map(([x]) => `<path d="M${x} 402 q4 -26 ${-10} -40 M${x} 402 q6 -24 14 -36 M${x} 402 q-4 -20 -16 -26" fill="none" stroke="${f.waterOk ? '#5ea36b' : '#4a7a52'}" stroke-width="3"/>`).join('')}
@@ -391,7 +403,9 @@
       ${hit(270, 262, 90, 142)}`)}
     <!-- 花盆架 -->
     ${H(v, 'g_pots', `<rect x="652" y="318" width="250" height="10" fill="#5a3d22"/><rect x="652" y="318" width="250" height="2" fill="#8a6a42"/><rect x="660" y="328" width="8" height="34" fill="#4a2f1c"/><rect x="886" y="328" width="8" height="34" fill="#4a2f1c"/>
-      ${[['#c44f5c', 680], ['#8a7bc8', 740], ['#8aa89a', 800], ['#6fbf8a', 860]].map(([c, x], i) => `<path d="M${x - 22} 276 L${x + 22} 276 L${x + 16} 318 L${x - 16} 318 Z" fill="${f.keyDug && i === 0 ? '#7a4a2a' : '#a3613a'}"/><path d="M${x - 18} 280 L${x - 14} 316" stroke="#c98a5a" stroke-width="2" opacity=".5"/>
+      ${vet
+        ? G.POTS_V.map((p, i) => { const x = 668 + i * 31, c = ['#c44f5c', '#8a7bc8', '#8aa89a', '#6fbf8a', '#b97ab0', '#6f8fc0', '#4f9a5b', '#efe6a8'][i]; return `<path d="M${x - 12} 286 L${x + 12} 286 L${x + 9} 318 L${x - 9} 318 Z" fill="${f.keyDug && p.id === 'sage' ? '#7a4a2a' : '#a3613a'}"/><rect x="${x - 13}" y="282" width="26" height="6" fill="#8a4f2e"/>${[-5, 0, 5].map(d => `<circle cx="${x + d}" cy="${272 - Math.abs(d)}" r="4.5" fill="${c}"/>`).join('')}<path d="M${x} 282 v-8" stroke="#4f7a4a" stroke-width="2"/><text x="${x}" y="308" text-anchor="middle" font-size="10" font-weight="700" fill="#f3e2c8">${p.n}</text>`; }).join('')
+        : [['#c44f5c', 680], ['#8a7bc8', 740], ['#8aa89a', 800], ['#6fbf8a', 860]].map(([c, x], i) => `<path d="M${x - 22} 276 L${x + 22} 276 L${x + 16} 318 L${x - 16} 318 Z" fill="${f.keyDug && i === 0 ? '#7a4a2a' : '#a3613a'}"/><path d="M${x - 18} 280 L${x - 14} 316" stroke="#c98a5a" stroke-width="2" opacity=".5"/>
         <rect x="${x - 24}" y="270" width="48" height="8" fill="#8a4f2e"/>${[-10, 0, 10].map(d => `<circle cx="${x + d}" cy="${258 - Math.abs(d) / 2}" r="7" fill="${c}"/>`).join('')}<path d="M${x} 270 v-10 M${x - 6} 268 l-4 -8 M${x + 6} 268 l4 -8" stroke="#4f7a4a" stroke-width="2.5"/>`).join('')}
       ${hit(648, 236, 258, 128)}`)}
     <!-- 工作台 -->
@@ -486,7 +500,8 @@
   /* ---------------- 暗房 ---------------- */
   function darkroom(v) {
     const f = v.s.flags;
-    const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W') };
+    const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K'), orange: L('橙', 'O'), purple: L('紫', 'P') };
+    const vet = v.s.mode === 'veteran';
     if (!f.darkroomLit) {
       const r = rng(5);
       let dust = '';
@@ -516,9 +531,14 @@
     ${H(v, 'd_line', `<path d="M160 130 Q420 160 700 130" fill="none" stroke="#5a2a20" stroke-width="2"/>${prints}
       ${f.p4Taken ? '' : `<rect x="398" y="146" width="40" height="56" fill="#f0d6c8" opacity=".85"/>${[156, 164, 172, 180, 188].map(y => `<line x1="404" y1="${y}" x2="432" y2="${y}" stroke="#7a3a2a" stroke-width="1.5"/>`).join('')}`}${hit(150, 120, 560, 90)}`)}
     ${H(v, 'd_vent', `<rect x="820" y="40" width="90" height="50" fill="#050101"/><path d="M820 40 L910 40 L910 72 L882 90 L820 90 Z" fill="#140404"/>${[50, 60, 70].map(y => `<line x1="826" y1="${y}" x2="${y < 72 ? 904 : 896}" y2="${y}" stroke="#2a0806" stroke-width="2"/>`).join('')}<path d="M882 90 L910 72 L910 90 Z" fill="#050101"/>${headlights ? `<circle cx="901" cy="85" r="7" fill="#ffe9a8" opacity=".25"/><circle cx="897" cy="86" r="2" fill="#ffe9a8"/><circle cx="905" cy="86" r="2" fill="#ffe9a8"/>` : ''}<path d="M882 90 L910 72" stroke="#3a0d0a" stroke-width="2"/>${hit(814, 34, 102, 62)}`)}
-    ${H(v, 'd_shelf', `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/><rect x="740" y="250" width="190" height="2" fill="#6a2018"/>
-      ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${759 + i * 44}" y="200" width="5" height="44" fill="#ff6a50" opacity=".15"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${({ red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0' })[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
+    ${H(v, 'd_shelf', vet
+      ? `<rect x="700" y="250" width="240" height="10" fill="#3a0d0a"/><rect x="700" y="250" width="240" height="2" fill="#6a2018"/>
+        ${G.BOTTLES_V.map((b, i) => `<rect x="${706 + i * 29}" y="200" width="22" height="50" rx="4" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${709 + i * 29}" y="204" width="4" height="40" fill="#ff6a50" opacity=".15"/><rect x="${708 + i * 29}" y="190" width="18" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${717 + i * 29}" y="232" text-anchor="middle" font-size="11" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
+        <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(696, 180, 248, 126)}`
+      : `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/><rect x="740" y="250" width="190" height="2" fill="#6a2018"/>
+      ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${759 + i * 44}" y="200" width="5" height="44" fill="#ff6a50" opacity=".15"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
       <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(736, 180, 198, 126)}`)}
+    ${H(v, 'd_chart', `<rect x="610" y="34" width="84" height="74" fill="#e8c8b8" opacity=".78" transform="rotate(2 652 71)"/><g transform="rotate(2 652 71)"><rect x="618" y="42" width="52" height="6" fill="#7a3a2a" opacity=".7"/>${[56, 66, 76, 86, 96].map(y => `<line x1="618" y1="${y}" x2="686" y2="${y}" stroke="#7a3a2a" stroke-width="1.5" opacity=".6"/>`).join('')}</g><circle cx="652" cy="36" r="2.5" fill="#8a929b"/>${hit(604, 28, 96, 86)}`)}
     ${H(v, 'd_tray', `<rect x="230" y="320" width="460" height="16" fill="#3a0d0a"/><rect x="230" y="320" width="460" height="2" fill="#6a2018"/><rect x="250" y="336" width="12" height="104" fill="#2a0806"/><rect x="658" y="336" width="12" height="104" fill="#2a0806"/>
       <rect x="236" y="250" width="10" height="70" fill="#2a0806"/><path d="M226 250 h40 v24 h-40 z" fill="#3a0d0a"/><rect x="238" y="274" width="16" height="10" fill="#1a0404"/><rect x="226" y="314" width="34" height="6" fill="#2a0806"/>
       ${[270, 380, 490].map(x => `<rect x="${x}" y="302" width="90" height="18" rx="3" fill="#120303" stroke="#6a2018" stroke-width="2"/><rect x="${x + 6}" y="306" width="78" height="4" fill="#ff6a50" opacity=".12"/>`).join('')}
@@ -526,7 +546,153 @@
     `;
   }
 
-  const ROOM_ART = { foyer, study, greenhouse, observatory, darkroom };
+  /* ---------------- 儲物間（資深） ---------------- */
+  function storeroom(v) {
+    const f = v.s.flags;
+    const r = rng(91);
+    let dust = '';
+    for (let i = 0; i < 22; i++) dust += `<circle cx="${(400 + r() * 260).toFixed(1)}" cy="${(220 + r() * 220).toFixed(1)}" r="${(0.6 + r()).toFixed(1)}" fill="#e8dcc0" opacity="${(0.08 + r() * 0.2).toFixed(2)}"/>`;
+    const tin = (x, y, body, lid, label) => `<rect x="${x}" y="${y}" width="26" height="30" rx="3" fill="${body}"/><rect x="${x - 1}" y="${y - 4}" width="28" height="6" rx="2" fill="${lid}"/><rect x="${x + 4}" y="${y + 10}" width="18" height="10" fill="#e8dcc0" opacity=".8"/><text x="${x + 13}" y="${y + 18.5}" text-anchor="middle" font-size="7" fill="#3b2a10">${label}</text>`;
+    const drawers = [];
+    for (let rr = 0; rr < 6; rr++) for (let c = 0; c < 4; c++) {
+      const x = 682 + c * 36, y = 186 + rr * 36;
+      drawers.push(`<rect x="${x}" y="${y}" width="32" height="32" fill="#5a3d22" stroke="#2f1d11" stroke-width="2"/><rect x="${x + 12}" y="${y + 14}" width="8" height="4" rx="1" fill="#c9a24f"/><rect x="${x + 4}" y="${y + 4}" width="24" height="7" fill="#e8dcc0" opacity=".55"/>`);
+    }
+    return `
+    <defs>
+      <linearGradient id="sr-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d140d"/><stop offset="1" stop-color="#33231a"/></linearGradient>
+      <linearGradient id="sr-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241a12"/><stop offset="1" stop-color="#140e09"/></linearGradient>
+      <linearGradient id="sr-moon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".2"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
+      <radialGradient id="sr-cottage" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd98a" stop-opacity=".8"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/></radialGradient>
+      <linearGradient id="sr-brass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0d38c"/><stop offset="1" stop-color="#8a6324"/></linearGradient>
+    </defs>
+    <rect width="960" height="540" fill="url(#sr-wall)"/>
+    ${[...Array(25)].map((_, i) => `<line x1="${i * 40}" y1="0" x2="${i * 40}" y2="440" stroke="#140d08" stroke-width="2"/><line x1="${i * 40 + 18}" y1="0" x2="${i * 40 + 18}" y2="440" stroke="#2a1d14" stroke-width="1" opacity=".5"/>`).join('')}
+    <!-- 斜屋頂與椽木 -->
+    <polygon points="0,0 960,0 960,120 0,36" fill="#120c08"/>
+    ${[0, 1, 2, 3, 4, 5, 6].map(i => `<line x1="${i * 160}" y1="${36 + i * 13.3}" x2="${i * 160 + 10}" y2="0" stroke="#2a1d12" stroke-width="10"/>`).join('')}
+    <line x1="0" y1="36" x2="960" y2="120" stroke="#3a2818" stroke-width="12"/>
+    <!-- 泥土地 -->
+    <rect y="440" width="960" height="100" fill="url(#sr-floor)"/>
+    ${perspectivePlanks(440, 540, 480, 300, 18, '#0e0a06')}
+    <rect y="436" width="960" height="6" fill="#2a1d12"/>
+    <!-- 月光 -->
+    <polygon points="444,222 540,222 660,540 380,540" fill="url(#sr-moon)"/>${dust}
+    <!-- 雜物架 -->
+    ${H(v, 't_shelf', `<rect x="30" y="110" width="140" height="322" fill="#2a1c12"/>${[150, 230, 310, 390].map(y => `<rect x="26" y="${y}" width="148" height="8" fill="#5a3d22"/>`).join('')}
+      ${[44, 70, 96, 124].map((x, i) => `<rect x="${x}" y="${126 + (i % 2) * 4}" width="18" height="${24 - (i % 2) * 4}" rx="3" fill="${['#6b5a3a', '#4f6a5a', '#7a5a3a', '#5a5a6a'][i]}"/>`).join('')}
+      <circle cx="70" cy="214" r="13" fill="none" stroke="#b59a5e" stroke-width="5"/><circle cx="70" cy="214" r="6" fill="none" stroke="#b59a5e" stroke-width="3"/>
+      <rect x="104" y="196" width="50" height="34" fill="#4a3a22"/><path d="M104 196 l25 -10 l25 10" fill="#5a4630"/>
+      ${[0, 1, 2, 3, 4].map(i => `<line x1="${48 + i * 6}" y1="${310 - 70}" x2="${52 + i * 6}" y2="310" stroke="#a89060" stroke-width="3"/>`).join('')}
+      <rect x="100" y="270" width="56" height="40" fill="#3a2a1a"/><rect x="104" y="274" width="48" height="10" fill="#6b5a3a"/>
+      <path d="M40 390 h120 l-8 -40 h-104 z" fill="#4a3220"/>${[50, 76, 102, 128].map(x => `<ellipse cx="${x + 10}" cy="350" rx="11" ry="5" fill="#6b4a2c"/>`).join('')}
+      <line x1="160" y1="120" x2="176" y2="420" stroke="#6b5a3a" stroke-width="5"/><path d="M168 118 l18 -10 l4 8 z" fill="#8a929b"/>
+      ${hit(26, 104, 160, 330)}`)}
+    <!-- 小窗：山谷對面的燈 -->
+    ${H(v, 't_window', `<rect x="436" y="124" width="112" height="104" fill="#3a2818" stroke="#5a3d22" stroke-width="5"/>
+      <rect x="444" y="132" width="96" height="88" fill="#0b1226"/>${starfield(17, 14, 446, 134, 92, 46)}
+      <path d="M444 196 Q470 168 498 182 Q520 170 540 186 L540 220 L444 220 Z" fill="#060a16"/>
+      <circle cx="510" cy="186" r="9" fill="url(#sr-cottage)"/><rect x="506" y="183" width="7" height="6" fill="#ffd98a"/><path d="M503 184 l7 -6 l7 6" fill="none" stroke="#1a1408" stroke-width="1.5"/>
+      <line x1="492" y1="132" x2="492" y2="220" stroke="#5a3d22" stroke-width="4"/><line x1="444" y1="176" x2="540" y2="176" stroke="#5a3d22" stroke-width="4"/>
+      <rect x="432" y="226" width="120" height="7" fill="#4a3220"/>${hit(430, 118, 124, 118)}`)}
+    <!-- 舊月曆 -->
+    ${H(v, 't_calendar', `<rect x="590" y="116" width="62" height="82" fill="#e5dcc4" transform="rotate(-2 621 157)"/>
+      <g transform="rotate(-2 621 157)"><rect x="590" y="116" width="62" height="16" fill="#a5473f"/><text x="621" y="128" text-anchor="middle" font-size="10" fill="#f6ecd6" class="t-mono">1999.12</text>
+      ${[0, 1, 2, 3, 4].map(rr => [0, 1, 2, 3, 4, 5, 6].map(c => `<rect x="${594 + c * 8}" y="${138 + rr * 11}" width="6" height="7" fill="#b9ad90" opacity=".6"/>`).join('')).join('')}
+      <circle cx="${594 + 3 * 8 + 3}" cy="${138 + 1 * 11 + 3.5}" r="6" fill="none" stroke="#c0392b" stroke-width="1.5"/></g>
+      <circle cx="621" cy="112" r="2.5" fill="#8a929b"/>${hit(584, 106, 74, 98)}`)}
+    <!-- 工作台：天平、種子罐、砝碼盒 -->
+    ${shadow(330, 438, 160, 8)}
+    <rect x="190" y="304" width="290" height="14" fill="#5a3d22"/><rect x="190" y="304" width="290" height="3" fill="#8a6a42"/>
+    <rect x="200" y="318" width="12" height="118" fill="#3a2414"/><rect x="458" y="318" width="12" height="118" fill="#3a2414"/><rect x="212" y="390" width="246" height="8" fill="#3a2414"/>
+    ${H(v, 't_balance', `<rect x="316" y="292" width="40" height="12" rx="2" fill="#3a3f45"/><rect x="332" y="200" width="8" height="94" fill="url(#sr-brass)"/><circle cx="336" cy="200" r="6" fill="#c9a24f"/>
+      <line x1="266" y1="204" x2="406" y2="196" stroke="#c9a24f" stroke-width="5" stroke-linecap="round"/><path d="M336 196 l-4 -14 h8 z" fill="#e7c77e"/>
+      ${[[266, 204], [406, 196]].map(([x, y]) => `<line x1="${x}" y1="${y}" x2="${x - 18}" y2="${y + 50}" stroke="#a5a5a5" stroke-width="1.2"/><line x1="${x}" y1="${y}" x2="${x + 18}" y2="${y + 50}" stroke="#a5a5a5" stroke-width="1.2"/><path d="M${x - 24} ${y + 50} h48 q-4 10 -24 10 q-20 0 -24 -10 z" fill="url(#sr-brass)"/>`).join('')}
+      ${tin(208, 272, '#6f8fb8', '#9fb6d8', esc(t(L('月', 'MOON'))))}${tin(240, 272, '#4f8a5b', '#7fb08a', esc(t(L('蕨', 'FERN'))))}${tin(426, 272, '#c9a46a', '#e3c99a', esc(t(L('仙', 'CACT'))))}
+      ${hit(200, 176, 260, 132)}`)}
+    ${H(v, 't_weights', `<rect x="366" y="284" width="52" height="20" fill="#6b4a2c" stroke="#3a2414" stroke-width="2"/><path d="M366 284 l8 -14 h52 l-8 14 z" fill="#7a5a36"/>
+      <path d="M378 284 q4 -10 8 0 z" fill="url(#sr-brass)"/><ellipse cx="400" cy="291" rx="6" ry="3" fill="#1a1006"/>${hit(362, 266, 60, 42)}`)}
+    <!-- 種子櫃 -->
+    ${shadow(756, 438, 92, 7)}
+    ${H(v, 't_cabinet', `<rect x="672" y="170" width="168" height="264" fill="#3a2414" stroke="#2a190c" stroke-width="3"/><rect x="668" y="164" width="176" height="10" fill="#5a3d22"/>
+      ${drawers.join('')}
+      ${f.cabinetOpen
+        ? `<rect x="682" y="186" width="68" height="212" fill="#120a06"/><path d="M682 186 L652 196 L652 392 L682 398 Z" fill="#5a3d22" stroke="#2f1d11" stroke-width="2"/><line x1="700" y1="194" x2="736" y2="392" stroke="#7a5a36" stroke-width="5"/>`
+        : `<rect x="736" y="396" width="40" height="26" rx="3" fill="#8a929b" stroke="#c7ccd4"/>${[0, 1, 2].map(i => `<rect x="${741 + i * 11}" y="402" width="9" height="14" fill="#1a1a1a"/>`).join('')}`}
+      ${hit(664, 160, 184, 278)}`)}
+    <!-- 出口 -->
+    ${H(v, 't_exit', `<rect x="882" y="214" width="66" height="222" fill="#1a2b22" stroke="#5a3d22" stroke-width="4"/><rect x="890" y="224" width="50" height="70" fill="#2f5a3f" opacity=".5"/><circle cx="892" cy="330" r="3.5" fill="#c9a24f"/>
+      ${exitPlaque(915, 200, '← ' + t(G.rooms.greenhouse.name))}${hit(876, 182, 78, 258)}`)}
+    <!-- 柴堆 -->
+    ${[0, 1, 2].map(row => [0, 1, 2, 3].map(c => `<circle cx="${210 + c * 22 + (row % 2) * 11}" cy="${432 - row * 18}" r="10" fill="#4a3220" stroke="#2a1c10" stroke-width="2"/><circle cx="${210 + c * 22 + (row % 2) * 11}" cy="${432 - row * 18}" r="4" fill="#6b4a2c"/>`).join('')).join('')}
+    `;
+  }
+
+  /* ---------------- 閣樓（資深） ---------------- */
+  function attic(v) {
+    const f = v.s.flags;
+    const r = rng(29);
+    let dust = '';
+    for (let i = 0; i < 30; i++) dust += `<circle cx="${(400 + r() * 200).toFixed(1)}" cy="${(160 + r() * 280).toFixed(1)}" r="${(0.6 + r()).toFixed(1)}" fill="#e8dcc0" opacity="${(0.08 + r() * 0.25).toFixed(2)}"/>`;
+    const marks = [[380, 3], [352, 5], [322, 7], [292, 9], [236, 13]];
+    const frames = G.PHOTO_ORDER.map((id, i) => {
+      const x = 196 + i * 42, y = 226;
+      const inside = f.photosSolved ? `<g transform="translate(${x + 3} ${y + 3}) scale(${30 / 160} ${36 / 120})">${photoScene(G.PHOTOS.find(p => p.id === id), true)}</g>` : `<rect x="${x + 3}" y="${y + 3}" width="30" height="36" fill="#120c08"/>`;
+      return `<rect x="${x}" y="${y}" width="36" height="42" fill="#6b4a1e" stroke="#2a1a0c" stroke-width="2"/>${inside}<circle cx="${x + 18}" cy="${y - 6}" r="1.6" fill="#8a929b"/><path d="M${x + 6} ${y} L${x + 18} ${y - 6} L${x + 30} ${y}" fill="none" stroke="#8a929b" stroke-width=".8"/>`;
+    }).join('');
+    return `
+    <defs>
+      <linearGradient id="at-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a130d"/><stop offset="1" stop-color="#2e2117"/></linearGradient>
+      <linearGradient id="at-moon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ff" stop-opacity=".22"/><stop offset="1" stop-color="#c9d6ff" stop-opacity="0"/></linearGradient>
+      <radialGradient id="at-sky" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#22305a"/><stop offset="1" stop-color="#0a1022"/></radialGradient>
+    </defs>
+    <rect width="960" height="540" fill="#0e0a07"/>
+    <!-- 山牆與斜屋頂 -->
+    <polygon points="150,440 150,190 480,24 810,190 810,440" fill="url(#at-wall)"/>
+    ${[...Array(17)].map((_, i) => `<line x1="${150 + i * 41}" y1="440" x2="${150 + i * 41}" y2="${Math.max(24 + Math.abs(480 - (150 + i * 41)) * 0.503, 30)}" stroke="#140d08" stroke-width="2"/>`).join('')}
+    <polygon points="0,0 480,0 480,24 150,190 0,265" fill="#120c08"/><polygon points="960,0 480,0 480,24 810,190 960,265" fill="#120c08"/>
+    ${[0, 1, 2, 3].map(i => `<line x1="${i * 45}" y1="${265 - i * 22}" x2="${150 + i * 110}" y2="${190 - i * 55}" stroke="#2a1d12" stroke-width="6"/><line x1="${960 - i * 45}" y1="${265 - i * 22}" x2="${810 - i * 110}" y2="${190 - i * 55}" stroke="#2a1d12" stroke-width="6"/>`).join('')}
+    <path d="M150 190 L480 24 L810 190" fill="none" stroke="#3a2818" stroke-width="10"/>
+    <rect x="0" y="440" width="960" height="100" fill="#1e150e"/>
+    ${perspectivePlanks(440, 540, 480, 280, 22, '#0f0a06')}
+    <rect y="436" width="960" height="6" fill="#2a1d12"/>
+    <polygon points="440,190 520,190 640,540 330,540" fill="url(#at-moon)"/>${dust}
+    <!-- 圓窗 -->
+    ${H(v, 'a_window', `<circle cx="480" cy="140" r="52" fill="#3a2818"/><circle cx="480" cy="140" r="44" fill="url(#at-sky)"/>${starfield(37, 16, 444, 104, 72, 72)}
+      <circle cx="502" cy="120" r="6" fill="#efe9d2" opacity=".9"/><line x1="436" y1="140" x2="524" y2="140" stroke="#3a2818" stroke-width="4"/><line x1="480" y1="96" x2="480" y2="184" stroke="#3a2818" stroke-width="4"/>
+      <circle cx="480" cy="140" r="46" fill="none" stroke="#6b4a2c" stroke-width="3"/>${hit(426, 86, 108, 108)}`)}
+    <!-- 相框牆 -->
+    ${H(v, 'a_frame', `${frames}<rect x="190" y="276" width="252" height="10" rx="2" fill="#2a1c12"/><text x="316" y="284.5" text-anchor="middle" font-size="8" fill="#c9a24f">${esc(t(L('從前 → 現在', 'past → present')))}</text>${hit(188, 210, 258, 80)}`)}
+    <!-- 身高刻度的柱子 -->
+    ${H(v, 'a_marks', `<rect x="734" y="80" width="28" height="360" fill="#4a3220"/><rect x="734" y="80" width="6" height="360" fill="#000" opacity=".2"/>
+      ${marks.map(([y, a]) => `<line x1="736" y1="${y}" x2="760" y2="${y}" stroke="#e8dcc0" stroke-width="1.6"/><text x="748" y="${y - 3}" text-anchor="middle" font-size="7" fill="#e8dcc0">${a}</text>`).join('')}${hit(728, 76, 40, 368)}`)}
+    <!-- 木馬 -->
+    <path d="M44 430 q50 22 100 0" fill="none" stroke="#3a2818" stroke-width="6"/><path d="M70 420 l10 -40 h40 l10 40 M80 380 l-6 -20 q-4 -14 10 -18 q10 0 8 12 l-4 8" fill="#3a2818" stroke="#3a2818" stroke-width="4"/>
+    <!-- 玩具箱 -->
+    ${shadow(268, 442, 74, 6)}
+    ${H(v, 'a_chest', `<rect x="200" y="368" width="136" height="70" rx="4" fill="#5a3a24" stroke="#2a190c" stroke-width="3"/><path d="M200 368 q68 -22 136 0" fill="#6b4a2c" stroke="#2a190c" stroke-width="3"/>
+      ${[[226, 398], [268, 410], [310, 396]].map(([x, y]) => emblemGlyph('emblem_star', x, y, 7, '#e8c97f')).join('')}<rect x="262" y="364" width="12" height="12" rx="2" fill="#c9a24f"/>${hit(196, 344, 144, 98)}`)}
+    <!-- 相片盒 -->
+    ${H(v, 'a_photobox', `<rect x="356" y="408" width="86" height="30" fill="#4a3220"/><rect x="368" y="384" width="62" height="24" rx="2" fill="#8a929b" stroke="#c7ccd4"/><rect x="368" y="384" width="62" height="6" fill="#a9b2bc"/>
+      ${f.photosTaken ? '' : `<rect x="376" y="374" width="20" height="14" fill="#d9c9a5" transform="rotate(-8 386 381)"/>`}${hit(352, 366, 94, 76)}`)}
+    <!-- 音樂盒與小桌 -->
+    ${shadow(628, 442, 70, 6)}
+    <rect x="566" y="338" width="124" height="10" fill="#5a3d22"/><rect x="576" y="348" width="8" height="90" fill="#3a2414"/><rect x="672" y="348" width="8" height="90" fill="#3a2414"/>
+    ${H(v, 'a_musicbox', `<rect x="590" y="304" width="76" height="34" rx="3" fill="#6b3a24" stroke="#2a190c" stroke-width="2"/>
+      ${f.crankInserted || f.musicSolved ? `<path d="M590 304 L600 274 L676 274 L666 304 Z" fill="#7a4a2c" stroke="#2a190c" stroke-width="2"/>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<line x1="${600 + i * 6}" y1="312" x2="${600 + i * 6}" y2="${326 - i * 0.8}" stroke="#d8dee8" stroke-width="2"/>`).join('')}` : `<rect x="588" y="298" width="80" height="8" rx="2" fill="#7a4a2c"/>${[[606, 302], [628, 302], [650, 302]].map(([x, y]) => emblemGlyph('emblem_star', x, y, 3, '#e8c97f')).join('')}`}
+      <circle cx="${f.crankInserted ? 672 : 670}" cy="320" r="3" fill="#1a1006"/>${f.crankInserted ? `<path d="M672 320 h10 m0 -6 v12" stroke="#c9a24f" stroke-width="3"/>` : ''}
+      ${f.musicSolved ? `<rect x="604" y="338" width="48" height="8" fill="#2a190c"/>` : ''}${hit(584, 268, 104, 76)}`)}
+    <!-- 箱子 -->
+    <rect x="830" y="350" width="100" height="88" fill="#4a3220" stroke="#2a190c" stroke-width="2"/><rect x="846" y="296" width="76" height="56" fill="#5a3d22" stroke="#2a190c" stroke-width="2"/><path d="M830 394 h100 M846 324 h76" stroke="#2a190c" stroke-width="2"/>
+    <!-- 下樓的梯口 -->
+    ${H(v, 'a_exit', `<path d="M760 470 L900 470 L930 530 L740 530 Z" fill="#050403" stroke="#3a2818" stroke-width="3"/><line x1="800" y1="470" x2="790" y2="530" stroke="#6b4a2c" stroke-width="5"/><line x1="860" y1="470" x2="870" y2="530" stroke="#6b4a2c" stroke-width="5"/>
+      ${[486, 508].map(y => `<line x1="${797 - (y - 470) / 6}" y1="${y}" x2="${863 + (y - 470) / 6}" y2="${y}" stroke="#6b4a2c" stroke-width="3"/>`).join('')}
+      ${exitPlaque(830, 458, '↓ ' + t(G.rooms.foyer.name))}${hit(736, 440, 200, 96)}`)}
+    `;
+  }
+
+  const CAP_COLORS = { red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0', green: '#5fb86e', black: '#1c1c1c', orange: '#f08a3a', purple: '#a070d0' };
+  const ROOM_ART = { foyer, study, greenhouse, observatory, darkroom, storeroom, attic };
   function scene(room, v) {
     // 模板裡的 <!-- 註解 --> 只是給讀程式的人看的，不放進畫面
     return `<svg class="scene-svg" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="${esc(t(G.rooms[room].name))}">${ROOM_ART[room](v).replace(/<!--[\s\S]*?-->/g, '')}</svg>`;
@@ -559,6 +725,15 @@
     emblem_sun: `<circle cx="24" cy="24" r="18" fill="url(#ic-brass)" stroke="#f3d68f" stroke-width="1.5"/>${emblemGlyph('emblem_sun', 24, 24, 11, '#5a3d10')}`,
     emblem_moon: `<circle cx="24" cy="24" r="18" fill="#c9d0dc" stroke="#f2f4f8" stroke-width="1.5"/>${emblemGlyph('emblem_moon', 23, 24, 11, '#4a5468')}`,
     emblem_star: `<circle cx="24" cy="24" r="18" fill="#22356a" stroke="#7a95d8" stroke-width="1.5"/>${emblemGlyph('emblem_star', 24, 24, 12, '#e8eeff')}`,
+    // 資深模式
+    storeroom_key: `<circle cx="14" cy="16" r="7" fill="none" stroke="#5a5f66" stroke-width="4"/><path d="M19 21 l16 16" stroke="#5a5f66" stroke-width="4" stroke-linecap="round"/><path d="M29 31 l4 -4 M33 35 l4 -4" stroke="#5a5f66" stroke-width="3"/><rect x="26" y="6" width="16" height="10" rx="2" fill="#e8dcc0" transform="rotate(20 34 11)"/><line x1="21" y1="12" x2="27" y2="9" stroke="#a89c80"/>`,
+    paperweight: `<path d="M10 38 q0 -20 14 -20 q14 0 14 20 z" fill="url(#ic-brass)"/><rect x="8" y="36" width="32" height="5" rx="2" fill="#8a6324"/><circle cx="24" cy="16" r="4" fill="none" stroke="#d9b45e" stroke-width="2.5"/><text x="24" y="33" text-anchor="middle" font-size="10" font-weight="700" fill="#3b2a10">5</text>`,
+    hook_pole: `<line x1="8" y1="42" x2="36" y2="10" stroke="#8a5a32" stroke-width="4" stroke-linecap="round"/><path d="M36 10 q8 -6 8 2 q0 6 -6 6" fill="none" stroke="#9aa1ab" stroke-width="3"/>`,
+    code_card: `<rect x="6" y="10" width="36" height="28" rx="3" fill="#f2ecdc" stroke="#9fb0c8"/><circle cx="13" cy="18" r="2" fill="#2d4f8a"/><rect x="17" y="17" width="8" height="2.5" fill="#2d4f8a"/><circle cx="29" cy="18" r="2" fill="#2d4f8a"/><rect x="11" y="25" width="8" height="2.5" fill="#c0392b"/><rect x="21" y="25" width="8" height="2.5" fill="#c0392b"/><rect x="31" y="25" width="8" height="2.5" fill="#c0392b"/><circle cx="14" cy="32" r="2" fill="#2d4f8a"/><circle cx="20" cy="32" r="2" fill="#2d4f8a"/>`,
+    photos: `<rect x="12" y="8" width="28" height="22" fill="#d9c9a5" stroke="#efe6cf" stroke-width="2" transform="rotate(10 26 19)"/><rect x="8" y="14" width="28" height="22" fill="#cbb48a" stroke="#efe6cf" stroke-width="2" transform="rotate(-6 22 25)"/><rect x="10" y="18" width="28" height="22" fill="#b59c72" stroke="#efe6cf" stroke-width="2"/><path d="M14 36 l7 -9 l5 5 l4 -4 l6 8 z" fill="#6a5236"/>`,
+    photo_comet: `<rect x="8" y="10" width="32" height="28" fill="#6a5236" stroke="#efe6cf" stroke-width="2"/><circle cx="24" cy="22" r="9" fill="#2b2216"/><path d="M19 25 l9 -6" stroke="#f6ead0" stroke-width="1.6"/><circle cx="19" cy="25" r="1.6" fill="#f6ead0"/><text x="37" y="35" text-anchor="end" font-size="5" fill="#e8742a" class="t-mono">99 12 08</text>`,
+    crank: `<circle cx="18" cy="18" r="9" fill="none" stroke="url(#ic-brass)" stroke-width="4"/>${emblemGlyph('emblem_star', 18, 18, 4, '#d9b45e')}<path d="M24 24 l12 12" stroke="#d9b45e" stroke-width="4" stroke-linecap="round"/><rect x="32" y="30" width="8" height="10" rx="1" fill="#a87b2e" transform="rotate(45 36 35)"/>`,
+    qing_letter: `<rect x="6" y="13" width="36" height="24" rx="2" fill="#f2d9e0"/><path d="M6 13 l18 13 l18 -13" fill="none" stroke="#c9a0aa" stroke-width="1.6"/>${emblemGlyph('emblem_star', 33, 30, 5, '#e8b04f')}`,
     plate: `<rect x="6" y="10" width="36" height="28" rx="2" fill="#0c0f16" stroke="#9aa6b8" stroke-width="1.5"/>${starfield(5, 8, 8, 12, 32, 24, { min: 0.4, var: 0.6 })}<path d="M16 26 l18 -8 l1 2 l-18 8 z" fill="#fffbe8" opacity=".7"/><circle cx="16" cy="27" r="2.4" fill="#fffbe8"/>`,
   };
   function icon(id) {
@@ -815,10 +990,12 @@
   }
 
   // 月光反光鏡
-  function mirrorsSvg(cfg) {
-    const g = G.MIRROR_GRID, cs = 64, ox = 40, oy = 60;
+  // opts.grid：鏡子格子（預設新手的 7 面鏡）；opts.beam === false 時不畫光路（資深模式拉開天窗前）
+  function mirrorsSvg(cfg, opts = {}) {
+    const g = opts.grid || G.MIRROR_GRID, cs = 64, ox = 40, oy = 60;
     const W = ox * 2 + g.cols * cs + 60, Hh = oy + g.rows * cs + 40;
-    const tr = G.traceBeam(cfg);
+    const tr = G.traceBeam(cfg, g);
+    const showBeam = opts.beam !== false;
     const center = ({ c, r }) => [ox + c * cs + cs / 2, oy + r * cs + cs / 2];
     const ps = tr.path.map((p, i) => {
       if (i === 0) return [ox + p.c * cs + cs / 2, oy - 40];
@@ -845,10 +1022,10 @@
       ${cells}
       <rect x="${ox + g.entry.c * cs + 8}" y="${oy - 46}" width="${cs - 16}" height="20" rx="4" fill="#cfe0ff" opacity=".85"/><text x="${ox + g.entry.c * cs + cs / 2}" y="${oy - 50}" text-anchor="middle" font-size="12" fill="#cfe0ff">${esc(t(L('天窗', 'Skylight')))}</text>
       ${blocks}
-      <polyline points="${ps.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f3f6ff" stroke-width="10" opacity=".18" stroke-linejoin="round"/>
-      <polyline points="${ps.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f3f6ff" stroke-width="3" stroke-linejoin="round"/>
+      ${showBeam ? `<polyline class="beam" points="${ps.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f3f6ff" stroke-width="10" opacity=".18" stroke-linejoin="round"/>
+      <polyline class="beam" points="${ps.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f3f6ff" stroke-width="3" stroke-linejoin="round"/>` : `<rect x="${ox + g.entry.c * cs + 8}" y="${oy - 46}" width="${cs - 16}" height="20" rx="4" fill="#2a3240"/>`}
       ${mirrors}
-      <g>${tr.hit ? `<circle cx="${fx}" cy="${fy}" r="30" fill="#ffffff" opacity=".25"/>` : ''}${[0, 72, 144, 216, 288].map(a => `<ellipse cx="${fx}" cy="${fy - 12}" rx="6" ry="12" fill="${tr.hit ? '#ffffff' : '#c9d4c0'}" transform="rotate(${a} ${fx} ${fy})"/>`).join('')}<circle cx="${fx}" cy="${fy}" r="5" fill="#e8e2a8"/>
+      <g>${tr.hit && showBeam ? `<circle cx="${fx}" cy="${fy}" r="30" fill="#ffffff" opacity=".25"/>` : ''}${[0, 72, 144, 216, 288].map(a => `<ellipse cx="${fx}" cy="${fy - 12}" rx="6" ry="12" fill="${tr.hit && showBeam ? '#ffffff' : '#c9d4c0'}" transform="rotate(${a} ${fx} ${fy})"/>`).join('')}<circle cx="${fx}" cy="${fy}" r="5" fill="#e8e2a8"/>
         <text x="${fx}" y="${fy + 34}" text-anchor="middle" font-size="12" fill="#c9d4c0">${esc(t(G.BEDS.moon.name))}</text></g>
     </svg>`;
   }
@@ -888,8 +1065,138 @@
   }
 
   function bottleSvg(b) {
-    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6' }[b.id];
+    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6', green: '#4f9a5b', black: '#1c1c1c', orange: '#e8873a', purple: '#8a5ac0' }[b.id];
     return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="16" y="30" width="6" height="56" fill="#ff7a60" opacity=".15"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/></svg>`;
+  }
+
+  /* ------------------------------------------------------------
+   * 資深模式的謎題圖
+   * ------------------------------------------------------------ */
+  // 一張老照片（160×120，棕褐色調）。屋子的圓頂、溫室、松樹高度、人物身形，都是判斷時間先後的線索。
+  function photoScene(p, thumb) {
+    const ink = '#3b2a16', mid = '#7a5f3c', light = '#d9c39a', paper = '#ead8b4';
+    let out = `<rect width="160" height="120" fill="${paper}"/>`;
+    if (p.indoor) {
+      // 閣樓圓窗邊：大人指著窗外的彗星，身邊是九歲的晴
+      out += `<rect width="160" height="120" fill="#6a5236"/><circle cx="80" cy="46" r="32" fill="#2b2216"/><circle cx="80" cy="46" r="27" fill="#4a3c2a"/>`;
+      for (const [x, y] of [[64, 34], [92, 30], [70, 58], [98, 54], [84, 66]]) out += `<circle cx="${x}" cy="${y}" r="1" fill="${light}"/>`;
+      out += `<path d="M66 40 L92 26" stroke="${light}" stroke-width="2.5" opacity=".7" stroke-linecap="round"/><circle cx="66" cy="40" r="3" fill="#f6ead0"/>`;
+      out += `<path d="M30 120 L30 70 q0 -14 12 -14 q12 0 12 14 L54 120 Z" fill="${ink}"/><circle cx="42" cy="48" r="9" fill="${ink}"/><path d="M50 72 L66 44" stroke="${ink}" stroke-width="5" stroke-linecap="round"/>`;
+      out += `<path d="M104 120 L104 90 q0 -10 9 -10 q9 0 9 10 L122 120 Z" fill="${ink}"/><circle cx="113" cy="72" r="7" fill="${ink}"/><path d="M106 72 q-4 8 0 14 M120 72 q4 8 0 14" stroke="${ink}" stroke-width="3" fill="none"/>`;
+    } else {
+      out += `<rect width="160" height="78" fill="#d8c6a0"/><rect y="78" width="160" height="42" fill="#b59c72"/>`;
+      // 主屋（中間）與左邊的天文台塔樓
+      out += `<rect x="50" y="46" width="62" height="34" fill="${mid}"/><path d="M46 46 L81 28 L116 46 Z" fill="${ink}"/>`;
+      out += `<rect x="58" y="56" width="8" height="10" fill="${light}"/><rect x="74" y="56" width="8" height="10" fill="${light}"/><rect x="90" y="62" width="9" height="18" fill="${ink}"/>`;
+      out += `<rect x="30" y="40" width="20" height="40" fill="${mid}"/>`;
+      if (p.dome === 2) out += `<path d="M28 40 a12 12 0 0 1 24 0 Z" fill="${ink}"/><rect x="38" y="29" width="4" height="9" fill="${light}"/>`;
+      if (p.dome === 1) out += `<path d="M28 40 a12 12 0 0 1 12 -12" fill="none" stroke="${ink}" stroke-width="3"/>${[24, 30, 36, 42, 48, 54].map(x => `<line x1="${x}" y1="22" x2="${x}" y2="80" stroke="${ink}" stroke-width="1"/>`).join('')}${[26, 36, 46, 56].map(y => `<line x1="22" y1="${y}" x2="56" y2="${y}" stroke="${ink}" stroke-width="1"/>`).join('')}`;
+      // 右邊的溫室
+      if (p.gh === 2) out += `<path d="M116 80 L116 58 L131 48 L146 58 L146 80 Z" fill="#c9d6c0" stroke="${ink}" stroke-width="1.4"/>${[121, 126, 131, 136, 141].map(x => `<line x1="${x}" y1="58" x2="${x}" y2="80" stroke="${ink}" stroke-width=".8"/>`).join('')}`;
+      if (p.gh === 1) out += `<path d="M116 80 L116 58 L131 48 L146 58 L146 80" fill="none" stroke="${ink}" stroke-width="1.4"/>${[124, 131, 138].map(x => `<line x1="${x}" y1="${x === 131 ? 48 : 53}" x2="${x}" y2="80" stroke="${ink}" stroke-width="1"/>`).join('')}`;
+      // 松樹（晴出生那年種下，一年比一年高）
+      const ph = [0, 10, 20, 32, 46, 64][p.pine || 0], pw = ph * 0.32;
+      if (ph) out += `<path d="M14 82 L${14 - pw} 82 L14 ${82 - ph} L${14 + pw} 82 Z" fill="#4a5a36"/><rect x="12.5" y="80" width="3" height="5" fill="${ink}"/>`;
+      // 人物
+      for (const who of p.people) {
+        if (who === 'luguan_baby') out += `<path d="M70 120 L70 96 q0 -10 8 -10 q8 0 8 10 L86 120 Z" fill="${ink}"/><circle cx="78" cy="80" r="6" fill="${ink}"/><ellipse cx="80" cy="98" rx="7" ry="4" fill="#f2e6cc" stroke="${ink}" stroke-width="1"/><circle cx="86" cy="96" r="2.5" fill="#f2e6cc" stroke="${ink}" stroke-width=".8"/>`;
+        if (who === 'zhou_ladder') out += `<line x1="18" y1="80" x2="28" y2="32" stroke="${ink}" stroke-width="2"/><line x1="24" y1="80" x2="34" y2="32" stroke="${ink}" stroke-width="2"/><circle cx="31" cy="30" r="4" fill="${ink}"/><path d="M28 34 h6 v12 h-6 z" fill="${ink}"/>`;
+        if (who === 'toddler') out += `<circle cx="100" cy="102" r="3.5" fill="${ink}"/><path d="M97 106 h6 v8 h-6 z" fill="${ink}"/>`;
+        if (who === 'girl7_telescope') out += `<circle cx="96" cy="94" r="4" fill="${ink}"/><path d="M93 98 h6 v14 h-6 z" fill="${ink}"/><line x1="106" y1="112" x2="112" y2="96" stroke="${ink}" stroke-width="1.4"/><line x1="118" y1="112" x2="112" y2="96" stroke="${ink}" stroke-width="1.4"/><rect x="104" y="90" width="16" height="4" fill="${ink}" transform="rotate(-25 112 92)"/>`;
+        if (who === 'teen_suitcase') out += `<circle cx="96" cy="84" r="4.5" fill="${ink}"/><path d="M92 89 h8 v22 h-8 z" fill="${ink}"/><rect x="102" y="102" width="12" height="10" rx="1" fill="${ink}"/>`;
+        if (who === 'zhou_grey') out += `<circle cx="124" cy="86" r="4.5" fill="#9a8a70"/><path d="M120 91 h8 v20 h-8 z" fill="${ink}"/>`;
+      }
+    }
+    if (p.stamp) out += `<text x="154" y="114" text-anchor="end" font-size="${thumb ? 12 : 10}" fill="#e8742a" class="t-mono">${p.stamp}</text>`;
+    out += `<rect width="160" height="120" fill="#7a5a2a" opacity=".12"/>`;
+    return out;
+  }
+  function photoSvg(p, opts = {}) {
+    const label = opts.label || '';
+    if (opts.back) {
+      const text = p.back ? esc(t(p.back)) : '';
+      return `<svg viewBox="0 0 160 120" class="photo-svg" role="img" aria-label="${esc(label)}"><rect width="160" height="120" fill="#efe6cf"/><rect width="160" height="120" fill="none" stroke="#d7c8a6" stroke-width="6"/>
+        ${text ? `<foreignObject x="10" y="16" width="140" height="92"><div xmlns="http://www.w3.org/1999/xhtml" class="photo-back">${text}</div></foreignObject>` : `<text x="80" y="66" text-anchor="middle" font-size="11" fill="#b9ab90">${esc(t(L('（背面沒有字）', '(nothing written)')))}</text>`}</svg>`;
+    }
+    return `<svg viewBox="0 0 160 120" class="photo-svg" role="img" aria-label="${esc(label)}"><rect width="160" height="120" fill="#f2ead6"/><g transform="translate(6 6) scale(${148 / 160} ${108 / 120})">${photoScene(p)}</g></svg>`;
+  }
+
+  const TIN_SHORT = { tin_moon: L('月光花', 'MOON'), tin_fern: L('蕨類', 'FERN'), tin_cactus: L('仙人掌', 'CACTUS') };
+  // 天平：place[id] = 'L' | 'R'。左右重量不同時橫桿傾斜，相等時指針變綠。
+  function balanceSvg(place) {
+    const w = id => G.BALANCE_THINGS.find(x => x.id === id).w;
+    let left = 0, right = 0;
+    const onL = [], onR = [];
+    for (const th of G.BALANCE_THINGS) {
+      if (place[th.id] === 'L') { left += w(th.id); onL.push(th); }
+      if (place[th.id] === 'R') { right += w(th.id); onR.push(th); }
+    }
+    const diff = right - left;
+    const level = diff === 0;
+    const ang = Math.max(-14, Math.min(14, diff * 3.5));
+    const a = ang * Math.PI / 180, cx = 300, cy = 92, arm = 190;
+    const ends = [[cx - arm * Math.cos(a), cy - arm * Math.sin(a)], [cx + arm * Math.cos(a), cy + arm * Math.sin(a)]];
+    const tinColor = { tin_moon: ['#6f8fb8', '#9fb6d8'], tin_fern: ['#4f8a5b', '#7fb08a'], tin_cactus: ['#c9a46a', '#e3c99a'] };
+    const drawThing = (th, x, y) => {
+      if (tinColor[th.id]) {
+        const [body, lid] = tinColor[th.id];
+        return `<rect x="${x - 15}" y="${y - 34}" width="30" height="34" rx="3" fill="${body}"/><rect x="${x - 16}" y="${y - 38}" width="32" height="6" rx="2" fill="${lid}"/><rect x="${x - 11}" y="${y - 24}" width="22" height="11" fill="#efe6cf"/><text x="${x}" y="${y - 15.5}" text-anchor="middle" font-size="7.5" fill="#3b2a10">${esc(t(TIN_SHORT[th.id]))}</text>`;
+      }
+      const big = th.w === 5;
+      return `<path d="M${x - (big ? 13 : 9)} ${y} h${big ? 26 : 18} l-${big ? 4 : 3} -${big ? 20 : 14} h-${big ? 18 : 12} z" fill="url(#bl-brass)"/><circle cx="${x}" cy="${y - (big ? 24 : 17)}" r="${big ? 5 : 3.5}" fill="none" stroke="#c9a24f" stroke-width="2"/><text x="${x}" y="${y - 5}" text-anchor="middle" font-size="${big ? 10 : 8}" font-weight="700" fill="#3b2a10">${th.w}</text>`;
+    };
+    const pan = ([x, y], things) => {
+      const py = y + 110;
+      let s = `<line x1="${x}" y1="${y}" x2="${x - 44}" y2="${py}" stroke="#a5a5a5" stroke-width="1.5"/><line x1="${x}" y1="${y}" x2="${x + 44}" y2="${py}" stroke="#a5a5a5" stroke-width="1.5"/>`;
+      things.forEach((th, i) => { s += drawThing(th, x - (things.length - 1) * 17 + i * 34, py); });
+      s += `<path d="M${x - 58} ${py} h116 q-8 16 -58 16 q-50 0 -58 -16 z" fill="url(#bl-brass)"/>`;
+      return s;
+    };
+    const aria = isEn()
+      ? `Balance: left pan ${onL.map(th => t(th.name)).join(', ') || 'empty'}; right pan ${onR.map(th => t(th.name)).join(', ') || 'empty'}; ${level ? 'level' : diff > 0 ? 'right side lower' : 'left side lower'}`
+      : `天平：左盤${onL.map(th => t(th.name)).join('、') || '空的'}；右盤${onR.map(th => t(th.name)).join('、') || '空的'}；${level ? '平衡' : diff > 0 ? '右邊比較低' : '左邊比較低'}`;
+    return `<svg viewBox="0 0 600 300" class="art balance-art" role="img" aria-label="${esc(aria)}">
+      <defs><linearGradient id="bl-brass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0d38c"/><stop offset="1" stop-color="#8a6324"/></linearGradient></defs>
+      <rect width="600" height="300" fill="#1d150e"/>
+      <rect x="0" y="276" width="600" height="24" fill="#3a2414"/>
+      <rect x="262" y="262" width="76" height="16" rx="3" fill="#3a3f45"/><rect x="294" y="${cy}" width="12" height="172" fill="url(#bl-brass)"/>
+      ${pan(ends[0], onL)}${pan(ends[1], onR)}
+      <line x1="${ends[0][0]}" y1="${ends[0][1]}" x2="${ends[1][0]}" y2="${ends[1][1]}" stroke="url(#bl-brass)" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="9" fill="#c9a24f" stroke="#f3d68f" stroke-width="2"/>
+      <path d="M${cx} ${cy} L${cx + Math.sin(a) * 56} ${cy - Math.cos(a) * 56}" stroke="${level ? '#8cc49a' : '#e39a8a'}" stroke-width="4" stroke-linecap="round"/>
+      <path d="M${cx - 30} ${cy - 50} A58 58 0 0 1 ${cx + 30} ${cy - 50}" fill="none" stroke="#6b4a1e" stroke-width="2"/><line x1="${cx}" y1="${cy - 62}" x2="${cx}" y2="${cy - 52}" stroke="#e8dcc0" stroke-width="2"/>
+      <text x="${cx}" y="${cy - 70}" text-anchor="middle" font-size="14" font-weight="700" fill="${level ? '#8cc49a' : '#e8dcc0'}">${level ? esc(t(L('平衡', 'Level'))) : ''}</text>
+    </svg>`;
+  }
+
+  // 音樂盒的音齒：1（最長、最低）到 10（最短、最高），每一根都可以點
+  function musicBoxSvg(lit) {
+    let tines = '';
+    for (let n = 1; n <= G.MUSIC_TINES; n++) {
+      const x = 52 + (n - 1) * 46, len = 150 - (n - 1) * 9;
+      tines += `<g class="tine ${lit === n ? 'lit' : ''}" data-tine="${n}" tabindex="0" role="button" aria-label="${esc(isEn() ? `Tine ${n}` : `第 ${n} 根音齒`)}">
+        <rect x="${x - 18}" y="40" width="36" height="${len + 30}" fill="transparent"/>
+        <rect x="${x - 7}" y="58" width="14" height="${len}" rx="3" fill="${lit === n ? '#f6dc95' : '#c7ccd4'}" stroke="#7a828c"/>
+        <text x="${x}" y="${58 + len + 22}" text-anchor="middle" font-size="16" font-weight="700" fill="#e8c97f">${n}</text></g>`;
+    }
+    return `<svg viewBox="0 0 560 250" class="art musicbox-art" role="group" aria-label="${esc(t(L('音樂盒的音齒', 'Music box tines')))}">
+      <rect width="560" height="250" fill="#2a160e"/><rect x="12" y="12" width="536" height="226" rx="10" fill="#5a2f1c" stroke="#8a5a36" stroke-width="3"/>
+      <rect x="24" y="30" width="512" height="30" rx="6" fill="#8a929b"/>${[...Array(30)].map((_, i) => `<circle cx="${36 + i * 17}" cy="${38 + (i * 7) % 14}" r="1.6" fill="#e8dcc0"/>`).join('')}
+      ${tines}</svg>`;
+  }
+
+  // 儲物間的小窗：山谷對面周伯家的燈（.zhou-lamp 由介面依燈號一亮一滅）
+  function signalSvg() {
+    return `<svg viewBox="0 0 560 260" class="art signal-art" role="img" aria-label="${esc(t(L('小窗外的山谷，對面山腰上有一盞燈', 'The valley through the window, with a single lamp on the far slope')))}">
+      <defs><radialGradient id="sg-lamp" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd98a" stop-opacity=".9"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/></radialGradient>
+      <linearGradient id="sg-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b1a"/><stop offset="1" stop-color="#18213d"/></linearGradient></defs>
+      <rect width="560" height="260" fill="url(#sg-sky)"/>${starfield(55, 40, 0, 0, 560, 130)}
+      <path d="M0 170 Q120 110 240 150 Q330 120 420 140 Q500 118 560 132 L560 260 L0 260 Z" fill="#0b0f1e"/>
+      <path d="M0 210 Q160 170 300 200 Q430 176 560 196 L560 260 L0 260 Z" fill="#05070f"/>
+      <g class="zhou-house"><path d="M386 146 l18 -14 l18 14 z" fill="#05070f"/><rect x="390" y="146" width="28" height="16" fill="#05070f"/>
+        <circle class="zhou-glow" cx="404" cy="153" r="22" fill="url(#sg-lamp)"/><rect class="zhou-lamp" x="400" y="149" width="8" height="7" fill="#ffd98a"/></g>
+      <rect x="0" y="0" width="560" height="260" fill="none" stroke="#3a2818" stroke-width="22"/><line x1="280" y1="0" x2="280" y2="260" stroke="#3a2818" stroke-width="8"/>
+    </svg>`;
   }
 
   root.Art = {
@@ -897,5 +1204,6 @@
     get lang() { return LANG; },
     scene, icon, emblemChip, poster, eyepiece, eyepieceStars, EYE_GROUND_CLEAR, bookshelf, gridSvg, note, plate,
     valvesSvg, mirrorsSvg, clockSvg, dialSvg, bottleSvg, esc,
+    photoSvg, photoScene, balanceSvg, musicBoxSvg, signalSvg,
   };
 }(typeof self !== 'undefined' ? self : this));

@@ -18,6 +18,7 @@ function rng(seed) {
 const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
 
 function allActions(s) {
+  const vet = s.mode === 'veteran';
   const acts = [];
   for (const h of E.visibleHotspots(s)) {
     acts.push(() => E.interact(s, h.id));
@@ -27,11 +28,15 @@ function allActions(s) {
   for (const r of G.roomOrder) acts.push(() => E.move(s, r));
   const answers = {
     drawer: [G.DRAWER_CODE, G.DRAWER_TRAP, '1234'], safe: [G.SAFE_CODE, '999'], trapdoor: [G.TRAPDOOR_CODE, '0000'],
-    pots: G.POTS.map(p => p.id), clock: [G.CLOCK_ANSWER, { h: 2, m: 15 }],
+    pots: (vet ? G.POTS_V : G.POTS).map(p => p.id), clock: [G.CLOCK_ANSWER, { h: 2, m: 15 }],
     valves: [VALVE_SOLUTION, { V1: true }], valves_set: [{ V2: true }, {}],
-    mirrors: [G.MIRROR_SOLUTIONS[0], G.MIRROR_GRID.initial, { A: '\\' }],
+    mirrors: vet ? [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial] : [G.MIRROR_SOLUTIONS[0], G.MIRROR_GRID.initial, { A: '\\' }],
+    skylight: [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial, null],
     dome: G.DIRECTIONS.map(d => d.id), dial: [G.DIAL_ANSWER, G.DIAL_ANSWER.slice().reverse()],
-    develop: [G.DEVELOP_ANSWER, ['red', 'blue', 'yellow', 'white']],
+    develop: vet ? [G.DEVELOP_ANSWER_V, G.DEVELOP_ANSWER] : [G.DEVELOP_ANSWER, ['red', 'blue', 'yellow', 'white']],
+    seedlock: [G.SEED_CODE, '473'], balance_set: [{ tin_moon: 'L', w2: 'L', w5: 'R' }, {}],
+    signal: [['.-.'], ['---', '...'], ['-.-', '...'], ['.-'], ['...']],
+    photos: [G.PHOTO_ORDER, G.PHOTO_ORDER.slice().reverse()], musicbox: [G.MUSIC_ANSWER, [1, 2, 3]],
     phone: ['refuse'], // 接受交易會直接結束遊戲，不在亂走範圍內
     exit: [],          // 離開也會結束遊戲
   };
@@ -42,7 +47,7 @@ function allActions(s) {
 // 通關者：從任意狀態出發，依序完成尚未完成的步驟，直到真結局。
 const F = (s, k) => !!s.flags[k];
 const has = (s, id) => s.inv.includes(id);
-const STEPS = [
+const COMMON_HEAD = [
   [s => !F(s, 'coatSearched'), 'foyer', s => E.interact(s, 'f_coat')],
   [s => !F(s, 'drawerOpen'), 'study', s => E.submit(s, 'drawer', G.DRAWER_CODE)],
   [s => has(s, 'flashlight_dead') && has(s, 'battery'), null, s => E.combine(s, 'flashlight_dead', 'battery')],
@@ -52,16 +57,34 @@ const STEPS = [
   [s => !F(s, 'chimneySearched') && has(s, 'flashlight'), 'study', s => E.useItem(s, 'flashlight', 's_fireplace')],
   [s => has(s, 'greenhouse_key'), 'foyer', s => E.useItem(s, 'greenhouse_key', 'f_gh_door')],
   [s => !F(s, 'trowelTaken'), 'greenhouse', s => E.interact(s, 'g_tools')],
+];
+const VETERAN_MIDDLE = [
+  [s => has(s, 'storeroom_key'), 'greenhouse', s => E.useItem(s, 'storeroom_key', 'g_storedoor')],
+  [s => !F(s, 'cabinetOpen') && has(s, 'paperweight'), 'storeroom', s => E.submit(s, 'seedlock', G.SEED_CODE)],
+  [s => has(s, 'hook_pole'), 'foyer', s => E.useItem(s, 'hook_pole', 'f_hatch')],
+  [s => !F(s, 'cardTaken') && F(s, 'atticOpen'), 'attic', s => E.interact(s, 'a_chest')],
+  [s => !F(s, 'photosTaken') && F(s, 'atticOpen'), 'attic', s => E.interact(s, 'a_photobox')],
+  [s => has(s, 'photos') && has(s, 'photo_comet'), 'attic', s => E.submit(s, 'photos', G.PHOTO_ORDER)],
+  [s => has(s, 'crank'), 'attic', s => E.useItem(s, 'crank', 'a_musicbox')],
+  [s => !F(s, 'zhouCalled') && F(s, 'storeroomOpen') && has(s, 'flashlight'), 'storeroom', s => E.submit(s, 'signal', ['.-.'])],
+  [s => F(s, 'zhouCalled') && !F(s, 'zhouReplied') && has(s, 'flashlight'), 'storeroom', s => E.submit(s, 'signal', ['---', '...'])],
+  [s => F(s, 'zhouReplied') && !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.POT_ANSWER_V)],
+  [s => !F(s, 'lightOk'), 'greenhouse', s => E.submit(s, 'skylight', G.MIRROR_SOLUTION_V)],
+  [s => F(s, 'crankInserted') && !F(s, 'musicSolved'), 'attic', s => E.submit(s, 'musicbox', G.MUSIC_ANSWER)],
+];
+const NOVICE_MIDDLE = [
   [s => !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.POT_ANSWER)],
   [s => !F(s, 'lightOk'), 'greenhouse', s => E.submit(s, 'mirrors', G.MIRROR_SOLUTIONS[0])],
+];
+const COMMON_TAIL = [
   [s => !F(s, 'trapdoorFound') && has(s, 'flashlight'), 'greenhouse', s => E.useItem(s, 'flashlight', 'g_bench')],
   [s => has(s, 'brass_key'), 'foyer', s => E.useItem(s, 'brass_key', 'f_gate')],
-  [s => !F(s, 'eyepieceFound') && has(s, 'flashlight'), 'observatory', s => E.useItem(s, 'flashlight', 'o_under')],
+  [s => !F(s, 'eyepieceFound') && has(s, 'flashlight') && F(s, 'gateOpen'), 'observatory', s => E.useItem(s, 'flashlight', 'o_under')],
   [s => has(s, 'eyepiece'), 'observatory', s => E.useItem(s, 'eyepiece', 'o_telescope')],
   [s => F(s, 'eyepieceInstalled') && !F(s, 'starDialSolved'), 'observatory', s => E.submit(s, 'dial', G.DIAL_ANSWER)],
-  [s => !F(s, 'transparencyTaken'), 'observatory', s => E.interact(s, 'o_cabinet')],
-  [s => !F(s, 'logBookmark'), 'observatory', s => E.interact(s, 'o_log')],
-  [s => !F(s, 'bulbTaken'), 'observatory', s => E.interact(s, 'o_lamp')],
+  [s => !F(s, 'cabinetSearched') && F(s, 'gateOpen'), 'observatory', s => E.interact(s, 'o_cabinet')],
+  [s => !F(s, 'logBookmark') && F(s, 'gateOpen'), 'observatory', s => E.interact(s, 'o_log')],
+  [s => !F(s, 'bulbTaken') && F(s, 'gateOpen'), 'observatory', s => E.interact(s, 'o_lamp')],
   [s => has(s, 'grid_paper') && has(s, 'transparency'), null, s => E.combine(s, 'grid_paper', 'transparency')],
   [s => has(s, 'note_left') && has(s, 'note_right'), null, s => E.combine(s, 'note_left', 'note_right')],
   [s => !F(s, 'clockSolved'), 'foyer', s => E.submit(s, 'clock', G.CLOCK_ANSWER)],
@@ -72,15 +95,19 @@ const STEPS = [
   [s => F(s, 'trapdoorFound') && !F(s, 'trapdoorOpen'), 'greenhouse', s => E.submit(s, 'trapdoor', G.TRAPDOOR_CODE)],
   [s => has(s, 'red_bulb') && F(s, 'trapdoorOpen'), 'darkroom', s => E.useItem(s, 'red_bulb', 'd_socket')],
   [s => F(s, 'darkroomLit') && !F(s, 'p4Taken'), 'darkroom', s => E.interact(s, 'd_line')],
-  [s => F(s, 'darkroomLit') && !F(s, 'plateDeveloped'), 'darkroom', s => E.submit(s, 'develop', G.DEVELOP_ANSWER)],
+  [s => F(s, 'darkroomLit') && !F(s, 'plateDeveloped'), 'darkroom', s => E.submit(s, 'develop', s.mode === 'veteran' ? G.DEVELOP_ANSWER_V : G.DEVELOP_ANSWER)],
   ...G.EMBLEMS.map(e => [s => has(s, e), 'foyer', s => E.useItem(s, e, 'f_door')]),
   [s => F(s, 'phoneRinging'), 'foyer', s => E.submit(s, 'phone', 'refuse')],
   [s => G.allInserted(s) && has(s, 'plate') && G.countPages(s) === 4, 'foyer', s => E.submit(s, 'exit', 'publish')],
 ];
+const STEPS = {
+  novice: [...COMMON_HEAD, ...NOVICE_MIDDLE, ...COMMON_TAIL],
+  veteran: [...COMMON_HEAD, ...VETERAN_MIDDLE, ...COMMON_TAIL],
+};
 
 function finish(s) {
-  for (let guard = 0; guard < 200 && !s.ending; guard++) {
-    const step = STEPS.find(([cond]) => cond(s));
+  for (let guard = 0; guard < 300 && !s.ending; guard++) {
+    const step = STEPS[s.mode].find(([cond]) => cond(s));
     if (!step) return { ok: false, why: '沒有可執行的下一步', s };
     const [, room, act] = step;
     if (room && s.room !== room) {
@@ -94,31 +121,34 @@ function finish(s) {
   return { ok: s.ending === 'B', why: '結局：' + s.ending, s };
 }
 
-test('從新遊戲直接交給通關者，會走到真結局 B', () => {
-  const r = finish(E.newState());
-  assert.ok(r.ok, r.why);
-});
+for (const mode of ['novice', 'veteran']) {
+  const tag = mode === 'veteran' ? '［資深］' : '［新手］';
+  test(`${tag}從新遊戲直接交給通關者，會走到真結局 B`, () => {
+    const r = finish(E.newState(mode));
+    assert.ok(r.ok, r.why);
+  });
 
-test('隨機亂走 400 次（每次最多 250 步）後，通關者都能打到真結局 B，且過程沒有任何例外', () => {
-  let totalSteps = 0;
-  for (let seed = 1; seed <= 400; seed++) {
-    const r = rng(seed * 7919);
-    const s = E.newState();
-    const len = 1 + Math.floor(r() * 250);
-    for (let i = 0; i < len; i++) {
-      const acts = allActions(s);
-      let res;
-      try { res = pick(r, acts)(); } catch (e) { assert.fail(`種子 ${seed} 第 ${i} 步拋出例外：${e.stack}`); }
-      assert.ok(res && Array.isArray(res.messages), '回傳格式錯誤');
-      const errs = E.validate(s);
-      assert.deepEqual(errs, [], `種子 ${seed} 第 ${i} 步後狀態不合法`);
-      totalSteps++;
+  test(`${tag}隨機亂走 400 次（每次最多 300 步）後，通關者都能打到真結局 B，且過程沒有任何例外`, () => {
+    let totalSteps = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const r = rng(seed * 7919 + (mode === 'veteran' ? 13 : 0));
+      const s = E.newState(mode);
+      const len = 1 + Math.floor(r() * 300);
+      for (let i = 0; i < len; i++) {
+        const acts = allActions(s);
+        let res;
+        try { res = pick(r, acts)(); } catch (e) { assert.fail(`種子 ${seed} 第 ${i} 步拋出例外：${e.stack}`); }
+        assert.ok(res && Array.isArray(res.messages), '回傳格式錯誤');
+        const errs = E.validate(s);
+        assert.deepEqual(errs, [], `種子 ${seed} 第 ${i} 步後狀態不合法`);
+        totalSteps++;
+      }
+      const done = finish(s);
+      assert.ok(done.ok, `種子 ${seed}：亂走 ${len} 步後無法通關（${done.why}）\n物品：${s.inv}\n旗標：${JSON.stringify(s.flags)}`);
     }
-    const done = finish(s);
-    assert.ok(done.ok, `種子 ${seed}：亂走 ${len} 步後無法通關（${done.why}）\n物品：${s.inv}\n旗標：${JSON.stringify(s.flags)}`);
-  }
-  assert.ok(totalSteps > 20000);
-});
+    assert.ok(totalSteps > 20000);
+  });
+}
 
 test('日記裝訂：任何殘頁組合、任何裝訂順序都不會遺失頁面', () => {
   const pages = G.PAGES;

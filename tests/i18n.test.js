@@ -96,15 +96,20 @@ test('美術：英文模式下，所有場景與謎題圖裡都沒有中文；�
   const Art = global.self.Art;
   global.self = prev;
   const all = Object.fromEntries(Object.keys({ greenhouseOpen: 1, phoneRinging: 1, trapdoorFound: 1, gateOpen: 1, clockSolved: 1, paintingMoved: 1, safeOpen: 1, lightOk: 1, waterOk: 1, wheelInstalled: 1, trapdoorOpen: 1, darkroomLit: 1, plateDeveloped: 1, inserted_emblem_sun: 1, eyepieceInstalled: 1, eyepieceFound: 1, starDialSolved: 1, bulbTaken: 1, moonTaken: 1, keyDug: 1, drawerOpen: 1 }).map(k => [k, true]));
+  Object.assign(all, { storeroomOpen: true, atticOpen: true, cabinetOpen: true, photosSolved: true, photosTaken: true, crankInserted: true, musicSolved: true });
   const states = [{}, all];
   const render = () => {
     const out = [];
-    for (const flags of states) {
+    for (const mode of ['novice', 'veteran']) for (const flags of states) {
       for (const room of G.roomOrder) {
-        const s = { room, flags, puz: { dome: 'SE' }, inv: [] };
-        out.push([`scene ${room}`, Art.scene(room, { s, vis: () => true, label: id => G.hotspots.find(h => h.id === id).name[Art.lang] })]);
+        const s = { room, flags, mode, puz: { dome: 'SE' }, inv: [] };
+        out.push([`scene ${mode} ${room}`, Art.scene(room, { s, vis: () => true, label: id => G.hotspots.find(h => h.id === id).name[Art.lang] })]);
       }
     }
+    for (const p of G.PHOTOS) out.push(['photo ' + p.id, Art.photoSvg(p) + Art.photoSvg(p, { back: true })]);
+    out.push(['balance', Art.balanceSvg({ tin_moon: 'L', w2: 'L', w5: 'R' }) + Art.balanceSvg({})], ['musicbox', Art.musicBoxSvg(3)], ['signal', Art.signalSvg()]);
+    out.push(['mirrors v', Art.mirrorsSvg(G.MIRROR_SOLUTION_V, { grid: G.MIRROR_GRID_V }) + Art.mirrorsSvg(G.MIRROR_GRID_V.initial, { grid: G.MIRROR_GRID_V, beam: false })]);
+    for (const b of G.BOTTLES_V) out.push(['bottle ' + b.id, Art.bottleSvg(b)]);
     out.push(['poster', Art.poster()], ['bookshelf', Art.bookshelf()], ['plate', Art.plate()]);
     for (const d of G.DIRECTIONS) out.push(['eyepiece ' + d.id, Art.eyepiece(d.id)]);
     for (const o of [{ digits: true }, { digits: false, stars: true }, { digits: true, stars: true }]) out.push(['grid', Art.gridSvg(o)]);
@@ -118,7 +123,7 @@ test('美術：英文模式下，所有場景與謎題圖裡都沒有中文；�
   assert.deepEqual(bad, []);
   Art.setLang('zh');
   const zh = render();
-  assert.ok(/書房/.test(zh.find(([k]) => k === 'scene foyer')[1]), '中文模式的門牌是中文');
+  assert.ok(/書房/.test(zh.find(([k]) => k === 'scene novice foyer')[1]), '中文模式的門牌是中文');
   assert.ok(zh.every(([, svg]) => !/undefined|\[object Object\]|NaN/.test(svg)));
   // 每個物品都有圖示
   for (const id of Object.keys(G.items)) assert.ok(/<(path|rect|circle|polygon|g)\b/.test(Art.icon(id)), id + ' 沒有圖示');

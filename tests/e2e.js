@@ -28,6 +28,29 @@ function ok(cond, msg) { if (!cond) throw new Error('檢查失敗：' + msg); }
 const X = (zh, en) => ({ zh, en });
 const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const ui = (key, lang, vars) => I.fmt(I.tr(I.UI[key], lang), vars);
+// 資深模式「剛爬上閣樓、拿了燈號卡與五張照片」的存檔碼：用引擎照玩家動作走出來，再編成存檔碼
+const VET_ATTIC_CODE = (() => {
+  const { makeGame } = require('./helpers');
+  const Store = require('../js/storage.js');
+  const P = makeGame('veteran');
+  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('s_desk'); P.use('flashlight', 's_fireplace'); P.go('foyer');
+  P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools');
+  P.use('storeroom_key', 'g_storedoor'); P.look('g_storedoor'); P.solve('seedlock', G.SEED_CODE);
+  P.go('foyer'); P.use('hook_pole', 'f_hatch'); P.look('f_hatch'); P.look('a_chest'); P.look('a_photobox');
+  return Store.encode(P.s);
+})();
+// 資深模式「三枚徽章到手、暗房紅燈已亮」的存檔碼
+const VET_DARKROOM_CODE = (() => {
+  const { makeGame, vetMainPath } = require('./helpers');
+  const Store = require('../js/storage.js');
+  const P = makeGame('veteran');
+  vetMainPath(P);
+  P.go('study'); P.look('s_waste'); P.go('observatory'); P.look('o_lamp'); P.combine('note_left', 'note_right');
+  P.go('greenhouse'); P.use('flashlight', 'g_bench'); P.solve('trapdoor', G.TRAPDOOR_CODE); P.look('g_trapdoor');
+  P.use('red_bulb', 'd_socket');
+  return Store.encode(P.s);
+})();
 
 async function setup(browser, lang, viewport = { width: 1280, height: 860 }) {
   // 用瀏覽器語言測試預設語言的偵測；之後仍透過標題畫面的語言按鈕確認一次
@@ -87,6 +110,10 @@ function player(page, lang) {
     },
     async shot(label) {
       await P.check(label);
+      // 等房間淡入之類的一次性動畫跑完（略過無限循環的動畫）
+      if (SHOTS) await page.evaluate(() => Promise.all(document.getAnimations()
+        .filter(a => a.effect && a.effect.getComputedTiming().iterations !== Infinity)
+        .map(a => a.finished.catch(() => {}))));
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${lang}-${String(++step).padStart(2, '0')}-${label}.png`) });
     },
     async obj(id) {
@@ -120,6 +147,13 @@ function player(page, lang) {
       const t = await page.locator('#modal-body .feedback').innerText();
       ok(x[lang].test(t), `回饋中沒有 ${x[lang]}：${t}`);
       await P.check('feedback ' + x[lang]);
+    },
+    async feedbackLacks(x) {
+      const t = await page.locator('#modal-body .feedback').innerText();
+      ok(!x[lang].test(t), `資深模式答錯時不應點破錯在哪（${x[lang]}）：${t}`);
+    },
+    async modalHasEnding(x, msg) {
+      ok(x[lang].test(await page.locator('#ending-card').innerText()), msg);
     },
     async modalHas(x, msg) {
       const t = await page.locator('#modal-body').innerText();
@@ -171,16 +205,25 @@ function player(page, lang) {
   return P;
 }
 
-async function newGame(P) {
+async function newGame(P, { mode = 'novice', tutorial = false } = {}) {
   const { page } = P;
   await page.click('#btn-new');
-  if (await page.locator('#btn-new').isVisible()) await page.click('#btn-new'); // 確認覆蓋自動存檔
+  ok(await P.modalOpen(), '「新遊戲」應先打開難度選擇');
+  await P.modalHas(X(/新手[\s\S]*資深/, /Novice[\s\S]*Veteran/), '兩種難度');
+  await P.check('mode');
+  const box = page.locator('#tut-toggle');
+  if ((await box.isChecked()) !== tutorial) await box.click();
+  await page.click(`#modal-body [data-mode="${mode}"]`);
   await P.check('intro');
   for (let i = 0; i < 6 && await page.locator('#intro').isVisible(); i++) await page.click('#btn-intro-next');
   ok(await P.modalOpen(), '開場後應該打開信');
   await P.modalHas(X(/三枚徽章/, /Three emblems/), '信的內容');
+  if (mode === 'veteran') await P.modalHas(X(/周伯/, /Old Zhou/), '資深模式的信提到周伯');
   await P.check('letter');
   await P.close();
+  const chip = (await page.locator('#chip-mode').innerText()).trim();
+  ok(chip === ui(mode === 'veteran' ? 'modeVeteran' : 'modeNovice', P.lang), `狀態列應顯示難度，實際「${chip}」`);
+  ok((await page.locator('#tutorial').isVisible()) === tutorial, tutorial ? '應出現操作教學' : '關掉教學時不應出現教學');
 }
 
 /* ---------- 各段流程（全部用介面操作） ---------- */
@@ -244,7 +287,7 @@ async function greenhouseAndGate(P) {
   await P.obj('f_gate');
 }
 
-async function observatory(P) {
+async function observatory(P, { vet = false } = {}) {
   const { page } = P;
   await P.obj('o_telescope');
   await P.said(X(/目鏡座是空的/, /eyepiece holder is empty/));
@@ -260,7 +303,7 @@ async function observatory(P) {
   await P.close();
   await P.obj('o_dial');
   await P.dial(['bird', 'boat', 'key']);  // 沒考慮倒像的答案
-  await P.feedback(X(/順序不對/, /order is wrong/));
+  await P.feedback(vet ? X(/^星盤紋絲不動。$/, /^The dial doesn't budge\.$/) : X(/順序不對/, /order is wrong/));
   await P.shot('dial-wrong');
   await P.dial(['key', 'boat', 'bird']);
   await P.said(X(/星徽/, /star emblem/));
@@ -268,12 +311,18 @@ async function observatory(P) {
   await P.obj('o_log'); await P.shot('obs-log'); await P.close();
   await P.obj('o_almanac'); await P.shot('almanac'); await P.close();
   await P.obj('o_lamp');
+  if (vet) return; // 資深模式的星圖膠片藏在閣樓的音樂盒裡
+  await overlay(P);
+}
+
+async function overlay(P) {
+  const { page } = P;
   await P.combine('grid_paper', 'transparency');
   await P.item('overlay'); await page.click('[data-detail=view]'); await P.shot('overlay'); await P.close();
   ok(!(await page.evaluate(() => document.body.classList.contains('holding'))), '查看之後物品不應仍拿在手上');
 }
 
-async function clockSafeValves(P) {
+async function clockSafeValves(P, { vet = false } = {}) {
   const { page } = P;
   await P.room('foyer');
   await P.obj('f_clock');
@@ -295,7 +344,8 @@ async function clockSafeValves(P) {
   await P.obj('g_valves');
   for (const v of ['V1', 'V2', 'V3', 'V4', 'V5']) await page.click(`#modal-body [data-valve="${v}"]`); // 全開
   await page.click('#modal-body [data-act=main]');
-  await P.feedback(X(/仙人掌/, /cactus/));
+  await P.feedback(vet ? X(/怪聲——不對/, /pipes groan — not right/) : X(/仙人掌/, /cactus/));
+  if (vet) await P.feedbackLacks(X(/仙人掌|蕨|蘭/, /cactus|fern|orchid/));
   await P.shot('valves-wrong');
   for (const v of ['V1', 'V3']) await page.click(`#modal-body [data-valve="${v}"]`); // 關掉 V1、V3
   await page.click('#modal-body [data-act=main]');
@@ -332,6 +382,325 @@ async function darkroom(P) {
   await P.said(X(/彗星/, /comet/));
   await P.shot('darkroom-lit');
   ok(await P.has('plate'), '底片');
+}
+
+/* ---------- 資深模式各段（全部用介面操作） ---------- */
+const NOT_RIGHT = X(/^不對。$/, /^That's not right\.$/);
+
+// 操作教學：第一步要真的點衣帽架；第五步在資深模式會說明第一階段沒有提示
+async function tutorial(P) {
+  const { page } = P;
+  const text = () => page.locator('#tut-text').innerText();
+  ok(await page.locator('#tutorial').isVisible(), '教學應出現');
+  ok((await text()) === ui('tut1', P.lang), '教學第一步');
+  ok(await page.locator('#tut-next').isHidden(), '第一步要真的點衣帽架，不能直接按下一步');
+  await P.shot('tutorial-1');
+  await page.click('#scene [data-hs="f_coat"]');
+  await P.said(X(/手電筒（沒電）/, /Flashlight \(Dead\)/));
+  ok((await text()) === ui('tut2', P.lang), '點了衣帽架之後前進到第二步');
+  for (const k of ['tut3', 'tut4', 'tut5']) {
+    await page.click('#tut-next');
+    const want = ui(k, P.lang) + (k === 'tut5' ? (P.lang === 'en' ? ' ' : '') + ui('tut5v', P.lang) : '');
+    ok((await text()) === want, `教學 ${k}：${await text()}`);
+  }
+  await page.waitForTimeout(300); // 等圈選框移動到位
+  const ring = await page.locator('#tut-ring').boundingBox(), btn = await page.locator('#btn-hints').boundingBox();
+  ok(Math.abs(ring.x + 6 - btn.x) < 2 && Math.abs(ring.y + 6 - btn.y) < 2, '第五步應圈出提示按鈕');
+  await P.shot('tutorial-5');
+  await page.click('#tut-next');
+  ok((await page.locator('#tut-next').innerText()).trim() === ui('tutDone', P.lang), '最後一步的按鈕是「開始」');
+  await page.click('#tut-next');
+  ok(await page.locator('#tutorial').isHidden(), '教學結束');
+}
+
+async function hintsLocked(P) {
+  const { page } = P;
+  ok((await page.locator('#hint-label').innerText()).trim() === ui('hintsBtnLocked', P.lang), '第一階段提示按鈕顯示鎖定');
+  await page.click('#btn-hints');
+  await P.modalHas(X(/第一階段不開放提示/, /no hints in the first stage/), '第一階段鎖定提示');
+  ok(await page.locator('#modal-body [data-hint]').count() === 0, '鎖定時沒有任何提示按鈕');
+  await P.shot('hints-locked');
+  await P.close();
+}
+
+async function vetStudy(P, { tutorialDone = true } = {}) {
+  const { page } = P;
+  if (!tutorialDone) await P.obj('f_coat');
+  await P.room('study');
+  await P.obj('s_shelf'); await P.close();
+  await P.obj('s_drawer');
+  await P.lockType('7135');
+  await P.feedback(X(/^鎖紋絲不動。$/, /^The lock doesn't budge\.$/));  // 資深模式不點破「數成了位置」
+  await P.feedbackLacks(X(/位置/, /position/));
+  await P.lockType('3751');
+  await P.said(X(/抽屜彈開/, /drawer springs open/));
+  ok(await P.has('photo_comet'), '資深模式的抽屜裡還有一張照片');
+  ok((await page.locator('#hint-label').innerText()).trim() === ui('hintsBtnLocked', P.lang), '燈還沒修好，第一階段還沒完成');
+  await P.combine('flashlight_dead', 'battery');
+  await P.said(X(/階段完成/, /Stage complete/));
+  ok(await page.locator('#btn-hints').evaluate(b => b.classList.contains('pulse')), '完成階段後提示按鈕會亮起來');
+  ok((await page.locator('#hint-label').innerText()).trim() === ui('hintsBtn', P.lang, { n: 2, total: 8 }), '提示按鈕顯示第 2/8 階段');
+  await page.click('#btn-hints');
+  await P.modalHas(X(/2\/8/, /2\/8/), '提示顯示目前階段');
+  await page.locator('#modal-body .hint.current [data-hint]').first().click();
+  ok(await page.locator('#modal-body .hint.current li').count() === 1, '目前階段的提示可以展開');
+  await P.shot('hints-stage2');
+  await P.close();
+  ok(!(await page.locator('#btn-hints').evaluate(b => b.classList.contains('pulse'))), '打開提示後按鈕不再閃');
+  await P.obj('s_desk');
+  ok(await P.has('paperweight'), '書桌上的紙鎮');
+  await P.obj('s_painting');
+  await P.use('flashlight', 's_fireplace');
+  ok(await P.has('storeroom_key'), '煙囪裡的儲物間鑰匙');
+}
+
+async function vetStoreroom(P) {
+  const { page } = P;
+  await P.room('foyer');
+  await P.use('greenhouse_key', 'f_gh_door');
+  await P.obj('f_gh_door');
+  await P.obj('g_tools');
+  await P.obj('g_rules'); await P.close();
+  await P.obj('g_storedoor');
+  await P.said(X(/閒人勿進/, /Keep out/));
+  await P.use('storeroom_key', 'g_storedoor');
+  await P.obj('g_storedoor');
+  ok((await page.locator('#room-name').innerText()).trim() === G.rooms.storeroom.name[P.lang], '進入儲物間');
+  await P.shot('storeroom');
+  await P.obj('t_calendar'); await P.shot('calendar'); await P.close();
+  await P.obj('t_balance');
+  ok(await page.locator('#modal-body .notice').count() === 0, '帶著紙鎮時不應提示缺砝碼');
+  const pan = async (id, side) => page.click(`#modal-body [data-pan="${id}:${side}"]`);
+  // 先比兩罐：蕨 vs 月 → 蕨重；再用砝碼秤出月＝3
+  await pan('tin_fern', 'L'); await pan('tin_moon', 'R');
+  await pan('tin_fern', ''); await pan('tin_moon', '');
+  await pan('tin_moon', 'L'); await pan('w2', 'L'); await pan('w5', 'R');
+  await P.shot('balance');
+  await page.click('#modal-body [data-act=clear]');
+  ok(await page.locator('#modal-body [data-pan$=":L"].cur').count() === 0, '清空天平');
+  await page.click('#modal-body [data-act=cabinet]');
+  await P.lockType('473');
+  await P.feedback(X(/^鎖紋絲不動。$/, /^The lock doesn't budge\.$/));
+  await P.lockType(G.SEED_CODE);
+  ok(await P.has('hook_pole'), '種子櫃裡的鉤桿');
+  await P.close();
+  await P.obj('t_window');
+  await P.modalHas(X(/燈號/, /Signal/), '帶著手電筒時小窗打開燈號畫面');
+  await P.close();
+}
+
+async function vetAttic(P) {
+  const { page } = P;
+  await P.room('foyer');
+  await P.obj('f_hatch');
+  await P.said(X(/搆不著/, /far too high/));
+  await P.use('hook_pole', 'f_hatch');
+  await P.obj('f_hatch');
+  ok((await page.locator('#room-name').innerText()).trim() === G.rooms.attic.name[P.lang], '爬上閣樓');
+  await P.shot('attic');
+  await P.obj('a_chest');
+  ok(await P.has('code_card'), '燈號卡');
+  await P.obj('a_photobox'); await P.close();
+  ok(await P.has('photos'), '五張照片');
+  await P.obj('a_marks'); await P.shot('height-marks'); await P.close();
+  await P.obj('a_window');
+  await P.obj('a_frame');
+  await page.click('#modal-body [data-act=flip]');
+  await P.shot('photos-backs');
+  await page.click('#modal-body [data-act=flip]');
+  for (const id of ['ph_a', 'ph_b', 'ph_c', 'ph_d', 'ph_e', 'ph_f']) await page.click(`#modal-body .tray [data-photo="${id}"]`);
+  await page.click('#modal-body [data-slot="0"]');           // 取下一張再掛回去
+  ok(await page.locator('#modal-body .tray [data-photo="ph_a"]').count() === 1, '取下的照片回到下方');
+  await page.click('#modal-body .tray [data-photo="ph_a"]');
+  await page.click('#modal-body [data-act=hang]');
+  await P.feedback(X(/毫無動靜。不對。/, /don't react\. Not right\./));
+  await page.click('#modal-body [data-act=clear]');
+  for (const id of G.PHOTO_ORDER) await page.click(`#modal-body .tray [data-photo="${id}"]`);
+  await P.shot('photos');
+  await page.click('#modal-body [data-act=hang]');
+  ok(await P.has('crank') && await P.has('qing_letter'), '相框後的發條鑰匙與晴的信');
+  await P.use('crank', 'a_musicbox');
+  await P.obj('a_musicbox');
+  for (const k of ['1', '2', '3']) await page.keyboard.press(k);
+  await page.click('#modal-body [data-act=play]');
+  await P.feedback(X(/什麼也沒發生。不對。/, /nothing happens\. Not right\./));
+  await page.click('#modal-body [data-act=letter]');
+  await P.shot('qing-letter');
+  await page.click('#modal-back-btn');
+  await P.close();
+}
+
+async function sendSignal(P, words) {
+  const { page } = P;
+  for (let i = 0; i < words.length; i++) {
+    for (const ch of words[i]) await page.click(`#modal-body [data-sig="${ch}"]`);
+    if (i < words.length - 1) await page.click('#modal-body [data-act=next]');
+  }
+  await page.click('#modal-body [data-act=send]');
+}
+
+async function vetSignal(P) {
+  const { page } = P;
+  await P.room('storeroom');
+  await P.obj('t_window');
+  const reply = () => page.locator('#modal-body .sig-line.reply .sig-code').innerText();
+  await sendSignal(P, ['---', '...']);                 // 還沒先表明身分就問
+  await P.feedback(X(/一動也不動/, /doesn't stir/));
+  ok(await page.locator('#modal-body .sig-line.reply').count() === 0, '周伯還沒回應');
+  await sendSignal(P, ['.-.']);                         // 晴
+  ok((await reply()) === '··', '周伯回「好」');
+  await sendSignal(P, ['---', '---']);                  // 看不懂的話
+  ok((await reply()) === '···', `周伯回「?」：${await reply()}`);
+  await sendSignal(P, ['---', '...']);                  // 花盆？
+  ok((await reply()) === G.ZHOU_REPLY.pot.map(w => G.SIGNAL_OF[w]).map(c => c.replace(/\./g, '·').replace(/-/g, '—')).join(' / '), `周伯回答花盆：${await reply()}`);
+  await P.shot('signal');
+  await page.click('#modal-body [data-act=card]');
+  await P.shot('code-card');
+  await page.click('#modal-back-btn');
+  await sendSignal(P, ['-.-', '...']);                  // 鑰匙？
+  ok((await reply()) === G.ZHOU_REPLY.key.map(w => G.SIGNAL_OF[w]).map(c => c.replace(/\./g, '·').replace(/-/g, '—')).join(' / '), '周伯回答鑰匙');
+  await P.close();
+}
+
+async function vetGreenhouse(P) {
+  const { page } = P;
+  await P.room('greenhouse');
+  await P.obj('g_pots');
+  ok(await page.locator('#modal-body [data-pot]').count() === 8, '資深模式有八個花盆');
+  await P.shot('pots8');
+  await page.click('#modal-body [data-pot="mint"]');
+  await P.feedback(X(/什麼也沒有/, /Nothing but roots/));
+  await page.click(`#modal-body [data-pot="${G.POT_ANSWER_V}"]`);
+  await P.said(X(/黃銅鑰匙/, /a brass key/));
+  await P.obj('g_mirrors');
+  const beam = () => page.locator('#modal-body .beam').count();
+  ok(await beam() === 0, '資深模式拉開天窗前看不到光路');
+  await page.click('#modal-body [data-act=skylight]');
+  await P.feedback(X(/不對/, /Not right/));
+  ok(await beam() > 0, '拉開天窗後看得到這一次的光路');
+  await P.shot('mirrors16-reveal');
+  const cfg = Object.assign({}, G.MIRROR_GRID_V.initial);
+  for (const id of Object.keys(G.MIRROR_SOLUTION_V)) {
+    if (G.MIRROR_SOLUTION_V[id] !== cfg[id]) await page.click(`#modal-body [data-mirror="${id}"]`);
+  }
+  ok(await beam() === 0, '動了鏡子之後光路消失');
+  await page.click('#modal-body [data-act=skylight]');
+  await P.said(X(/月光花/, /moonflower/));
+  await P.obj('g_mirrors'); await P.shot('mirrors16-solved'); await P.close();
+  await P.use('flashlight', 'g_bench');
+  await P.room('foyer');
+  await P.use('brass_key', 'f_gate');
+  await P.obj('f_gate');
+}
+
+async function vetMusic(P) {
+  const { page } = P;
+  await P.room('attic');
+  await P.obj('a_musicbox');
+  for (const n of G.MUSIC_ANSWER) await page.click(`#modal-body [data-tine="${n}"]`);
+  await P.shot('musicbox');
+  await page.click('#modal-body [data-act=play]');
+  ok(await P.has('transparency') && await P.has('page2'), '音樂盒裡的星圖膠片與日記第二頁');
+  await overlay(P);
+}
+
+async function vetDarkroom(P, { dryingLine = true } = {}) {
+  const { page } = P;
+  await P.room('study');
+  await P.obj('s_waste');
+  await P.room('observatory');
+  await P.obj('o_log'); await P.close();
+  await P.combine('note_left', 'note_right');
+  await P.room('greenhouse');
+  await P.obj('g_trapdoor');
+  await P.lockType('1208');
+  await P.obj('g_trapdoor');
+  await P.use('red_bulb', 'd_socket');
+  if (dryingLine) await P.obj('d_line');
+  await P.obj('d_chart'); await P.shot('process-chart'); await P.close();
+  await P.obj('d_shelf'); await P.shot('bottle-card-v'); await P.close();
+  await P.obj('d_tray');
+  ok(await page.locator('#modal-body [data-bottle]').count() === 8, '資深模式有八瓶藥劑');
+  for (const b of ['red', 'blue', 'yellow', 'white', 'green', 'black', 'orange', 'purple']) await page.click(`#modal-body [data-bottle="${b}"]`);
+  await page.click('#modal-body [data-act=go]');
+  await P.feedback(X(/一片模糊。不對。/, /just a blur\. Not right\./));
+  for (const b of G.DEVELOP_ANSWER_V) await page.click(`#modal-body [data-bottle="${b}"]`);
+  await P.shot('develop8');
+  await page.click('#modal-body [data-act=go]');
+  await P.said(X(/彗星/, /comet/));
+  ok(await P.has('plate'), '底片');
+}
+
+/* ---------- 資深模式：五個結局 ---------- */
+async function vetRun(browser, lang) {
+  const results = [];
+  const page = await setup(browser, lang);
+  const P = player(page, lang);
+  await newGame(P, { mode: 'veteran', tutorial: true });
+  await tutorial(P);
+  await hintsLocked(P);
+  await vetStudy(P);
+  await vetStoreroom(P);
+  await vetAttic(P);
+  await vetSignal(P);
+  await vetGreenhouse(P);
+  await observatory(P, { vet: true });
+  await vetMusic(P);
+  await clockSafeValves(P, { vet: true });
+  // 欄位三：三枚徽章到手、還沒進暗房 → 之後走普通結局 A
+  await page.click('#btn-save'); await page.click('#modal-body [data-save="3"]'); await P.close();
+  await vetDarkroom(P, { dryingLine: false });
+  // 欄位二：底片到手、但沒拿晾片繩上的日記四 → 之後走孤證 C
+  await page.click('#btn-save'); await page.click('#modal-body [data-save="2"]'); await P.close();
+  await P.obj('d_line');                                 // 還在暗房裡：補拿晾片繩上的日記四
+  await P.combine('page1', 'page2');
+  await P.combine('diary', 'page3');
+  await P.combine('diary', 'page4');
+  ok(/4\/4/.test(await page.locator('#inventory').innerText()), '日記 4/4');
+  await P.item('plate'); await page.click('[data-detail=view]'); await P.close();
+  await P.room('foyer');
+  await P.obj('f_phone');
+  await page.click('#modal-body [data-act=later]');
+  await insertEmblems(P);
+  await exitWith(P, 'publish', 'B');
+  await P.modalHasEnding(X(/周伯/, /Zhou/), '資深模式的真結局提到周伯');
+  ok((await page.locator('.stats').innerText()).includes(ui('modeVeteran', lang)), '結局統計顯示資深');
+  results.push('B');
+  await page.click('#btn-preend');
+  await exitWith(P, 'leave_plate', 'E');
+  results.push('E');
+  await page.click('#btn-preend');
+  await P.obj('f_phone');
+  await page.click('#modal-body [data-act=accept]');
+  await page.click('#modal-body [data-act=yes]');
+  await page.waitForSelector('#ending:not([hidden])');
+  ok(await page.locator('.ending-title').innerText() === G.endings.D.title[lang], '結局 D');
+  results.push('D');
+  // 讀欄位二 → 孤證 C
+  await page.click('#btn-end-title');
+  await page.click('#btn-load');
+  await page.click('#modal-body [data-load="2"]');
+  ok(await P.has('plate') && !(await P.has('page4')), '欄位二：有底片、沒有日記四');
+  ok((await page.locator('#chip-mode').innerText()).trim() === ui('modeVeteran', lang), '讀檔後仍是資深模式');
+  await P.room('foyer');
+  await insertEmblems(P);
+  await exitWith(P, 'publish', 'C');
+  results.push('C');
+  // 讀欄位三 → 普通結局 A
+  await page.click('#btn-end-title');
+  await page.click('#btn-load');
+  await page.click('#modal-body [data-load="3"]');
+  ok(!(await P.has('plate')), '欄位三：還沒有底片');
+  await P.room('foyer');
+  await insertEmblems(P);
+  await exitWith(P, 'leave', 'A');
+  results.push('A');
+  await page.click('#btn-end-gallery');
+  ok(await page.locator('#modal-body .badge-vet').count() === 5, '圖鑑上五個結局都有資深徽記');
+  await P.shot('gallery-veteran');
+  await P.close();
+  await page.context().close();
+  return results;
 }
 
 async function insertEmblems(P) {
@@ -487,6 +856,8 @@ async function keyboardRun(browser, lang) {
   const name = id => G.hotspots.find(h => h.id === id).name[lang];
   const label = () => page.evaluate(() => { const a = document.activeElement; return (a.getAttribute('aria-label') || a.textContent || '').trim(); });
   await page.focus('#btn-new'); await page.keyboard.press('Enter');
+  ok((await label()) === ui('modeStart', lang, { mode: ui('modeNovice', lang) }), '鍵盤：難度選擇的焦點預設在「新手」');
+  await page.keyboard.press('Enter');
   for (let i = 0; i < 4; i++) await page.keyboard.press('Enter');
   ok(await page.locator('#modal-back').isVisible(), '鍵盤：開場後打開信');
   await page.keyboard.press('Escape');
@@ -528,6 +899,44 @@ async function mobileRun(browser, lang) {
   await page.click('#btn-menu');
   await P.noHorizontalScroll('手機選單');
   await P.shot('mobile-menu');
+  await P.close();
+  // 資深模式的新畫面：用「存檔碼匯入」載入一個剛上閣樓的進度（玩家也能這樣接續別台裝置的進度）
+  await page.click('#btn-save');
+  await page.fill('#code-in', VET_ATTIC_CODE);
+  await page.click('#modal-body [data-act=import]');
+  ok(!(await P.modalOpen()) && (await page.locator('#chip-mode').innerText()).trim() === ui('modeVeteran', lang), '匯入資深模式的存檔碼');
+  const view = async (label, open, more) => {
+    await open();
+    await P.noHorizontalScroll('手機' + label);
+    if (more) await more();
+    await P.shot('mobile-' + label);
+    await P.close();
+  };
+  ok((await page.locator('#room-name').innerText()).trim() === G.rooms.attic.name[lang], '存檔碼的進度停在閣樓');
+  await view('photos', () => P.obj('a_frame'), async () => {
+    for (const id of G.PHOTO_ORDER) await page.click(`#modal-body .tray [data-photo="${id}"]`);
+    await P.noHorizontalScroll('手機相框（掛滿）');
+    await P.shot('mobile-photos-full');
+    await page.click('#modal-body [data-act=hang]');
+  });
+  ok(await P.has('crank'), '手機上也能掛好照片');
+  await P.use('crank', 'a_musicbox');
+  await view('musicbox', () => P.obj('a_musicbox'));
+  await P.room('storeroom');
+  await view('balance', () => P.obj('t_balance'));
+  await view('signal', () => P.obj('t_window'), () => sendSignal(P, ['.-.']));
+  await P.room('greenhouse');
+  await view('pots8', () => P.obj('g_pots'));
+  await view('mirrors16', () => P.obj('g_mirrors'), () => page.click('#modal-body [data-act=skylight]'));
+  await page.click('#btn-hints');
+  await P.noHorizontalScroll('手機提示');
+  await P.shot('mobile-hints');
+  await P.close();
+  await page.click('#btn-save');
+  await page.fill('#code-in', VET_DARKROOM_CODE);
+  await page.click('#modal-body [data-act=import]');
+  ok((await page.locator('#room-name').innerText()).trim() === G.rooms.darkroom.name[lang], '存檔碼的進度停在暗房');
+  await view('develop8', () => P.obj('d_tray'));
   await page.context().close();
 }
 
@@ -572,15 +981,18 @@ async function switchRun(browser) {
   const summary = [];
   for (const lang of LANGS) {
     const results = await fullRun(browser, lang);
+    const vet = await vetRun(browser, lang);
     await keyboardRun(browser, lang);
     await mobileRun(browser, lang);
-    const missing = ['A', 'B', 'C', 'D', 'E'].filter(e => !results.includes(e));
-    if (missing.length) { console.error(`[${lang}] 沒有走到的結局：`, missing); process.exit(1); }
-    summary.push(`${lang}：${results.join('、')}`);
+    for (const [m, got] of [['novice', results], ['veteran', vet]]) {
+      const missing = ['A', 'B', 'C', 'D', 'E'].filter(e => !got.includes(e));
+      if (missing.length) { console.error(`[${lang}/${m}] 沒有走到的結局：`, missing); process.exit(1); }
+    }
+    summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}`);
   }
   if (LANGS.length > 1) await switchRun(browser);
   await browser.close();
   console.log(`走完的結局 ${summary.join('；')}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);
   if (errors.length) { console.error('主控台錯誤：', errors); process.exit(1); }
-  console.log(`端對端測試通過：${LANGS.join(' / ')} 兩種語言都能只靠介面操作玩到五個結局；英文畫面沒有任何中文，主控台沒有錯誤。`);
+  console.log(`端對端測試通過：${LANGS.join(' / ')}${LANGS.length > 1 ? ' 兩種語言' : ''}、新手與資深兩種難度，都能只靠介面操作玩到五個結局；英文畫面沒有任何中文，主控台沒有錯誤。`);
 })().catch(e => { console.error(e); console.error('主控台錯誤：', errors); process.exit(1); });

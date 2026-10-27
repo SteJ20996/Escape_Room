@@ -5,12 +5,14 @@ const assert = require('node:assert/strict');
 const { G, makeGame, VALVE_SOLUTION } = require('./helpers');
 const { textProblem } = require('./solver');
 
-function recorder() {
-  const P = makeGame();
+const forMode = (h, mode) => !h.mode || h.mode === mode;
+
+function recorder(mode) {
+  const P = makeGame(mode);
   const seen = new Set();
   const check = () => {
     for (const h of G.hints) {
-      if (!h.avail(P.s) || h.done(P.s)) continue;
+      if (!forMode(h, P.s.mode) || !h.avail(P.s) || h.done(P.s)) continue;
       seen.add(h.id);
       h.texts.forEach((t, i) => {
         const text = typeof t === 'function' ? t(P.s) : t;
@@ -71,7 +73,7 @@ test('完整玩一遍時，每一個提示都會在某個時刻出現，且三�
   P.solve('develop', G.DEVELOP_ANSWER);
   P.go('foyer'); P.solve('phone', 'refuse');
   for (const e of G.EMBLEMS) P.use(e, 'f_door');
-  const missing = G.hints.map(h => h.id).filter(id => !seen.has(id));
+  const missing = G.hints.filter(h => forMode(h, 'novice')).map(h => h.id).filter(id => !seen.has(id));
   assert.deepEqual(missing, []);
   assert.equal(P.solve('exit', 'publish').ending, 'B');
 });
@@ -84,4 +86,72 @@ test('「還沒看過的地方」最後會全部看完而消失', () => {
   for (const id of ['s_shelf', 's_drawer', 's_clipping', 's_desk', 's_painting', 's_waste']) P.look(id);
   P.go('foyer'); P.look('f_clock');
   assert.ok(!P.E.hintList(P.s).some(h => h.id === 'explore'), '門廳與書房都看完了，而其他房間還鎖著');
+});
+
+/* ================= 資深模式 ================= */
+
+test('［資深］完整玩一遍時，每一個資深提示都會在某個時刻出現，且三段文字都有內容', () => {
+  const { P, seen } = recorder('veteran');
+  P.look('f_coat');
+  P.go('study'); P.look('s_shelf'); P.look('s_clipping'); P.look('s_drawer');
+  P.solve('drawer', G.DRAWER_CODE);
+  P.combine('flashlight_dead', 'battery');
+  P.look('s_desk'); P.look('s_painting'); P.look('s_waste');
+  P.go('foyer'); P.look('f_clock'); P.look('f_hatch');
+  P.use('greenhouse_key', 'f_gh_door');
+  P.go('greenhouse'); P.look('g_valves'); P.look('g_pots'); P.look('g_tools'); P.look('g_storedoor');
+  P.go('study'); P.use('flashlight', 's_fireplace');
+  P.go('greenhouse'); P.use('storeroom_key', 'g_storedoor');
+  P.go('storeroom'); P.look('t_balance'); P.look('t_cabinet'); P.look('t_calendar');
+  P.solve('seedlock', G.SEED_CODE);
+  P.go('foyer'); P.use('hook_pole', 'f_hatch');
+  P.go('attic'); P.look('a_chest'); P.look('a_photobox'); P.look('a_marks');
+  P.solve('photos', G.PHOTO_ORDER);
+  P.use('crank', 'a_musicbox');
+  P.go('storeroom'); P.solve('signal', ['.-.']); P.solve('signal', ['---', '...']);
+  P.go('greenhouse'); P.solve('pots', G.POT_ANSWER_V);
+  P.use('flashlight', 'g_bench');
+  P.go('foyer'); P.use('brass_key', 'f_gate');
+  P.go('observatory'); P.look('o_telescope'); P.look('o_dial'); P.look('o_poster');
+  P.use('flashlight', 'o_under'); P.use('eyepiece', 'o_telescope');
+  P.solve('dome', 'SE'); P.solve('dial', G.DIAL_ANSWER);
+  P.look('o_cabinet'); P.look('o_log'); P.look('o_almanac'); P.look('o_lamp');
+  P.go('attic'); P.solve('musicbox', G.MUSIC_ANSWER);
+  P.combine('grid_paper', 'transparency'); P.combine('note_left', 'note_right');
+  P.go('foyer'); P.solve('clock', G.CLOCK_ANSWER);
+  P.go('study'); P.solve('safe', G.SAFE_CODE);
+  P.go('greenhouse'); P.solve('skylight', G.MIRROR_SOLUTION_V);
+  P.use('valve_wheel', 'g_valves'); P.solve('valves', VALVE_SOLUTION);
+  P.look('g_moonflower');
+  P.solve('trapdoor', G.TRAPDOOR_CODE); P.go('darkroom');
+  P.use('red_bulb', 'd_socket'); P.look('d_shelf'); P.look('d_chart'); P.look('d_line');
+  P.solve('develop', G.DEVELOP_ANSWER_V);
+  P.go('foyer'); P.solve('phone', 'refuse');
+  for (const e of G.EMBLEMS) P.use(e, 'f_door');
+  const missing = G.hints.filter(h => forMode(h, 'veteran')).map(h => h.id).filter(id => !seen.has(id));
+  assert.deepEqual(missing, []);
+  assert.equal(P.solve('exit', 'publish').ending, 'B');
+});
+
+test('［資深］提示不會預告還沒發現的閣樓、儲物間或周伯', () => {
+  const { P } = recorder('veteran');
+  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  const titles = () => P.E.hintList(P.s).map(h => h.title.zh + h.title.en).join(' ');
+  assert.ok(!/閣樓|儲物間|周伯|Attic|Storeroom|Zhou/.test(titles()), titles());
+  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.go('greenhouse'); P.look('g_storedoor');
+  assert.ok(P.E.hintList(P.s).some(h => h.id === 'storeroom'));
+  assert.ok(!/閣樓|周伯|Attic|Zhou/.test(titles()), titles());
+});
+
+test('［資深］提示依階段分組：目前階段的提示排在最前面', () => {
+  const { P } = recorder('veteran');
+  P.look('f_coat'); P.go('study'); P.look('s_drawer'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('s_painting'); // 保險箱屬於之後的階段
+  const list = P.E.hintList(P.s);
+  assert.equal(P.E.stage(P.s).id, 'greenhouse');
+  const safe = list.find(h => h.id === 'safe');
+  const gh = list.find(h => h.id === 'greenhouse');
+  assert.equal(safe.group, 'other');
+  assert.equal(gh.group, 'current');
+  assert.ok(list.indexOf(gh) < list.indexOf(safe));
 });

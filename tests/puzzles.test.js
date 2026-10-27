@@ -150,3 +150,161 @@ function permute(arr) {
   if (arr.length <= 1) return [arr];
   return arr.flatMap((x, i) => permute(arr.filter((_, j) => j !== i)).map(p => [x, ...p]));
 }
+
+/* ================= 資深模式 ================= */
+
+test('資深・八盆證詞：周伯說「兩句為真」時答案唯一；不問周伯則無法確定', () => {
+  const count = k => G.POTS_V.filter(p => p.truth(k)).length;
+  const byCount = {};
+  for (let k = 1; k <= 8; k++) (byCount[count(k)] = byCount[count(k)] || []).push(k);
+  const answer = G.POTS_V.find(p => p.id === G.POT_ANSWER_V).n;
+  assert.deepEqual(byCount[G.POT_TRUE_COUNT_V], [answer]);
+  // 若不知道句數：至少還有兩種句數各自指向另一個盆，所以必須先問周伯
+  const otherSingles = Object.entries(byCount).filter(([c, ks]) => +c !== G.POT_TRUE_COUNT_V && ks.length === 1);
+  assert.ok(otherSingles.length >= 2, JSON.stringify(byCount));
+  // 盆的編號 1～8 依序排列
+  assert.deepEqual(G.POTS_V.map(p => p.n), [1, 2, 3, 4, 5, 6, 7, 8]);
+});
+
+test('資深・燈號：每個燈號只代表一個字；周伯的回覆解讀為「盆、真、2、句」，與花盆的真話句數一致', () => {
+  const codes = Object.keys(G.SIGNAL_CODE);
+  assert.equal(new Set(Object.values(G.SIGNAL_CODE)).size, codes.length);
+  assert.ok(codes.every(c => /^[.-]+$/.test(c)));
+  assert.deepEqual(G.ZHOU_REPLY.pot, ['pot', 'true', String(G.POT_TRUE_COUNT_V), 'sayings']);
+  // 燈號卡上列出了回覆裡出現的每一個字與數字（兩種語言）
+  for (const lang of ['zh', 'en']) {
+    const card = G.docs.code_card.body[lang].join('\n');
+    for (const w of [...G.ZHOU_REPLY.pot, ...G.ZHOU_REPLY.call, 'qing', 'ask']) assert.ok(card.includes(G.signalText([w])), `${lang}：卡片缺少 ${w}`);
+    assert.ok(card.includes(lang === 'zh' ? '儲物間' : 'storeroom'), '卡片指出要從儲物間的窗打燈號');
+  }
+});
+
+test('資深・十六面鏡子：65536 種組合中，照得到月光花的光路只有一條（經過 13 面鏡子，另 3 面是干擾）', () => {
+  const g = G.MIRROR_GRID_V;
+  assert.equal(g.mirrors.length, 16);
+  const ids = g.mirrors.map(m => m.id);
+  const hits = [];
+  for (let mask = 0; mask < 1 << ids.length; mask++) {
+    const cfg = {};
+    ids.forEach((id, i) => { cfg[id] = (mask >> i) & 1 ? '\\' : '/'; });
+    if (G.traceBeam(cfg, g).hit) hits.push(cfg);
+  }
+  const path = G.MIRROR_PATH_V;
+  assert.equal(Object.keys(path).length, 13);
+  assert.equal(hits.length, 2 ** (16 - 13), '干擾鏡怎麼擺都可以，其餘必須唯一');
+  for (const cfg of hits) for (const id of Object.keys(path)) assert.equal(cfg[id], path[id]);
+  assert.equal(G.traceBeam(g.initial, g).hit, false, '初始狀態照不到');
+  const beam = G.traceBeam(G.MIRROR_SOLUTION_V, g).path;
+  assert.ok(!beam.some(p => g.blocks.some(b => b.c === p.c && b.r === p.r)));
+});
+
+function permute(arr) {
+  if (arr.length <= 1) return [arr];
+  return arr.flatMap((x, i) => permute(arr.filter((_, j) => j !== i)).map(p => [x, ...p]));
+}
+
+const CHEMS_V = ['presoak', 'developer', 'stop', 'fixer', 'toner', 'hypo', 'water', 'wetting'];
+function bottleRuleHolds(r, P) {
+  const caps = G.BOTTLES_V.map(b => b.id);
+  const pos = ch => P.indexOf(ch);
+  switch (r.k) {
+    case 'half': return pos(r.a) >= 4;
+    case 'notCaps': return !r.caps.includes(caps[pos(r.a)]);
+    case 'adjacent': return Math.abs(pos(r.a) - pos(r.b)) === 1;
+    case 'notAdjacent': return Math.abs(pos(r.a) - pos(r.b)) > 1;
+    case 'immLeft': return pos(r.a) + 1 === pos(r.b);
+    case 'leftOf': return pos(r.a) < pos(r.b);
+    case 'gap': return Math.abs(pos(r.a) - pos(r.b)) === r.between + 1;
+  }
+  throw new Error(r.k);
+}
+
+test('資深・八瓶藥劑：40320 種排列中只有一種符合卡片的八條規則，而且每一條都不可省略', () => {
+  const all = permute(CHEMS_V);
+  const fits = rules => all.filter(P => rules.every(r => bottleRuleHolds(r, P)));
+  const sol = fits(G.BOTTLE_RULES_V);
+  assert.equal(sol.length, 1);
+  assert.deepEqual(sol[0], G.BOTTLES_V.map(b => b.content));
+  G.BOTTLE_RULES_V.forEach((r, i) => {
+    assert.ok(fits(G.BOTTLE_RULES_V.filter((_, j) => j !== i)).length > 1, `第 ${i + 1} 條規則是多餘的`);
+  });
+  assert.equal(G.docs.bottle_card_v.body.zh.length, 1 + G.BOTTLE_RULES_V.length);
+});
+
+test('資深・沖洗順序：便條的四步加上流程表的四條，八種藥劑的順序唯一；只看便條則無法確定', () => {
+  const core = ['developer', 'stop', 'fixer', 'water'];
+  const coreOk = P => core.every((c, i) => i === 0 || P.indexOf(core[i - 1]) < P.indexOf(c));
+  const ruleOk = (r, P) => {
+    const at = ch => P.indexOf(ch);
+    switch (r.k) {
+      case 'before': return at(r.a) < at(r.b);
+      case 'immAfter': return at(r.a) === at(r.b) + 1;
+      case 'between': return at(r.a) > at(r.after) && at(r.a) < at(r.before);
+      case 'last': return at(r.a) === P.length - 1;
+    }
+    throw new Error(r.k);
+  };
+  const all = permute(CHEMS_V).filter(coreOk);
+  const sol = all.filter(P => G.PROCESS_RULES_V.every(r => ruleOk(r, P)));
+  assert.equal(sol.length, 1);
+  assert.deepEqual(sol[0], G.DEVELOP_SEQUENCE_V);
+  assert.ok(all.length > 1);
+  // 便條上的基本順序，就是新手模式的那四步
+  assert.deepEqual(core, G.DEVELOP_SEQUENCE);
+  assert.deepEqual(G.DEVELOP_ANSWER_V, G.DEVELOP_SEQUENCE_V.map(c => G.BOTTLES_V.find(b => b.content === c).id));
+});
+
+test('資深・天平：有了 5 兩紙鎮，三罐的重量才能唯一確定；密碼照園丁守則的順序', () => {
+  // 觀察：天平兩邊任意擺放（每樣東西放左、放右或不放），記下每次的傾向。
+  const truth = Object.fromEntries(G.TINS.map(t => [t.id, t.w]));
+  function signature(w, things) {
+    const out = [];
+    const n = things.length;
+    for (let m = 0; m < 3 ** n; m++) {
+      let d = 0, x = m;
+      for (const t of things) { const side = x % 3; x = Math.floor(x / 3); const wt = t.w != null && !t.id.startsWith('tin') ? t.w : w[t.id]; if (side === 1) d += wt; if (side === 2) d -= wt; }
+      out.push(Math.sign(d));
+    }
+    return out.join('');
+  }
+  const consistent = things => {
+    const want = signature(truth, things);
+    let n = 0;
+    for (let a = 1; a <= 9; a++) for (let b = 1; b <= 9; b++) for (let c = 1; c <= 9; c++) {
+      if (signature({ tin_moon: a, tin_fern: b, tin_cactus: c }, things) === want) n++;
+    }
+    return n;
+  };
+  assert.equal(consistent(G.BALANCE_THINGS), 1, '有紙鎮：唯一');
+  assert.ok(consistent(G.BALANCE_THINGS.filter(t => t.id !== 'w5')) > 1, '沒有紙鎮：無法確定');
+  assert.equal(G.SEED_CODE, ['moon', 'fern', 'cactus'].map(b => G.TINS.find(t => t.bed === b).w).join(''));
+  assert.deepEqual(Object.keys(G.BEDS), ['moon', 'fern', 'cactus']);
+  for (const lang of ['zh', 'en']) assert.ok(G.docs.garden_rules.body[lang].join('').length > 0);
+});
+
+test('資深・相框：720 種掛法中，只有一種符合照片裡看得出的時間線索', () => {
+  const P = Object.fromEntries(G.PHOTOS.map(p => [p.id, p]));
+  const ok = order => {
+    for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
+      const a = P[order[i]], b = P[order[j]];
+      for (const k of ['dome', 'gh', 'pine']) if (a[k] != null && b[k] != null && a[k] > b[k]) return false;
+      if (a.pine != null && b.pine != null && a.pine === b.pine) return false; // 松樹一直在長
+      for (const k of ['age', 'year']) if (a[k] != null && b[k] != null && a[k] >= b[k]) return false;
+    }
+    return true;
+  };
+  const fits = permute(G.PHOTOS.map(p => p.id)).filter(ok);
+  assert.deepEqual(fits, [G.PHOTO_ORDER]);
+  // 背面寫的年紀與照片資料一致
+  assert.ok(P.ph_b.back.zh.includes('七歲') && P.ph_e.back.zh.includes('九歲') && P.ph_e.back.en.includes('age 9'));
+  assert.deepEqual([...G.PHOTOS_IN_BOX, 'ph_e'].sort(), G.PHOTOS.map(p => p.id).sort());
+});
+
+test('資深・音樂盒：晴的星星譜照星座的星數換成音齒號碼', () => {
+  assert.deepEqual(G.MUSIC_ANSWER, G.MUSIC_SCORE.map(id => G.CONSTELLATIONS[id].stars.length));
+  assert.ok(G.MUSIC_ANSWER.every(n => n >= 1 && n <= G.MUSIC_TINES));
+  for (const lang of ['zh', 'en']) {
+    const letter = G.docs.qing_letter.body[lang].join('\n');
+    for (const id of G.MUSIC_SCORE) assert.ok(letter.includes(G.CONSTELLATIONS[id].name[lang]), id);
+  }
+});

@@ -363,7 +363,103 @@ textarea.code {
   .picker-row { grid-template-columns: 3.5em 40px minmax(4.5em, auto) 40px; }
   .paper { padding: 16px 16px; }
   .bottles { grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+  .photo-pair { grid-template-columns: 1fr; }
 }
+/* ---------- 難度、提示按鈕、階段 ---------- */
+.mode-chip { color: var(--good); border-color: #3a5a44; }
+.mode-chip.vet { color: #f0a080; border-color: #6a3a2a; }
+.hint-btn { border-color: var(--brass); color: var(--brass-hi); gap: .35em; }
+.hint-btn .bulb { font-size: .9em; }
+.hint-btn.locked { opacity: .6; border-color: var(--rule); color: var(--dim); }
+.hint-btn.pulse { background: var(--brass); color: var(--brass-ink); animation: hintPulse 1.4s ease-in-out infinite; }
+@keyframes hintPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 201, 127, .55); } 50% { box-shadow: 0 0 0 7px rgba(232, 201, 127, 0); } }
+.m-stage { color: var(--brass-hi); font-weight: 600; }
+.stage-head { border: 1px solid var(--brass); border-radius: 10px; padding: 10px 14px; background: rgba(201, 162, 79, .08); display: grid; gap: 4px; }
+.stage-head p { margin: 0; }
+.stage-n { color: var(--brass-hi); font-weight: 700; }
+.stage-goal { color: var(--star); }
+.stage-bar { display: flex; gap: 4px; margin-top: 4px; }
+.stage-bar span { flex: 1; height: 5px; border-radius: 3px; background: var(--rule); }
+.stage-bar span.done { background: var(--brass); }
+.stage-bar span.cur { background: var(--brass-hi); box-shadow: 0 0 6px rgba(232, 201, 127, .7); }
+.hint-group { margin: 6px 0 -4px; font-size: .85rem; letter-spacing: .14em; color: var(--dim); font-weight: 600; }
+.hint h4 { margin: 0; font-size: 1rem; }
+.hint.current { border-color: var(--brass); }
+.hint.other { opacity: .8; }
+
+/* 選擇難度 */
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.mode-card { border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; background: var(--night-3); }
+.mode-card h3 { margin: 0; font-size: 1.3rem; letter-spacing: .1em; color: var(--good); }
+.mode-card.mode-veteran h3 { color: #f0a080; }
+.mode-card p { margin: 0; color: var(--dim); font-size: .95rem; }
+.mode-card .btn { justify-self: start; }
+.btn.vet { border-color: #8a4a3a; color: #f6c0a8; background: #3a1a14; }
+.btn.vet:hover { border-color: #f0a080; color: #fff0e8; }
+.check { display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: .92rem; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--brass); }
+
+/* 教學 */
+.tutorial { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+.tut-ring { position: fixed; border: 2px solid var(--brass-hi); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(4, 6, 14, .45), 0 0 18px rgba(232, 201, 127, .6); transition: all .25s ease; }
+.tut-bubble { position: fixed; pointer-events: auto; background: var(--night-2); border: 1px solid var(--brass); border-radius: 12px; padding: 12px 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, .55); display: grid; gap: 6px; }
+.tut-bubble p { margin: 0; }
+.tut-count { font-size: .8rem; color: var(--brass); letter-spacing: .12em; }
+.tut-text { line-height: 1.6; }
+.tut-bubble .row .spacer { flex: 1; }
+
+/* 燈號卡片 */
+.paper.card { background-color: #e9e4d6; font-family: var(--font-ui); }
+.paper.card p { margin: 0 0 .5em; letter-spacing: .04em; }
+.paper.card p:nth-child(n+2):nth-child(-n+5) { font-family: var(--font-mono); font-size: .98rem; }
+
+/* 天平 */
+.pan-list { display: grid; gap: 6px; max-width: 520px; margin: 0 auto; width: 100%; }
+.pan-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pan-name { color: var(--star); }
+.seg { display: inline-flex; }
+.seg .btn { border-radius: 0; min-width: 4.2em; }
+.seg .btn:first-child { border-radius: 8px 0 0 8px; }
+.seg .btn:last-child { border-radius: 0 8px 8px 0; }
+.seg .btn + .btn { margin-left: -1px; }
+.seg .btn.cur { background: var(--brass); color: var(--brass-ink); border-color: var(--brass-hi); font-weight: 700; }
+
+/* 相框與照片 */
+.photo-svg { width: 100%; height: auto; display: block; border-radius: 3px; }
+.photo-back { font-family: var(--font-hand); font-size: 15px; line-height: 1.35; color: #2b2418; }
+.frames { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.frame { aspect-ratio: 4 / 3; padding: 4px; border: 3px solid #6b4a1e; background: #120c08; border-radius: 4px; cursor: pointer; display: grid; place-items: center; color: var(--dim); }
+.frame.filled { background: #2a1c12; }
+.frame:hover { border-color: var(--brass-hi); }
+.frames-axis { margin: -6px 0 0; text-align: center; color: var(--brass); font-size: .85rem; letter-spacing: .2em; }
+.tray { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.photo-card { padding: 4px; border: 1px solid var(--rule); border-radius: 6px; background: var(--night-3); cursor: pointer; display: grid; gap: 2px; color: var(--dim); font-size: .8rem; }
+.photo-card:hover { border-color: var(--brass); }
+.photo-pairs { display: grid; gap: 10px; }
+.photo-pair { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+.photo-pair figcaption { grid-column: 1 / -1; color: var(--dim); font-size: .85rem; }
+
+/* 音樂盒 */
+.musicbox-art .tine { cursor: pointer; }
+.musicbox-art .tine:hover rect:nth-child(2), .musicbox-art .tine:focus-visible rect:nth-child(2) { fill: #f6dc95; }
+.musicbox-art .tine:focus-visible { outline: none; }
+.played { margin: 0; text-align: center; color: var(--dim); }
+.played strong { color: var(--brass-hi); font-family: var(--font-mono); letter-spacing: .05em; }
+
+/* 燈號 */
+.sig-line { margin: 0; text-align: center; color: var(--dim); }
+.sig-code { font-family: var(--font-mono); color: var(--brass-hi); font-size: 1.15rem; letter-spacing: .08em; }
+.sig-line.reply .sig-code { color: #ffd98a; }
+.signal-art .zhou-house.dark .zhou-lamp, .signal-art .zhou-house.dark .zhou-glow { opacity: 0; }
+.signal-art .zhou-lamp, .signal-art .zhou-glow { transition: opacity .08s; }
+
+/* 八個花盆、八個藥瓶 */
+.pots.eight { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.pots.eight .pot q { font-size: 1rem; }
+.bottles.eight { grid-template-columns: repeat(8, minmax(44px, 72px)); gap: 6px; }
+.bottles.eight .bottle-btn span { font-size: .78rem; }
+.badge-vet { margin-left: auto; font-size: .75rem; color: #f0a080; border: 1px solid #6a3a2a; border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
+
 /* ---------- 語言切換 ---------- */
 .lang-switch { display: inline-flex; }
 .lang-switch .btn { border-radius: 0; min-width: 4.6em; }
@@ -397,6 +493,9 @@ html:lang(en) .inv-tile { font-size: .82rem; line-height: 1.2; }
 html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
 @media (max-width: 520px) {
+  /* 資深模式的八瓶藥劑、六個相框：手機上換行，照片才看得清楚 */
+  .bottles.eight { grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+  .frames { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   html:lang(en) .picker-row { grid-template-columns: 5.6em 40px minmax(4.5em, auto) 40px; }
   .title-card { margin-bottom: 18vh; }
 }

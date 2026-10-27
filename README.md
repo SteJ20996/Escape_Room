@@ -2,13 +2,16 @@
 
 一款完整的瀏覽器密室逃脫遊戲，**中文／English 雙語**。雨後的山中老宅，亡師用機關鎖住了大門——找回日、月、星三枚徽章才能離開；屋裡還藏著二十年前一顆彗星的真名。
 
-- **5 個相互關聯的房間**：門廳、書房、溫室、天文台，以及一間隱藏的暗房
-- **11 道類型各異的謎題**（主線必經 8 道），全部只靠遊戲內線索就能推理
+- **兩種難度**：
+  - **新手**：5 個相互關聯的房間（門廳、書房、溫室、天文台，以及一間隱藏的暗房）、11 道類型各異的謎題（主線必經 8 道）；答錯時會告訴你哪裡不對
+  - **資深**：再加上閣樓與屋子邊緣的儲物間、兩位新角色（園丁周伯、陸觀的女兒陸晴）、4 道新謎題（天平、對山谷打燈號、相框牆、音樂盒），花盆與藥瓶各升級為八個、反光鏡升級為十六面且平常看不見光路；答錯只說「不對」，第一階段沒有提示
+- 全部謎題只靠遊戲內線索就能推理
 - **物品收集與線索組合**：撕開的便條、疊合的星圖、裝上電池的手電筒、裝訂成冊的日記
 - **5 種結局**，取決於你找到了什麼、又做了什麼選擇
 - **存檔**：自動存檔、三個手動欄位、可攜帶的存檔碼、結局前的回溯點
 - **中文與英文**：標題畫面、遊戲中的「選單」或右上角按鈕隨時切換，進度與存檔不受影響；預設跟隨瀏覽器語言，也可以用網址 `?lang=en` 指定
-- 三段式提示、線索筆記、結局圖鑑；可用鍵盤操作；手機也能玩
+- **可跳過的操作教學**；右上角的**階段提示**會偵測你走到哪一階段，完成一個階段時亮起來告訴你下一步，卡關時可以一段一段展開提示
+- 線索筆記、結局圖鑑（標出資深模式達成的結局）；可用鍵盤操作；手機也能玩
 - 純 HTML／CSS／JavaScript，沒有任何相依套件，美術全部是內嵌 SVG（場景、謎題圖、物品圖示）
 
 ## 開始玩
@@ -26,7 +29,8 @@
 | 組合線索 | 點選物品 → 「組合…」→ 點另一個物品 |
 | 移動 | 點門，或使用場景下方的房間按鈕 |
 | 重讀文件 | 「線索筆記」 |
-| 卡關 | 「提示」（每個目標三段，從方向到答案） |
+| 卡關 | 右上角「提示」：目前階段與目標；每個提示三段，從方向到答案（資深模式第一階段不開放） |
+| 操作教學 | 開新遊戲時勾選；遊戲中可從「選單」重看 |
 | 鍵盤 | Tab 移動、Enter 選擇、Esc 關閉視窗／放下物品；數字鎖可直接打數字 |
 
 ## 專案結構
@@ -51,8 +55,8 @@ docs/TEST_REPORT.md 測試報告
 需要 Node.js 18 以上。
 
 ```bash
-npm test            # 邏輯測試 59 項：謎題唯一解、五個結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示、雙語完整性（約 1 分鐘）
-npm run test:e2e    # 打包後用 Playwright 只透過點擊介面，中文、英文各玩完五個結局（開發版與單檔版各一次，約 4 分鐘）
+npm test            # 邏輯測試 108 項：兩種難度各自的謎題唯一解、五個結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示、雙語完整性（約 4 分鐘）
+npm run test:e2e    # 打包後用 Playwright 只透過點擊介面，中文、英文 × 新手、資深，各玩完五個結局（開發版與單檔版各一次，約 10 分鐘）
 npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 ```
 
@@ -62,6 +66,7 @@ npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 
 *The Stargazer's House* is a complete browser escape room, playable in Chinese or English. Your late teacher, the astronomer Lu Guan, has locked you inside his house on a rainy mountain night: recover the Sun, Moon and Star emblems to open the door — and decide what to do with the twenty-year-old secret of a comet.
 
-- 5 connected rooms, 11 puzzles (8 on the main path), item combination, 5 endings, autosave + 3 slots + portable save codes, three-step hints.
+- Two difficulties. **Novice**: 5 connected rooms, 11 puzzles (8 on the main path), wrong answers explain what went wrong. **Veteran**: adds the attic and the storeroom on the edge of the house, two new characters (Old Zhou the gardener and Lu Guan's daughter Qing), 4 new puzzles (a balance scale, signalling across the valley, a wall of photo frames, a music box), eight pots, eight bottles and sixteen mirrors whose light you can't see until you open the skylight; wrong answers only say "not right", and there are no hints in the first stage.
+- Item combination, 5 endings, autosave + 3 slots + portable save codes, a skippable tutorial, and stage-aware hints that light up when you finish a stage.
 - Every puzzle is solvable from in-game clues alone. Switch language at any time from the title screen, the Menu, or the button at the top right; your progress is kept. Add `?lang=en` to the URL to start in English.
 - Open `index.html` or the single-file `dist/stargazer.html` in any modern browser. No install needed.

@@ -54,13 +54,14 @@
       <span class="chip" id="chip-pages"></span>
       <span class="chip" id="chip-plate" hidden data-i18n="plateChip">玻璃底片</span>
       <span class="chip" id="chip-time" data-i18n-title="playTime"></span>
+      <span class="chip mode-chip" id="chip-mode"></span>
       <span class="spacer"></span>
       <div class="row">
-        <button class="btn small" id="btn-hints" type="button" data-i18n="hints">提示</button>
         <button class="btn small" id="btn-notes" type="button" data-i18n="notebook">線索筆記</button>
         <button class="btn small" id="btn-save" type="button" data-i18n="save">存檔</button>
         <button class="btn small" id="btn-menu" type="button" data-i18n="menu">選單</button>
         <button class="btn small ghost lang-btn" id="btn-lang" type="button" data-i18n-title="switchLang">EN</button>
+        <button class="btn small hint-btn" id="btn-hints" type="button"><span class="bulb" aria-hidden="true">✦</span><span id="hint-label">提示</span></button>
       </div>
     </header>
     <div class="stage">
@@ -90,6 +91,15 @@
 
 <div id="ending" class="screen" hidden>
   <div class="ending-card" id="ending-card"></div>
+</div>
+
+<div class="tutorial" id="tutorial" hidden>
+  <div class="tut-ring" id="tut-ring"></div>
+  <div class="tut-bubble" id="tut-bubble" role="dialog" aria-live="polite" aria-labelledby="tut-text">
+    <p class="tut-count" id="tut-count"></p>
+    <p class="tut-text" id="tut-text"></p>
+    <div class="row"><button class="btn small ghost" id="tut-skip" type="button" data-i18n="tutSkip">跳過教學</button><span class="spacer"></span><button class="btn small primary" id="tut-next" type="button" data-i18n="tutNext">下一步</button></div>
+  </div>
 </div>
 
 <div class="modal-back" id="modal-back" hidden>

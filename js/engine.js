@@ -180,6 +180,8 @@
       const p = G.puzzles[puzzleId];
       if (!p) return fail(L('沒有那個機關。', 'There is no such mechanism.'));
       if (!p.available(s)) return fail(L('現在沒辦法操作那個機關。', 'You can\'t operate that right now.'));
+      // 還沒拿到線索：不論輸入什麼都一樣拒絕（不洩漏答案對不對、不算錯誤、不改變狀態）
+      if (p.clue && !p.clue(s)) return fail(p.needClue);
       const out = result();
       const solved = p.check(makeCtx(s, out), answer);
       if (solved === null) return fail(L('這個選項現在不能用。', 'That option isn\'t available right now.')); // 不合法的輸入：不改變任何狀態

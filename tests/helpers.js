@@ -58,6 +58,7 @@ function mainPath(P, { chimney = false } = {}) {
   P.look('o_telescope');
   P.use('flashlight', 'o_under');
   P.use('eyepiece', 'o_telescope');
+  P.look('o_poster');        // 星座圖：星盤要先認得星座
   P.solve('dome', G.COMET_DIRECTION);
   P.look('o_dial');
   P.solve('dial', G.DIAL_ANSWER);
@@ -138,10 +139,10 @@ function vetMainPath(P) {
   P.look('o_telescope');
   P.use('flashlight', 'o_under');
   P.use('eyepiece', 'o_telescope');
+  P.look('o_poster');
   P.solve('dome', G.COMET_DIRECTION);
   P.look('o_dial');
   P.solve('dial', G.DIAL_ANSWER);
-  P.look('o_poster');
   P.look('o_log');
   P.look('o_almanac');
   P.go('attic');

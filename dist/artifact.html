@@ -1629,6 +1629,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       id: 's_shelf', room: 'study', name: L('書架', 'Bookshelf'),
       examine(ctx) {
         ctx.note('bookshelf');
+        ctx.set('shelfRead');
         ctx.open({ view: 'bookshelf' });
       },
     },
@@ -1744,13 +1745,13 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
     {
       id: 'g_rules', room: 'greenhouse', name: L('園丁守則', 'Gardener\'s Rules'),
-      examine(ctx) { ctx.note('garden_rules'); ctx.open({ view: 'doc', id: 'garden_rules' }); },
+      examine(ctx) { ctx.note('garden_rules'); ctx.set('rulesRead'); ctx.open({ view: 'doc', id: 'garden_rules' }); },
     },
     {
       id: 'g_valves', room: 'greenhouse', name: L('灌溉系統', 'Irrigation System'),
       examine(ctx) {
         if (ctx.flag('waterOk')) { ctx.say(L('雨水桶和肥料桶靜靜地立著。月光花、蕨類都喝足了水，仙人掌的土依然乾燥。', 'The rainwater and fertilizer tanks stand quiet. The moonflower and the ferns have drunk their fill; the cactus bed is still dry.')); return; }
-        ctx.note('garden_rules');
+        ctx.note('garden_rules'); ctx.set('rulesRead'); // 守則就貼在灌溉系統旁
         ctx.open({ view: 'valves' });
       },
       use: {
@@ -1867,11 +1868,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
     {
       id: 'o_poster', room: 'observatory', name: L('星座圖', 'Constellation Chart'),
-      examine(ctx) { ctx.note('poster'); ctx.open({ view: 'poster' }); },
+      examine(ctx) { ctx.note('poster'); ctx.set('posterRead'); ctx.open({ view: 'poster' }); },
     },
     {
       id: 'o_almanac', room: 'observatory', name: L('月落時刻表', 'Moonset Table'),
-      examine(ctx) { ctx.note('almanac'); ctx.open({ view: 'doc', id: 'almanac' }); },
+      examine(ctx) { ctx.note('almanac'); ctx.set('almanacRead'); ctx.open({ view: 'doc', id: 'almanac' }); },
     },
     {
       id: 'o_log', room: 'observatory', name: L('觀測日誌', 'Observation Log'),
@@ -1950,7 +1951,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     {
       id: 'd_shelf', room: 'darkroom', name: L('藥瓶架', 'Bottle Shelf'),
       visible: s => !!s.flags.darkroomLit,
-      examine(ctx) { const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card'; ctx.note(id); ctx.open({ view: 'doc', id }); },
+      examine(ctx) { const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card'; ctx.note(id); ctx.set('bottleCardRead'); ctx.open({ view: 'doc', id }); },
     },
     {
       id: 'd_tray', room: 'darkroom', name: L('顯影台', 'Developing Bench'),
@@ -1979,7 +1980,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     {
       id: 'd_chart', room: 'darkroom', mode: 'veteran', name: L('牆上的流程表', 'Developing Chart'),
       visible: s => !!s.flags.darkroomLit,
-      examine(ctx) { ctx.note('process_chart'); ctx.open({ view: 'doc', id: 'process_chart' }); },
+      examine(ctx) { ctx.note('process_chart'); ctx.set('chartRead'); ctx.open({ view: 'doc', id: 'process_chart' }); },
     },
 
     /* ---------------- 儲物間（資深） ---------------- */
@@ -2158,6 +2159,9 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
   });
 
+  // 拿到線索才能作答：clue(s) 為假時，不論輸入什麼都只得到 needClue（不洩漏對錯、不算錯誤），
+  // 所以背下答案的玩家也得先把線索找齊。線索本身就在謎題畫面上的（花盆、鏡子、閥門、相框）不設門檻。
+  const noteReady = s => s.inv.includes('note_full') || (s.inv.includes('note_left') && s.inv.includes('note_right'));
   const puzzles = {
     drawer: Object.assign(lockPuzzle({
       code: DRAWER_CODE,
@@ -2176,6 +2180,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         ? L('鎖紋絲不動。你數的好像是書在架上的位置——便條問的是「第幾卷」。', 'The lock doesn\'t budge. It looks like you counted the books\' positions on the shelf — the note asks which volume each one is.')
         : LOCK_STUCK,
     }), {
+      clue: s => !!s.flags.shelfRead,
+      needClue: L('你還不知道這四個數字。便條問的是書的卷數——得先看過那些書。', 'You don\'t know the four digits yet. The note asks about volume numbers — you\'d need to look at the books first.'),
       digits: 4, title: L('書桌抽屜', 'Desk Drawer'),
       prompt: L('四位數字鎖。鎖旁的便條寫著：「紅、黃、藍、綠——照這個順序，它們各是第幾卷？」', 'A four-digit lock. The note beside it reads: "Red, yellow, blue, green — in that order: which volume is each one?"'),
     }),
@@ -2189,6 +2195,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         ctx.give('emblem_sun');
       },
     }), {
+      clue: s => s.inv.includes('overlay'),
+      needClue: L('你還不知道是哪三個數字。「星星會告訴你數字」——可是你手上還沒有任何東西能讓星星說話。', 'You don\'t know which three digits yet. "The stars will tell you the numbers" — but nothing you have can make the stars speak yet.'),
       digits: 3, title: L('保險箱', 'Wall Safe'),
       prompt: L('嵌在牆裡的保險箱，三位數字轉盤。畫框背面寫著：「星星會告訴你數字。」', 'A safe set into the wall, with a three-digit dial. On the back of the painting\'s frame: "The stars will tell you the numbers."'),
     }),
@@ -2201,12 +2209,16 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         ctx.say(L('數字鎖彈開了。你掀起活板門，一道窄梯通往漆黑的地下。', 'The combination lock springs open. You lift the trapdoor; a narrow ladder leads down into darkness.'), 'good');
       },
     }), {
+      clue: noteReady,
+      needClue: L('你還不知道活板門的密碼。', 'You don\'t know the trapdoor\'s code yet.'),
       digits: 4, title: L('活板門', 'Trapdoor'),
       prompt: L('活板門上的四位數字鎖。鎖旁刻著一顆拖著尾巴的彗星。', 'A four-digit lock on the trapdoor. A comet with a tail is engraved beside it.'),
     }),
 
     pots: {
       available: s => inRoom('greenhouse')(s) && !s.flags.keyDug,
+      clue: s => !VET(s) || !!s.flags.zhouReplied, // 新手：線索就在木牌上；資深：要先問到周伯
+      needClue: L('八句話裡有幾句是真的，只有周伯知道。在弄清楚之前，你不敢亂挖。', 'Only Old Zhou knows how many of the eight sayings are true. Until you find out, you don\'t dare dig at random.'),
       vetKeep: true, // 「挖開了，什麼也沒有」本身就只說「不對」，不透露錯在哪
       check(ctx, potId) {
         const list = VET(ctx.s) ? POTS_V : POTS;
@@ -2243,6 +2255,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     clock: {
       available: s => inRoom('foyer')(s) && !s.flags.clockSolved,
+      clue: s => !!s.flags.logBookmark && !!s.flags.almanacRead, // 觀測日誌（哪一天、月落後一小時）＋月落時刻表
+      needClue: L('鐘上刻的是「最後一次觀測開始的那一刻」——你還不知道那是幾點。', 'The clock asks for "the moment the last observation began" — and you don\'t know when that was yet.'),
       vetWrong: L('你撥好指針，等了一會兒。落地鐘毫無反應。', 'You set the hands and wait. The grandfather clock does nothing.'),
       check(ctx, ans) {
         const h = Number(ans && ans.h), m = Number(ans && ans.m);
@@ -2344,6 +2358,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     dial: {
       available: s => inRoom('observatory')(s) && !s.flags.starDialSolved,
+      clue: s => !!s.flags.posterRead && !!s.flags.eyepieceInstalled, // 星座圖（認得星座）＋裝好目鏡（看得到天空）
+      needClue: L('三個星環上刻著八個星座的名字。你既不認得這些星座，也還沒從望遠鏡裡看過天空。', 'The three rings are engraved with the names of eight constellations. You don\'t know these constellations, and you haven\'t seen the sky through the telescope yet.'),
       vetWrong: L('星盤紋絲不動。', 'The dial doesn\'t budge.'),
       check(ctx, ans) {
         const pick = Array.isArray(ans) ? ans.slice(0, 3) : [];
@@ -2364,6 +2380,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     develop: {
       available: s => inRoom('darkroom')(s) && s.flags.darkroomLit && !s.flags.plateDeveloped,
+      clue: s => noteReady(s) && !!s.flags.bottleCardRead && (!VET(s) || !!s.flags.chartRead), // 便條的順序、藥瓶卡片（資深：加上流程表）
+      needClue: L('你還不知道哪一瓶是什麼、該照什麼順序倒。', 'You don\'t know which bottle is which, or what order to pour them in.'),
       vetWrong: L('你先拿一張廢片試了試——一片模糊。不對。', 'You try it on a scrap of film first — just a blur. Not right.'),
       check(ctx, seq) {
         const answer = VET(ctx.s) ? DEVELOP_ANSWER_V : DEVELOP_ANSWER;
@@ -2392,6 +2410,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         ctx.note('zhou_log');
       },
     }), {
+      clue: s => s.inv.includes('paperweight') && !!s.flags.rulesRead,
+      needClue: L('你還不知道三罐種子各有多重、該照什麼順序。光靠 2 兩的砝碼秤不出來。', 'You don\'t know what each tin weighs, or what order they go in. The 2 oz weight alone can\'t tell you.'),
       digits: 3, title: L('種子櫃', 'Seed Cabinet'),
       prompt: L('三位數字鎖。字條上寫著：「三罐種子各有幾兩重——照溫室守則上寫的順序。」', 'A three-digit lock. The note says: "How many ounces each of the three seed tins weighs — in the order they come in the greenhouse rules."'),
     }),
@@ -2413,6 +2433,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     signal: {
       available: s => VET(s) && inRoom('storeroom')(s) && s.inv.includes('flashlight'),
+      clue: s => s.inv.includes('code_card'),
+      needClue: L('你知道周伯看得懂燈號，可是你不知道該怎麼打。', 'You know Old Zhou can read light signals, but you don\'t know the code.'),
       vetKeep: true, // 只出現在資深模式；回應本身就只是「沒反應」或「？」
       check(ctx, tokens) {
         if (!Array.isArray(tokens) || !tokens.length || tokens.some(t => typeof t !== 'string' || !/^[.-]{1,6}$/.test(t))) return null;
@@ -2457,6 +2479,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     musicbox: {
       available: s => VET(s) && inRoom('attic')(s) && s.flags.crankInserted && !s.flags.musicSolved,
+      clue: s => s.inv.includes('qing_letter') && !!s.flags.posterRead, // 晴的星星譜＋星座圖的星數
+      needClue: L('十根音齒，你不知道該彈哪一首曲子。', 'Ten tines — but you don\'t know which tune to play.'),
       vetWrong: L('音樂盒叮叮咚咚地響完，什麼也沒發生。不對。', 'The music box tinkles to the end, and nothing happens. Not right.'),
       check(ctx, notes) {
         if (!Array.isArray(notes) || !notes.length || notes.some(n => !Number.isInteger(n) || n < 1 || n > MUSIC_TINES)) return null;
@@ -3051,7 +3075,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
-    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
     BOTTLES_V, BOTTLE_RULES_V, PROCESS_RULES_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
@@ -3241,6 +3265,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const p = G.puzzles[puzzleId];
       if (!p) return fail(L('沒有那個機關。', 'There is no such mechanism.'));
       if (!p.available(s)) return fail(L('現在沒辦法操作那個機關。', 'You can\'t operate that right now.'));
+      // 還沒拿到線索：不論輸入什麼都一樣拒絕（不洩漏答案對不對、不算錯誤、不改變狀態）
+      if (p.clue && !p.clue(s)) return fail(p.needClue);
       const out = result();
       const solved = p.check(makeCtx(s, out), answer);
       if (solved === null) return fail(L('這個選項現在不能用。', 'That option isn\'t available right now.')); // 不合法的輸入：不改變任何狀態
@@ -5933,7 +5959,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
           root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
-          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: app.s.mode === 'veteran' ? 'bottle_card_v' : 'bottle_card' });
+          // 透過「查看藥瓶架」讀卡片，遊戲才會記得你讀過（沖洗台要讀過卡片才能作答）
+          root.querySelector('[data-doc]').onclick = () => act(() => E.interact(app.s, 'd_shelf'));
           const n = root.querySelector('[data-note]');
           if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
         },

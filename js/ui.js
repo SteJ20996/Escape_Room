@@ -850,7 +850,8 @@
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
           root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
-          root.querySelector('[data-doc]').onclick = () => openView({ view: 'doc', id: app.s.mode === 'veteran' ? 'bottle_card_v' : 'bottle_card' });
+          // 透過「查看藥瓶架」讀卡片，遊戲才會記得你讀過（沖洗台要讀過卡片才能作答）
+          root.querySelector('[data-doc]').onclick = () => act(() => E.interact(app.s, 'd_shelf'));
           const n = root.querySelector('[data-note]');
           if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
         },

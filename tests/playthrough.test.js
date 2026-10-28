@@ -58,6 +58,7 @@ test('結局 D「交易」：接受韓嶽的電話交易', () => {
   // 壞結局不需要徽章：拿到底片後就能觸發
   P.look('f_coat');
   P.go('study');
+  P.look('s_shelf');
   P.solve('drawer', G.DRAWER_CODE);
   P.combine('flashlight_dead', 'battery');
   P.look('s_waste');
@@ -77,6 +78,7 @@ test('結局 D「交易」：接受韓嶽的電話交易', () => {
   P.solve('trapdoor', '1208');
   P.go('darkroom');
   P.use('red_bulb', 'd_socket');
+  P.look('d_shelf');
   P.solve('develop', G.DEVELOP_ANSWER);
   P.go('foyer');
   assert.equal(P.s.flags.phoneRinging, true);
@@ -167,7 +169,7 @@ test('［資深］結局 D、E', () => {
 
 test('［資深］答錯時只說「不對」，不說錯在哪；前置條件不足（沒有工具）的說明照樣保留', () => {
   const P = vet();
-  P.look('f_coat'); P.go('study');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf');
   const trap = P.E.submit(P.s, 'drawer', G.DRAWER_TRAP);
   assert.equal(trap.ok, true);
   assert.equal(trap.solved, false);
@@ -175,18 +177,24 @@ test('［資深］答錯時只說「不對」，不說錯在哪；前置條件�
   assert.equal(P.s.stats.wrong, 1);
   // 新手模式同樣的錯誤會給出具體提示
   const N = makeGame();
-  N.go('study');
+  N.go('study'); N.look('s_shelf');
   assert.ok(N.E.submit(N.s, 'drawer', G.DRAWER_TRAP).messages.some(m => /位置/.test(txt(m))));
-  // 前置條件：沒鏟子挖花盆
+  // 前置條件：還沒問到周伯就挖花盆——「還沒拿到線索」的說明照樣保留，不換成「不對」，也不算錯誤
   vetMainPathTo(P, 'greenhouse');
+  const wrong = P.s.stats.wrong;
   const dig = P.E.submit(P.s, 'pots', 'rose');
-  assert.ok(dig.messages.some(m => /工具/.test(txt(m))), '沒有工具的說明要保留');
+  assert.ok(dig.messages.some(m => /周伯/.test(txt(m))), '缺線索的說明要保留');
+  assert.equal(P.s.stats.wrong, wrong);
+  // 新手：沒鏟子挖花盆，說明照樣保留
+  N.go('foyer'); N.look('f_coat'); N.go('study'); N.solve('drawer', G.DRAWER_CODE); N.go('foyer'); N.use('greenhouse_key', 'f_gh_door'); N.look('f_gh_door');
+  assert.ok(N.E.submit(N.s, 'pots', 'rose').messages.some(m => /工具/.test(txt(m))), '沒有工具的說明要保留');
 });
 
 // 只走到資深主線的某個房間（給上面的測試用）
 function vetMainPathTo(P, room) {
   if (!P.has('flashlight_dead') && !P.has('flashlight')) P.look('f_coat');
   if (P.s.room !== 'study') P.go('study');
+  P.look('s_shelf');
   P.solve('drawer', G.DRAWER_CODE);
   P.combine('flashlight_dead', 'battery');
   P.go('foyer');
@@ -198,7 +206,7 @@ test('［資深］星盤順序錯、閥門錯、時鐘錯：都只得到不透�
   const R = vet();
   vetMainPathTo(R, 'greenhouse');
   // 直接設定進度旗標，跳到能操作這三個機關的時候
-  Object.assign(R.s.flags, { gateOpen: true, eyepieceInstalled: true, wheelInstalled: true });
+  Object.assign(R.s.flags, { gateOpen: true, eyepieceInstalled: true, wheelInstalled: true, posterRead: true, logBookmark: true, almanacRead: true });
   R.go('observatory');
   const dial = R.E.submit(R.s, 'dial', G.DIAL_ANSWER.slice().reverse());
   assert.ok(!dial.messages.some(m => /順序/.test(txt(m))), dial.messages.map(txt).join());
@@ -217,7 +225,7 @@ test('［資深］第一階段不開放提示；打開抽屜、修好手電筒�
   assert.equal(P.E.hintsLocked(P.s), true);
   assert.deepEqual(P.E.hintList(P.s), []);
   assert.equal(P.E.revealHint(P.s, 'explore'), false);
-  P.look('f_coat'); P.go('study'); P.look('s_drawer');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.look('s_drawer');
   P.solve('drawer', G.DRAWER_CODE);
   assert.equal(P.E.hintsLocked(P.s), true, '手電筒還沒修好，仍在第一階段');
   P.combine('flashlight_dead', 'battery');
@@ -263,10 +271,16 @@ test('［新手］階段依序推進，且新手模式看不到資深模式的�
 
 test('［資深］燈號：沒先呼叫「晴」，周伯不會回應；問「鑰」只會得到線索，問「盆」才會得到句數', () => {
   const P = vet();
-  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
   P.use('flashlight', 's_fireplace');
   P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.go('greenhouse');
   P.use('storeroom_key', 'g_storedoor'); P.go('storeroom');
+  // 還沒拿到燈號卡：連正確的燈號（晴）都打不出去，也不算錯誤
+  const noCard = P.E.submit(P.s, 'signal', ['.-.']);
+  assert.equal(noCard.ok, false);
+  assert.ok(!P.s.flags.zhouCalled && P.s.stats.wrong === 0);
+  getCodeCard(P);
+  P.go('storeroom');
   const early = P.E.submit(P.s, 'signal', ['---', '...']);
   assert.equal(early.solved, false);
   assert.ok(!P.s.flags.zhouReplied);
@@ -299,13 +313,29 @@ test('［資深］反光鏡：調整角度本身不會解開；要拉開天窗�
   assert.ok(P.s.flags.lightOk);
 });
 
+// 從儲物間出發，照正規路線拿到閣樓玩具箱裡的燈號卡（紙鎮、園丁守則 → 種子櫃 → 鉤桿 → 閣樓）
+function getCodeCard(P) {
+  P.go('study'); P.look('s_desk');
+  P.go('greenhouse'); P.look('g_rules');
+  P.go('storeroom'); P.solve('seedlock', G.SEED_CODE);
+  P.go('foyer'); P.use('hook_pole', 'f_hatch');
+  P.go('attic'); P.look('a_chest');
+}
+// 資深：走到「問過周伯、站在花盆前」
+function vetToPots() {
+  const P = vet();
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.use('flashlight', 's_fireplace');
+  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools');
+  P.use('storeroom_key', 'g_storedoor');
+  getCodeCard(P);
+  P.go('storeroom'); P.solve('signal', ['.-.']); P.solve('signal', ['---', '...']);
+  P.go('greenhouse'); P.look('g_pots');
+  return P;
+}
+
 test('［資深］花盆：挖錯一、兩盆仍可挖對；挖錯第三盆就失敗（F），之後所有動作都被拒絕', () => {
-  const setup = () => {
-    const P = vet();
-    P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
-    P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_pots');
-    return P;
-  };
+  const setup = vetToPots;
   const misses = P => (P.s.flags.potsDug || []).length;
   // 挖錯兩盆之後挖對：照常拿到鑰匙
   let P = setup();
@@ -332,19 +362,60 @@ test('［資深］花盆：挖錯一、兩盆仍可挖對；挖錯第三盆就�
   for (let i = 0; i < 5; i++) assert.equal(P.E.submit(P.s, 'pots', 'mint').ending, null);
   assert.equal(misses(P), 1);
   assert.equal(P.s.stats.wrong, wrong);
-  // 沒有鏟子時挖不動，不算挖錯
+  // 還沒問到周伯：挖哪一盆都不行——包括答案那一盆（背答案沒有用），也不扣機會
   const Q = vet();
-  Q.look('f_coat'); Q.go('study'); Q.solve('drawer', G.DRAWER_CODE); Q.go('foyer'); Q.use('greenhouse_key', 'f_gh_door'); Q.look('f_gh_door');
-  for (let i = 0; i < 5; i++) Q.E.submit(Q.s, 'pots', 'mint');
+  Q.look('f_coat'); Q.go('study'); Q.look('s_shelf'); Q.solve('drawer', G.DRAWER_CODE); Q.go('foyer'); Q.use('greenhouse_key', 'f_gh_door'); Q.look('f_gh_door'); Q.look('g_tools');
+  for (const pot of ['mint', 'rose', 'basil', G.POT_ANSWER_V]) assert.equal(Q.E.submit(Q.s, 'pots', pot).ok, false);
   assert.equal(Q.s.flags.potsDug, undefined);
-  assert.equal(Q.s.ending, null);
+  assert.ok(!Q.has('brass_key') && Q.s.ending === null && Q.s.stats.wrong === 0);
 });
 
 test('［新手］花盆沒有次數限制，也不會失敗', () => {
   const P = makeGame('novice');
-  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE);
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE);
   P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_pots');
   for (const pot of ['mint', 'lavender', 'sage', 'mint']) assert.equal(P.E.submit(P.s, 'pots', pot).ending, null);
   assert.equal(P.s.flags.potsDug, undefined);
   assert.ok(P.solve('pots', G.POT_ANSWER).solved);
+});
+
+test('拿到線索才能作答：沒有線索時，正確答案也被拒絕（回應與答錯時一樣、不改變狀態、不算錯誤）；拿到線索後才有效', () => {
+  const { create } = require('./helpers');
+  const E = create(G);
+  // [難度, 謎題, 所在房間, 讓謎題可以操作的進度, 補上線索, 正確答案, 用來比較的錯誤答案]
+  const cases = [
+    ['novice', 'drawer', 'study', {}, s => { s.flags.shelfRead = true; }, G.DRAWER_CODE, '0000'],
+    ['novice', 'safe', 'study', { flags: { paintingMoved: true } }, s => { s.inv.push('overlay'); }, G.SAFE_CODE, '000'],
+    ['novice', 'trapdoor', 'greenhouse', { flags: { greenhouseOpen: true, trapdoorFound: true } }, s => { s.inv.push('note_full'); }, G.TRAPDOOR_CODE, '0000'],
+    ['veteran', 'trapdoor', 'greenhouse', { flags: { greenhouseOpen: true, trapdoorFound: true } }, s => { s.inv.push('note_left', 'note_right'); }, G.TRAPDOOR_CODE, '1210'],
+    ['novice', 'clock', 'foyer', {}, s => { Object.assign(s.flags, { logBookmark: true, almanacRead: true }); }, G.CLOCK_ANSWER, { h: 2, m: 15 }],
+    ['novice', 'dial', 'observatory', { flags: { gateOpen: true, eyepieceInstalled: true } }, s => { s.flags.posterRead = true; }, G.DIAL_ANSWER, G.DIAL_ANSWER.slice().reverse()],
+    ['novice', 'develop', 'darkroom', { flags: { trapdoorOpen: true, darkroomLit: true } }, s => { s.inv.push('note_full'); s.flags.bottleCardRead = true; }, G.DEVELOP_ANSWER, G.DEVELOP_ANSWER.slice().reverse()],
+    ['veteran', 'develop', 'darkroom', { flags: { trapdoorOpen: true, darkroomLit: true, bottleCardRead: true }, inv: ['note_full'] }, s => { s.flags.chartRead = true; }, G.DEVELOP_ANSWER_V, G.DEVELOP_ANSWER],
+    ['veteran', 'pots', 'greenhouse', { flags: { greenhouseOpen: true }, inv: ['trowel'] }, s => { s.flags.zhouReplied = true; }, G.POT_ANSWER_V, 'mint'],
+    ['veteran', 'seedlock', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true, rulesRead: true } }, s => { s.inv.push('paperweight'); }, G.SEED_CODE, '473'],
+    ['veteran', 'signal', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true }, inv: ['flashlight'] }, s => { s.inv.push('code_card'); }, ['.-.'], ['---', '...']],
+    ['veteran', 'musicbox', 'attic', { flags: { atticOpen: true, crankInserted: true }, inv: ['qing_letter'] }, s => { s.flags.posterRead = true; }, G.MUSIC_ANSWER, [1, 2, 3]],
+  ];
+  for (const [mode, pid, room, pre, addClue, right, wrongAns] of cases) {
+    const tag = `${mode}/${pid}`;
+    const s = E.newState(mode);
+    Object.assign(s.flags, pre.flags || {});
+    s.inv.push(...(pre.inv || []));
+    s.room = room;
+    assert.ok(G.puzzles[pid].available(s) && !G.puzzles[pid].clue(s), `${tag}：測試狀態應該「可以操作、但還沒有線索」`);
+    const before = JSON.stringify([s.inv, s.flags]);
+    const r1 = E.submit(s, pid, right), r2 = E.submit(s, pid, wrongAns);
+    assert.equal(r1.ok, false, `${tag}：沒有線索時正確答案應被拒絕`);
+    assert.deepEqual(r1.messages.map(txt), r2.messages.map(txt), `${tag}：答對與答錯的回應必須一樣，不能洩漏答案`);
+    assert.ok(r1.messages.map(txt).join() === txt({ text: G.puzzles[pid].needClue }), tag);
+    assert.equal(JSON.stringify([s.inv, s.flags]), before, `${tag}：狀態不應改變`);
+    assert.equal(s.stats.wrong, 0, `${tag}：不算錯誤嘗試`);
+    addClue(s);
+    assert.ok(G.puzzles[pid].clue(s), tag);
+    assert.equal(E.submit(s, pid, right).solved, true, `${tag}：拿到線索後正確答案有效`);
+  }
+  // 線索就畫在謎題上的（新手花盆、鏡子、閥門、相框）不設門檻
+  for (const pid of ['mirrors', 'skylight', 'valves', 'photos']) assert.equal(G.puzzles[pid].clue, undefined, pid);
+  assert.ok(G.puzzles.pots.clue(E.newState('novice')), '新手花盆的線索就是木牌本身');
 });

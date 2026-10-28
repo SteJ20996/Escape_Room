@@ -33,20 +33,25 @@ const VET_ATTIC_CODE = (() => {
   const { makeGame } = require('./helpers');
   const Store = require('../js/storage.js');
   const P = makeGame('veteran');
-  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
   P.look('s_desk'); P.use('flashlight', 's_fireplace'); P.go('foyer');
-  P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools');
+  P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_rules');
   P.use('storeroom_key', 'g_storedoor'); P.look('g_storedoor'); P.solve('seedlock', G.SEED_CODE);
   P.go('foyer'); P.use('hook_pole', 'f_hatch'); P.look('f_hatch'); P.look('a_chest'); P.look('a_photobox');
   return Store.encode(P.s);
 })();
-// 資深模式「剛進溫室、拿了鏟子、還沒問周伯」的存檔碼（用來測挖錯三盆的失敗）
+// 資深模式「問過周伯、回到溫室、還沒挖」的存檔碼（用來測挖錯三盆的失敗）
 const VET_POTS_CODE = (() => {
   const { makeGame } = require('./helpers');
   const Store = require('../js/storage.js');
   const P = makeGame('veteran');
-  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
-  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('s_desk'); P.use('flashlight', 's_fireplace');
+  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_rules');
+  P.use('storeroom_key', 'g_storedoor'); P.look('g_storedoor'); P.solve('seedlock', G.SEED_CODE);
+  P.go('foyer'); P.use('hook_pole', 'f_hatch'); P.look('f_hatch'); P.look('a_chest');
+  P.go('storeroom'); P.solve('signal', ['.-.']); P.solve('signal', ['---', '...']);
+  P.go('greenhouse');
   return Store.encode(P.s);
 })();
 // 資深模式「三枚徽章到手、暗房紅燈已亮」的存檔碼
@@ -436,6 +441,12 @@ async function vetStudy(P, { tutorialDone = true } = {}) {
   const { page } = P;
   if (!tutorialDone) await P.obj('f_coat');
   await P.room('study');
+  // 背下來的密碼沒有用：還沒看過書架，正確的 3751 也打不開
+  await P.obj('s_drawer');
+  await P.lockType('3751');
+  await P.feedback({ zh: new RegExp('^' + reEsc(G.puzzles.drawer.needClue.zh) + '$'), en: new RegExp('^' + reEsc(G.puzzles.drawer.needClue.en) + '$') });
+  ok(!(await P.has('greenhouse_key')), '沒看過書架就打不開抽屜');
+  await P.close();
   await P.obj('s_shelf'); await P.close();
   await P.obj('s_drawer');
   await P.lockType('7135');
@@ -470,6 +481,12 @@ async function vetStoreroom(P) {
   await P.obj('f_gh_door');
   await P.obj('g_tools');
   await P.obj('g_rules'); await P.close();
+  await P.obj('g_pots');
+  await page.click(`#modal-body [data-pot="${G.POT_ANSWER_V}"]`);       // 背答案：還沒問周伯就挖對的那一盆
+  await P.feedback({ zh: new RegExp(reEsc(G.puzzles.pots.needClue.zh)), en: new RegExp(reEsc(G.puzzles.pots.needClue.en)) });
+  ok(!(await P.has('brass_key')), '還沒問周伯，挖不到鑰匙');
+  ok((await page.locator('#modal-body .notice').first().innerText()) === ui('potsChances', P.lang, { n: 3, total: 3 }), '被拒絕的挖掘不扣機會');
+  await P.close();
   await P.obj('g_storedoor');
   await P.said(X(/閒人勿進/, /Keep out/));
   await P.use('storeroom_key', 'g_storedoor');
@@ -499,6 +516,8 @@ async function vetStoreroom(P) {
   await P.close();
   await P.obj('t_window');
   await P.modalHas(X(/燈號/, /Signal/), '帶著手電筒時小窗打開燈號畫面');
+  await sendSignal(P, ['.-.']);                                         // 還沒有燈號卡：連「晴」都打不出去
+  await P.feedback({ zh: new RegExp(reEsc(G.puzzles.signal.needClue.zh)), en: new RegExp(reEsc(G.puzzles.signal.needClue.en)) });
   await P.close();
 }
 
@@ -534,9 +553,11 @@ async function vetAttic(P) {
   ok(await P.has('crank') && await P.has('qing_letter'), '相框後的發條鑰匙與晴的信');
   await P.use('crank', 'a_musicbox');
   await P.obj('a_musicbox');
-  for (const k of ['1', '2', '3']) await page.keyboard.press(k);
+  // 背答案：還沒看過天文台的星座圖，就算用鍵盤彈出正確的旋律也沒有用
+  for (const n of G.MUSIC_ANSWER) await page.keyboard.press(n === 10 ? '0' : String(n));
   await page.click('#modal-body [data-act=play]');
-  await P.feedback(X(/什麼也沒發生。不對。/, /nothing happens\. Not right\./));
+  await P.feedback({ zh: new RegExp(reEsc(G.puzzles.musicbox.needClue.zh)), en: new RegExp(reEsc(G.puzzles.musicbox.needClue.en)) });
+  ok(!(await P.has('transparency')), '沒有線索時音樂盒不會打開');
   await page.click('#modal-body [data-act=letter]');
   await P.shot('qing-letter');
   await page.click('#modal-back-btn');
@@ -610,6 +631,9 @@ async function vetMusic(P) {
   const { page } = P;
   await P.room('attic');
   await P.obj('a_musicbox');
+  for (const k of ['1', '2', '3']) await page.keyboard.press(k);              // 讀過星座圖之後：彈錯只說「不對」
+  await page.click('#modal-body [data-act=play]');
+  await P.feedback(X(/什麼也沒發生。不對。/, /nothing happens\. Not right\./));
   for (const n of G.MUSIC_ANSWER) await page.click(`#modal-body [data-tine="${n}"]`);
   await P.shot('musicbox');
   await page.click('#modal-body [data-act=play]');
@@ -640,6 +664,9 @@ async function vetDarkroom(P, { dryingLine = true } = {}) {
   await P.obj('d_shelf'); await P.shot('bottle-card-v'); await P.close();
   await P.obj('d_tray');
   ok(await page.locator('#modal-body [data-bottle]').count() === 8, '資深模式有八瓶藥劑');
+  await page.click('#modal-body [data-doc]');
+  await P.modalHas(X(/潤濕液/, /wetting agent/), '沖洗台的「看卡片」打開資深的藥瓶卡片');
+  await page.click('#modal-back-btn');
   for (const b of ['red', 'blue', 'yellow', 'white', 'green', 'black', 'orange', 'purple']) await page.click(`#modal-body [data-bottle="${b}"]`);
   await page.click('#modal-body [data-act=go]');
   await P.feedback(X(/一片模糊。不對。/, /just a blur\. Not right\./));
@@ -888,6 +915,7 @@ async function keyboardRun(browser, lang) {
   await page.keyboard.press('Enter');
   ok(X(/手電筒/, /Flashlight/)[lang].test(await page.locator('#narration').innerText()), '鍵盤：Enter 觸發場景熱點');
   await page.locator('#objects [data-obj="f_study_door"]').focus(); await page.keyboard.press('Enter');
+  await page.locator('#objects [data-obj="s_shelf"]').focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
   await page.locator('#objects [data-obj="s_drawer"]').focus(); await page.keyboard.press('Enter');
   await page.keyboard.type('3751'); await page.keyboard.press('Enter');
   ok(X(/抽屜彈開/, /drawer springs open/)[lang].test(await page.locator('#narration').innerText()), '鍵盤：直接打數字開鎖');
@@ -966,6 +994,7 @@ async function switchRun(browser) {
   await newGame(P);
   await P.obj('f_coat');
   await P.room('study');
+  await P.obj('s_shelf'); await P.close();
   await P.obj('s_drawer');
   await P.lockType('3751');
   // 比較時排除遊戲計時（它每秒都在走，與語言無關）

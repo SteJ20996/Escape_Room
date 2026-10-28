@@ -52,7 +52,8 @@ for (const mode of ['novice', 'veteran']) {
   const tag = mode === 'veteran' ? '［資深］' : '［新手］';
 
   test(`${tag}窮舉過程沒有任何例外或空白回應（${graph.states.length} 個狀態）`, () => {
-    assert.ok(graph.states.length > (mode === 'veteran' ? 50000 : 10000), `狀態數異常地少：${graph.states.length}`);
+    // 拿到線索才能作答之後，「先輸入背下來的答案、再拿線索」的順序都不存在了，狀態數因此比早期版本少
+    assert.ok(graph.states.length > 5000, `狀態數異常地少：${graph.states.length}`);
     assert.deepEqual(graph.errors.slice(0, 3), []);
   });
 
@@ -129,13 +130,20 @@ for (const mode of ['novice', 'veteran']) {
     assert.deepEqual(expect.filter(p => !solved.has(p)), []);
   });
 
+  test(`${tag}每一道設了線索門檻的謎題，都列在公平性檢查裡`, () => {
+    const gated = Object.keys(G.puzzles).filter(pid => G.puzzles[pid].clue && !(mode === 'novice' && VET_PUZZLES.includes(pid)));
+    assert.deepEqual(gated.filter(pid => !CLUES[mode][pid]), []);
+  });
+
   for (const [pid, c] of Object.entries(CLUES[mode])) {
     test(`${tag}公平性：謎題「${pid}」的線索（${c.why}）不必先解開它就能取得`, () => {
       const reach = reachableWithout(graph, pid);
       const found = graph.states.some((s, i) => {
         if (!reach[i] || s.ending || !E.canEnter(s, c.room)) return false;
         const x = enter(s, c.room);
-        return G.puzzles[pid].available(x) && c.clue(x);
+        // 遊戲本身的門檻（拿到線索才能作答）也必須在不解開它的前提下滿足得了
+        const gate = G.puzzles[pid].clue;
+        return G.puzzles[pid].available(x) && c.clue(x) && (!gate || gate(x));
       });
       assert.ok(found);
     });
@@ -143,7 +151,7 @@ for (const mode of ['novice', 'veteran']) {
 
   test(`${tag}被化簡掉的動作（無效用法、無效組合、錯誤答案、純顯示機關）不會改變邏輯狀態，也不會拋錯`, () => {
     // 抽樣涵蓋各個進度階段，並包含所有結局前一刻的狀態
-    const every = mode === 'veteran' ? 31 : 7;
+    const every = 7;
     const sample = { states: graph.states.filter((s, i) => i % every === 0 || G.allInserted(s)) };
     const { problems, tried } = inertActions(sample);
     assert.ok(tried > 10000, `嘗試次數過少：${tried}`);

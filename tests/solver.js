@@ -99,6 +99,9 @@ const PICKUPS_COMMON = [
   ['observatory', 'look', 'o_lamp'], ['observatory', 'look', 'o_log'], ['greenhouse', 'look', 'g_moonflower'],
   ['greenhouse', 'use', 'g_bench', 'flashlight'], ['observatory', 'use', 'o_under', 'flashlight'],
   ['observatory', 'look', 'o_cabinet'],
+  // 讀線索（只會設「讀過」的旗標，讓需要線索的謎題可以作答；不移除任何東西）
+  ['study', 'look', 's_shelf'], ['greenhouse', 'look', 'g_rules'], ['observatory', 'look', 'o_poster'],
+  ['observatory', 'look', 'o_almanac'], ['darkroom', 'look', 'd_shelf'],
   // 注意：日記殘頁（煙囪、晾片繩、音樂盒）「不」在此列——收齊四頁會讓「孤證」結局消失，
   // 它們會改變結局選項，因此必須當成一般動作窮舉。
 ];
@@ -108,7 +111,7 @@ const PICKUPS = {
     // 資深模式的煙囪裡是儲物間鑰匙（不是日記），只會增加物品
     ['study', 'use', 's_fireplace', 'flashlight'],
     ['attic', 'look', 'a_chest'], ['attic', 'look', 'a_photobox'],
-    ['foyer', 'look', 'f_hatch'], ['greenhouse', 'look', 'g_storedoor'],
+    ['foyer', 'look', 'f_hatch'], ['greenhouse', 'look', 'g_storedoor'], ['darkroom', 'look', 'd_chart'],
   ]),
 };
 

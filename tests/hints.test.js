@@ -135,7 +135,7 @@ test('［資深］完整玩一遍時，每一個資深提示都會在某個時�
 
 test('［資深］提示不會預告還沒發現的閣樓、儲物間或周伯', () => {
   const { P } = recorder('veteran');
-  P.look('f_coat'); P.go('study'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
   const titles = () => P.E.hintList(P.s).map(h => h.title.zh + h.title.en).join(' ');
   assert.ok(!/閣樓|儲物間|周伯|Attic|Storeroom|Zhou/.test(titles()), titles());
   P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.go('greenhouse'); P.look('g_storedoor');
@@ -145,7 +145,7 @@ test('［資深］提示不會預告還沒發現的閣樓、儲物間或周伯',
 
 test('［資深］提示依階段分組：目前階段的提示排在最前面', () => {
   const { P } = recorder('veteran');
-  P.look('f_coat'); P.go('study'); P.look('s_drawer'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.look('s_drawer'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
   P.look('s_painting'); // 保險箱屬於之後的階段
   const list = P.E.hintList(P.s);
   assert.equal(P.E.stage(P.s).id, 'greenhouse');

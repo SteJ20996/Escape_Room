@@ -204,7 +204,7 @@
     zh: NOTE_LINES.zh.map((l, i) => (i === 2 ? ['門鎖密碼是那', '個冬夜的月和日。'] : l)),
     en: NOTE_LINES.en.map((l, i) => (i === 2 ? ['Its code is the month and d', 'ay of that winter night.'] : l)),
   };
-  const noteLines = mode => (mode === 'veteran' ? NOTE_LINES_V : NOTE_LINES);
+  const noteLines = mode => (RANK[mode] >= 1 ? NOTE_LINES_V : NOTE_LINES);
   const NOTE_ORDER_TEXT = { zh: '顯影→停影→定影→清水', en: 'developer → stop bath → fixer → water' };
   const TRAPDOOR_CODE = '1208';
 
@@ -231,7 +231,14 @@
    * 一之二、資深模式的謎題資料（新手模式完全不使用）
    * 這些數值都由程式搜尋產生，測試會逐一證明唯一解。
    * ================================================================ */
-  const VET = s => !!s && s.mode === 'veteran';
+  // 難度：新手 < 資深 < 大師。大師包含資深的全部內容，再加上自己的東西。
+  // 熱點、房間、提示的 mode 欄位表示「最低難度」；upTo 表示「最高難度」（給被大師版本取代的內容用）。
+  const MODES = ['novice', 'veteran', 'master'];
+  const RANK = { novice: 0, veteran: 1, master: 2 };
+  const isAdv = mode => RANK[mode] >= 1;      // 資深以上
+  const modeOk = (mode, x) => (!x.mode || RANK[mode] >= RANK[x.mode]) && (!x.upTo || RANK[mode] <= RANK[x.upTo]);
+  const VET = s => !!s && isAdv(s.mode);
+  const MASTER = s => !!s && s.mode === 'master';
 
   // 資深・花盆：八個盆、盆上漆著編號 1～8；八句話裡有幾句為真，只有周伯知道（答案：兩句）。
   // 不知道句數時，假設 2、3、4 句為真會分別指向三個不同的盆——所以一定要先問周伯。
@@ -371,6 +378,24 @@
   const MUSIC_TINES = 10;
   const MUSIC_SCORE = ['boat', 'fish', 'tower', 'crown', 'fish', 'key', 'boat', 'fish'];
   const MUSIC_ANSWER = MUSIC_SCORE.map(id => CONSTELLATIONS[id].stars.length);
+
+  /* ---------------- 大師模式 ---------------- */
+  // 音樂盒：晴的信不再寫出星座，要用星盤的解答（由外到內＝天空中由高到低）——每個撥兩下，最後回到最高的那個
+  const MUSIC_ANSWER_M = DIAL_ANSWER.flatMap(id => [CONSTELLATIONS[id].stars.length, CONSTELLATIONS[id].stars.length])
+    .concat([CONSTELLATIONS[DIAL_ANSWER[0]].stars.length]);
+  // 牆上那張卡片是韓嶽在陸觀死後偽造的：自己推得出唯一的答案，但它是錯的（顯影液不是瓶口結晶的黑蓋）
+  const FAKE_BOTTLE_RULES = [
+    { k: 'immLeft', a: 'developer', b: 'stop' },
+    { k: 'gap', a: 'developer', b: 'toner', between: 2 },
+    { k: 'notCaps', a: 'stop', caps: ['red', 'white'] },
+    { k: 'leftOf', a: 'fixer', b: 'toner' },
+    { k: 'immLeft', a: 'stop', b: 'water' },
+  ];
+  const DEV_MISS_LIMIT = 3;        // 避光盒裡只剩三張廢片：三次都試壞就失敗
+  const DEATH_DAY = 10, HAN_VISIT_DAY = 17; // 陸觀今年 10 月 10 日過世（開場：三週前）；韓嶽 10 月 17 日進過暗房（周伯日誌）
+  // 水道鐵門：「那顆彗星真正的位置」＝赤經 5 時 27 分、赤緯 −16 度（剪報的 −17 是韓嶽照抄的錯字）
+  const TUNNEL_CODE = '52716';
+  const TUNNEL_TRAP = '52717';
 
   /* ================================================================
    * 二、線索文件（可在「線索筆記」中隨時重讀）
@@ -650,6 +675,22 @@
         '9 December — first thing, I posted a registered letter for the master, a thick one, to Professor Han in the city. The master said it was an important observation report. I tucked the receipt behind the calendar.',
         '12 December — the master didn\'t say a word all day, and didn\'t eat.',
       ]),
+      // 大師：日誌最後幾頁是今年寫的——老水道的交代（橋），以及陸觀死後韓嶽進過暗房（識破假卡片的證據）
+      bodyM: L([
+        '12 月 8 日　晴。夜裡老爺帶晴丫頭在閣樓的圓窗看星星，兩個人鬧到半夜。',
+        '12 月 9 日　一早替老爺寄了一封掛號，厚厚的，寄給城裡的韓教授。老爺說是要緊的觀測報告。收據我夾在月曆後面。',
+        '12 月 12 日　老爺一整天沒說話，飯也沒吃。',
+        '（日誌的最後幾頁，是今年寫的。）',
+        `10 月 ${DEATH_DAY} 日　老爺走了。走之前交代我：哪天大門外要是有人守著，就讓阿遙走我那條老水道。`,
+        `10 月 ${HAN_VISIT_DAY} 日　韓教授來了，說要借老爺的書。他一個人在暗房裡待了快一個鐘頭，出來時兩手空空，臉色很難看。`,
+      ], [
+        '8 December — clear. In the night the master and little Qing watched the stars from the attic\'s round window; the two of them were up past midnight.',
+        '9 December — first thing, I posted a registered letter for the master, a thick one, to Professor Han in the city. The master said it was an important observation report. I tucked the receipt behind the calendar.',
+        '12 December — the master didn\'t say a word all day, and didn\'t eat.',
+        '(The last few pages of the log were written this year.)',
+        `${DEATH_DAY} October — the master passed away. Before he went, he told me: if one day someone is keeping watch outside the front door, let Yao take my old water channel.`,
+        `${HAN_VISIT_DAY} October — Professor Han came, saying he wanted to borrow some of the master\'s books. He spent nearly an hour alone in the darkroom and came out empty-handed, looking grim.`,
+      ]),
     },
     calendar: {
       title: L('1999 年 12 月的舊月曆', 'An Old Calendar: December 1999'), style: 'plain',
@@ -728,6 +769,18 @@
         MUSIC_SCORE.map(id => CONSTELLATIONS[id].name.en).join(', '),
         '— Qing, December 1999',
       ]),
+      // 大師：不寫星座名字，要用星盤的解答（連鎖）
+      bodyM: L([
+        '爸爸：',
+        '你說，音樂盒的每一根音齒都對應一個星座——星座有幾顆星，就撥第幾根。',
+        '這次我不把星座寫出來了，考考你：我們的歌，從你星盤上最高的那個星座開始，照星盤由外到內，每個撥兩下；最後再回到最高的那一個。',
+        '晴　1999 年 12 月',
+      ], [
+        'Dad —',
+        'You said every tine of the music box belongs to a constellation: as many stars as it has, that\'s the tine you pluck.',
+        'This time I won\'t write the constellations down — here\'s a test: our song starts with the highest constellation on your star dial, then goes through the dial from the outside in, plucking each one twice, and finally comes back to the highest one.',
+        '— Qing, December 1999',
+      ]),
     },
     process_chart: {
       title: L('牆上的沖洗流程表', 'Developing Chart on the Wall'), style: 'hand',
@@ -740,6 +793,18 @@
         'A glass plate needs only four chemicals: developer, stop bath, fixer and water. The order is on my note to Yao.',
         'The other two bottles on the shelf — toner and hypo clearing agent — are for printing paper. You won\'t need them.',
       ]),
+      // 大師：多一條實物線索——只有顯影液的瓶口會結晶
+      bodyM: L([
+        '玻璃底片沖洗流程（陸觀手寫）',
+        '玻璃底片只用四種藥劑：顯影液、停影液、定影液、清水。順序寫在給阿遙的便條上。',
+        '架上另外兩瓶——調色液和洗淨液——是沖相紙用的，這次用不到。',
+        '顯影液放久了，瓶口會結一圈褐色的結晶。別的藥劑不會。',
+      ], [
+        'Developing a glass plate (in Lu Guan\'s hand)',
+        'A glass plate needs only four chemicals: developer, stop bath, fixer and water. The order is on my note to Yao.',
+        'The other two bottles on the shelf — toner and hypo clearing agent — are for printing paper. You won\'t need them.',
+        'Developer left standing grows a ring of brown crystals around the neck of its bottle. The other chemicals don\'t.',
+      ]),
     },
     bottle_card_v: {
       title: L('藥瓶架上的卡片', 'Card on the Bottle Shelf'), style: 'hand',
@@ -749,6 +814,34 @@
       ], [
         `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
         ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+      ]),
+      bodyM: L([
+        `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
+        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六'[i]}、${bottleRuleText(r).zh}`),
+        '（泛黃的舊卡紙，邊角都磨圓了。）',
+      ], [
+        `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
+        ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+        '(Old yellowed card stock, its corners worn round.)',
+      ]),
+    },
+    tunnel_lock: {
+      title: L('水道鐵門上的刻字', 'Words on the Channel Gate'), style: 'plain',
+      body: L(['低矮的鐵門上有一個五位數的密碼鎖。鎖旁刻著一行字：', '「那顆彗星真正的位置。」'],
+        ['A five-digit combination lock is set into the low iron gate. Carved beside it:', '"Where the comet truly was."']),
+    },
+    // 大師：牆上釘著的另一張卡片（韓嶽偽造）。破綻：寫在今年 10 月 17 日撕下的日曆紙上——那時陸觀已經過世。
+    // 逐日撕的日曆要到那一天才會撕下（暗房門邊的日曆也正好撕到這一天），所以卡片不可能早於 17 日寫成
+    bottle_card_fake: {
+      title: L('牆上釘著的卡片', 'Card Pinned to the Wall'), style: 'hand',
+      body: L([
+        `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
+        ...FAKE_BOTTLE_RULES.map((r, i) => `${'一二三四五六'[i]}、${bottleRuleText(r).zh}`),
+        `（卡片很新，背面是一張撕下來的日曆紙，印著今年 10 月 ${HAN_VISIT_DAY} 日——暗房門邊那本逐日撕的日曆，也正好撕到這一天。）`,
+      ], [
+        `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
+        ...FAKE_BOTTLE_RULES.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+        `(The card is new. On the back is a page torn from a day-by-day calendar, printed with ${HAN_VISIT_DAY} October of this year — and the tear-off calendar by the darkroom door has been torn off up to exactly that day.)`,
       ]),
     },
   };
@@ -873,7 +966,11 @@
     ctx.set('inserted_' + e);
     ctx.say(L(`你把${items[e].name.zh}按進大門上對應的凹槽，「喀」的一聲，嵌得嚴絲合縫。`,
       `You press the ${items[e].name.en} into its socket in the door. Click — a perfect fit.`), 'good');
-    if (allInserted(ctx.s)) ctx.say(L('三枚徽章全部歸位。門內傳來齒輪轉動的聲音——大門的鎖開了。', 'All three emblems are in place. Gears turn inside the door — the lock has opened.'), 'event');
+    if (allInserted(ctx.s)) {
+      ctx.say(L('三枚徽章全部歸位。門內傳來齒輪轉動的聲音——大門的鎖開了。', 'All three emblems are in place. Gears turn inside the door — the lock has opened.'), 'event');
+      // 大師：同一個機關也鬆開了儲物間雜物架底下的鐵栓（橋：屋子另一頭的聲音）
+      if (MASTER(ctx.s)) ctx.say(L('同一時間，屋子另一頭也傳來一聲沉重的「喀」——像是很遠的地方，有一根鐵栓收了回去。', 'At the same moment a heavy clunk sounds from the far side of the house — as if, somewhere distant, an iron bolt has slid back.'), 'event');
+    }
   };
   const DEAD_LIGHT = L('手電筒沒電，照不亮任何東西。', 'The flashlight is dead. It lights up nothing.');
 
@@ -895,7 +992,8 @@
     {
       id: 'f_mailslot', room: 'foyer', name: L('信件口', 'Mail Slot'),
       examine(ctx) {
-        if (ctx.flag('phoneDone')) ctx.say(L('信件口外一片漆黑。門外那輛車的引擎聲已經遠去了。', 'Beyond the mail slot there is only darkness. The car\'s engine has faded into the distance.'));
+        if (ctx.flag('phoneDone') && MASTER(ctx.s)) ctx.say(L('從信件口往外看，那輛黑色轎車還停在石階下，車燈照著大門。', 'Through the mail slot you can see the black car still parked below the steps, its headlights trained on the door.'));
+        else if (ctx.flag('phoneDone')) ctx.say(L('信件口外一片漆黑。門外那輛車的引擎聲已經遠去了。', 'Beyond the mail slot there is only darkness. The car\'s engine has faded into the distance.'));
         else ctx.say(L('門上的黃銅信件口。往外推只能推開一條細縫——夠塞進一封信，人是絕對過不去的。', 'A brass mail slot in the door. It only pushes open a crack — wide enough for a letter, never for a person.'));
       },
       use: {
@@ -1023,7 +1121,7 @@
     },
     {
       id: 's_clipping', room: 'study', name: L('牆上的剪報', 'Newspaper Clipping'),
-      examine(ctx) { ctx.note('clipping'); ctx.open({ view: 'doc', id: 'clipping' }); },
+      examine(ctx) { ctx.note('clipping'); ctx.set('clippingRead'); ctx.open({ view: 'doc', id: 'clipping' }); },
     },
     {
       id: 's_painting', room: 'study', name: L('星空油畫', 'Starry Painting'),
@@ -1317,7 +1415,12 @@
     {
       id: 'd_shelf', room: 'darkroom', name: L('藥瓶架', 'Bottle Shelf'),
       visible: s => !!s.flags.darkroomLit,
-      examine(ctx) { const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card'; ctx.note(id); ctx.set('bottleCardRead'); ctx.open({ view: 'doc', id }); },
+      examine(ctx) {
+        const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card';
+        // 大師：兩張卡片（橋：內容對不上）；黑蓋瓶口的結晶是識破假卡片的實物證據
+        if (MASTER(ctx.s)) ctx.say(L('藥瓶架上壓著一張舊卡片；牆上還釘著另一張，筆跡很像，內容卻對不上。黑蓋那一瓶的瓶口，結著一圈褐色的結晶。', 'An old card is tucked under the bottles; another is pinned to the wall beside them. The handwriting is alike, but they don\'t agree. Around the neck of the black-capped bottle is a ring of brown crystals.'));
+        ctx.note(id); ctx.set('bottleCardRead'); ctx.open({ view: 'doc', id });
+      },
     },
     {
       id: 'd_tray', room: 'darkroom', name: L('顯影台', 'Developing Bench'),
@@ -1347,6 +1450,11 @@
       id: 'd_chart', room: 'darkroom', mode: 'veteran', name: L('牆上的流程表', 'Developing Chart'),
       visible: s => !!s.flags.darkroomLit,
       examine(ctx) { ctx.note('process_chart'); ctx.set('chartRead'); ctx.open({ view: 'doc', id: 'process_chart' }); },
+    },
+    {
+      id: 'd_card2', room: 'darkroom', mode: 'master', name: L('牆上的卡片', 'Card on the Wall'),
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) { ctx.note('bottle_card_fake'); ctx.set('fakeCardRead'); ctx.open({ view: 'doc', id: 'bottle_card_fake' }); },
     },
 
     /* ---------------- 儲物間（資深） ---------------- */
@@ -1386,7 +1494,27 @@
     },
     {
       id: 't_shelf', room: 'storeroom', name: L('雜物架', 'Shelves'),
-      examine(ctx) { ctx.say(L('鋤頭、麻繩、一捆捆竹竿，每樣東西都擺得整整齊齊。周伯是個仔細的人。', 'Hoes, twine, bundles of bamboo canes — everything is put away neatly. Old Zhou is a careful man.')); },
+      examine(ctx) {
+        if (!MASTER(ctx.s)) { ctx.say(L('鋤頭、麻繩、一捆捆竹竿，每樣東西都擺得整整齊齊。周伯是個仔細的人。', 'Hoes, twine, bundles of bamboo canes — everything is put away neatly. Old Zhou is a careful man.')); return; }
+        // 大師：架子後面藏著老水道的鐵門；三枚徽章歸位時，卡住架子的鐵栓才會收回
+        if (ctx.flag('tunnelFound')) { ctx.say(L('雜物架推到了一邊，後面就是那扇低矮的鐵門。', 'The shelves stand pushed aside; behind them is the low iron gate.')); return; }
+        if (allInserted(ctx.s)) {
+          ctx.set('tunnelFound');
+          ctx.say(L('架子底下那根插進地板的鐵栓不見了。你把雜物架推開——後面是一扇低矮的鐵門，冷風夾著溪水的聲音從門縫裡灌進來。', 'The iron bolt that pinned the shelves to the floor is gone. You push the shelves aside — behind them is a low iron gate, and cold air carrying the sound of running water pours through the gap.'), 'event');
+          return;
+        }
+        ctx.set('draftNoticed');
+        ctx.say(L('鋤頭、麻繩、一捆捆竹竿，擺得整整齊齊。架子後面的牆縫裡透出一股濕冷的風，帶著溪水的味道。架子底下有一根鐵栓插進地板，推不動。', 'Hoes, twine, bundles of bamboo canes, all neatly put away. A damp, cold draft that smells of the creek seeps through a crack in the wall behind the shelves. An iron bolt pins the shelves to the floor; they won\'t budge.'));
+      },
+    },
+    {
+      id: 't_tunnel', room: 'storeroom', mode: 'master', name: L('水道鐵門', 'Channel Gate'),
+      visible: s => !!s.flags.tunnelFound,
+      examine(ctx) {
+        if (ctx.flag('tunnelOpen')) { ctx.open({ view: 'exit', via: 'tunnel' }); return; }
+        ctx.note('tunnel_lock');
+        ctx.open({ view: 'lock', id: 'tunnel' });
+      },
     },
     {
       id: 't_exit', room: 'storeroom', name: L('回到溫室', 'Back to the Greenhouse'),
@@ -1447,7 +1575,11 @@
     },
     {
       id: 'a_window', room: 'attic', name: L('圓窗', 'Round Window'),
-      examine(ctx) { ctx.say(L('圓窗朝著東南方的夜空。周伯家在山谷的另一頭，從這裡看不到——屋子最邊上那間儲物間的小窗才正對著那邊。', 'The round window faces the southeastern sky. Old Zhou\'s house is on the other side of the valley and can\'t be seen from here — only the little window of the storeroom, on the edge of the house, looks that way.')); },
+      examine(ctx) {
+        ctx.say(L('圓窗朝著東南方的夜空。周伯家在山谷的另一頭，從這裡看不到——屋子最邊上那間儲物間的小窗才正對著那邊。', 'The round window faces the southeastern sky. Old Zhou\'s house is on the other side of the valley and can\'t be seen from here — only the little window of the storeroom, on the edge of the house, looks that way.'));
+        // 大師：從高處往下看得到水道口（橋）
+        if (MASTER(ctx.s)) ctx.say(L('往下看，儲物間那頭的牆腳有一道石砌的水道口，一路穿過草坡，通到山谷裡的溪邊。', 'Looking down, you see a stone-lined water channel at the foot of the storeroom wall, running across the slope all the way to the creek in the valley.'));
+      },
     },
     {
       id: 'a_exit', room: 'attic', name: L('下梯子回門廳', 'Down the Ladder'),
@@ -1746,12 +1878,15 @@
 
     develop: {
       available: s => inRoom('darkroom')(s) && s.flags.darkroomLit && !s.flags.plateDeveloped,
-      clue: s => noteReady(s) && !!s.flags.bottleCardRead && (!VET(s) || !!s.flags.chartRead), // 便條的順序、藥瓶卡片（資深：加上流程表）
+      clue: s => noteReady(s) && !!s.flags.bottleCardRead && (!VET(s) || !!s.flags.chartRead), // 便條的順序、藥瓶卡片（資深以上：加上流程表）
       needClue: L('你還不知道哪一瓶是什麼、該照什麼順序倒。', 'You don\'t know which bottle is which, or what order to pour them in.'),
       vetWrong: L('你先拿一張廢片試了試——一片模糊。不對。', 'You try it on a scrap of film first — just a blur. Not right.'),
       check(ctx, seq) {
         const answer = VET(ctx.s) ? DEVELOP_ANSWER_V : DEVELOP_ANSWER;
-        const pick = Array.isArray(seq) ? seq.slice(0, answer.length) : [];
+        const bottles = VET(ctx.s) ? BOTTLES_V : BOTTLES;
+        // 不完整或不存在的瓶子：不算一次嘗試（大師模式每一次都會用掉一張廢片）
+        if (!Array.isArray(seq) || seq.length < answer.length || seq.slice(0, answer.length).some(id => !bottles.some(b => b.id === id))) return null;
+        const pick = seq.slice(0, answer.length);
         if (pick.join() === answer.join()) {
           ctx.set('plateDeveloped');
           ctx.say(L('你先用一張廢片試了一次——影像清清楚楚地浮現出來。順序對了。', 'First you try a scrap of film — the image comes up crisp and clear. The order is right.'), 'good');
@@ -1761,6 +1896,20 @@
         }
         ctx.wrong();
         ctx.say(L('你先拿一張廢片試了試——片子上一片模糊。順序不對。幸好沒有直接用那張底片。', 'You try it on a scrap of film first — the result is a blur. Wrong order. Good thing you didn\'t use the real plate.'), 'bad');
+        if (MASTER(ctx.s)) {
+          // 大師：避光盒裡只有三張廢片，三張都試壞就失敗（keep：資深以上答錯只說「不對」時，這句照樣保留）
+          const miss = (ctx.get('devMisses') || 0) + 1;
+          ctx.set('devMisses', miss);
+          if (miss >= DEV_MISS_LIMIT) {
+            ctx.say(L('第三張廢片也毀了。避光盒裡只剩那張真正的底片。', 'The third scrap is ruined too. Only the real plate is left in the light-tight box.'), 'bad', { keep: true });
+            ctx.end('G');
+            return false;
+          }
+          const left = DEV_MISS_LIMIT - miss;
+          ctx.say(left === 1
+            ? L('避光盒裡只剩最後一張廢片了。', 'Only one scrap of film is left in the light-tight box.')
+            : L(`避光盒裡還剩 ${left} 張廢片。`, `${left} scraps of film are left in the light-tight box.`), 'bad', { keep: true });
+        }
         return false;
       },
     },
@@ -1845,12 +1994,13 @@
 
     musicbox: {
       available: s => VET(s) && inRoom('attic')(s) && s.flags.crankInserted && !s.flags.musicSolved,
-      clue: s => s.inv.includes('qing_letter') && !!s.flags.posterRead, // 晴的星星譜＋星座圖的星數
+      // 晴的星星譜＋星座圖的星數（大師：晴的信指向星盤，要先解開星盤）
+      clue: s => s.inv.includes('qing_letter') && !!s.flags.posterRead && (!MASTER(s) || !!s.flags.starDialSolved),
       needClue: L('十根音齒，你不知道該彈哪一首曲子。', 'Ten tines — but you don\'t know which tune to play.'),
       vetWrong: L('音樂盒叮叮咚咚地響完，什麼也沒發生。不對。', 'The music box tinkles to the end, and nothing happens. Not right.'),
       check(ctx, notes) {
         if (!Array.isArray(notes) || !notes.length || notes.some(n => !Number.isInteger(n) || n < 1 || n > MUSIC_TINES)) return null;
-        if (notes.join() === MUSIC_ANSWER.join()) {
+        if (notes.join() === (MASTER(ctx.s) ? MUSIC_ANSWER_M : MUSIC_ANSWER).join()) {
           ctx.set('musicSolved');
           ctx.say(L('熟悉的旋律在閣樓裡響起。最後一個音落下，音樂盒的底座「喀」地彈出一個小抽屜：裡面是一張畫著星星的透明膠片，和一頁折起來的日記。', 'A familiar tune fills the attic. As the last note fades, a little drawer clicks out of the music box\'s base: inside are a sheet of clear film with stars drawn on it, and a folded diary page.'), 'good');
           ctx.give('transparency'); ctx.give('page2');
@@ -1875,7 +2025,8 @@
         if (choice === 'refuse') {
           ctx.set('phoneRinging', false);
           ctx.set('phoneDone');
-          ctx.say(L('「……你會後悔的。」電話被狠狠地掛斷了。過了一會兒，門外傳來汽車發動、駛遠的聲音。', '"…You\'ll regret this." The line goes dead with a slam. A moment later, a car engine starts outside the door and fades away.'), 'event');
+          if (MASTER(ctx.s)) ctx.say(L('「……隨你。我就在這裡等，等到天亮。」電話被掛斷了。門外那輛車沒有開走，車燈一直亮著。', '"…Suit yourself. I\'ll wait right here, until dawn." The line goes dead. The car outside doesn\'t leave; its headlights stay on.'), 'event');
+          else ctx.say(L('「……你會後悔的。」電話被狠狠地掛斷了。過了一會兒，門外傳來汽車發動、駛遠的聲音。', '"…You\'ll regret this." The line goes dead with a slam. A moment later, a car engine starts outside the door and fades away.'), 'event');
           return true;
         }
         return null;
@@ -1885,14 +2036,46 @@
     exit: {
       available: s => inRoom('foyer')(s) && allInserted(s),
       check(ctx, choice) {
-        const plate = ctx.has('plate');
-        if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
-        if (choice === 'publish' && plate) { ctx.end(countPages(ctx.s) === 4 ? 'B' : 'C'); return true; }
-        if (choice === 'leave_plate' && plate) { ctx.take('plate'); ctx.end('E'); return true; }
-        return null;
+        // 大師：韓嶽守在大門外。沖出底片之後從大門走（帶著或留在屋裡），一定會被截胡
+        if (MASTER(ctx.s)) {
+          const plate = ctx.has('plate');
+          if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
+          if ((choice === 'publish' || choice === 'leave_plate') && plate) { if (choice === 'leave_plate') ctx.take('plate'); ctx.end('H'); return true; }
+          return null;
+        }
+        return leaveWith(ctx, choice);
       },
     },
+
+    /* ---------- 大師模式 ---------- */
+    tunnel: Object.assign(lockPuzzle({
+      code: TUNNEL_CODE,
+      available: s => MASTER(s) && inRoom('storeroom')(s) && s.flags.tunnelFound && !s.flags.tunnelOpen,
+      success(ctx) {
+        ctx.set('tunnelOpen');
+        ctx.say(L('最後一位轉到定位，鐵門「喀」地彈開。門後是一條低矮的石砌水道，溪水聲從黑暗的另一頭傳來。', 'The last digit clicks into place and the iron gate springs open. Beyond it is a low, stone-lined channel; the sound of the creek comes from the dark at the far end.'), 'good');
+      },
+    }), {
+      // 剪報的赤經（只有剪報有）＋日記三或底片紙套上的修正（−17 是照抄的錯字，真的是 −16）
+      clue: s => !!s.flags.clippingRead && (s.inv.includes('plate') || s.inv.includes('page3') || (s.flags.diaryPages || []).includes('page3')),
+      needClue: L('鎖旁刻著「那顆彗星真正的位置」。你還不確定它真正在哪裡。', 'Beside the lock is carved "where the comet truly was". You aren\'t sure yet where that is.'),
+      digits: 5, title: L('水道鐵門', 'Channel Gate'),
+      prompt: L('低矮的鐵門上有一個五位數的密碼鎖。鎖旁刻著一行字：「那顆彗星真正的位置。」', 'A five-digit combination lock on the low iron gate. Carved beside it: "Where the comet truly was."'),
+    }),
+    escape: {
+      available: s => MASTER(s) && inRoom('storeroom')(s) && !!s.flags.tunnelOpen,
+      check: (ctx, choice) => leaveWith(ctx, choice),
+    },
   };
+
+  // 離開：帶著底片公開（日記齊全是真結局，否則孤證）、把底片留下，或沒有底片直接走
+  function leaveWith(ctx, choice) {
+    const plate = ctx.has('plate');
+    if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
+    if (choice === 'publish' && plate) { ctx.end(countPages(ctx.s) === 4 ? 'B' : 'C'); return true; }
+    if (choice === 'leave_plate' && plate) { ctx.take('plate'); ctx.end('E'); return true; }
+    return null;
+  }
 
   function countPages(s) {
     const bound = (s.flags.diaryPages || []).length;
@@ -2011,7 +2194,83 @@
       ]),
     },
   };
-  const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D'];
+  // 大師模式專屬的結局與失敗
+  endings.H = {
+    mode: 'master',
+    title: L('截胡', 'Intercepted'), rank: L('壞結局', 'Bad Ending'),
+    text: L([
+      '大門開了。你走下石階，夜風很冷。',
+      '那輛黑色轎車就停在門外，車燈一直亮著。車門打開，韓嶽走了下來——他一直在等。「辛苦了，阿遙。」',
+      '他沒有多說什麼，只是一樣一樣地拿走了他要的東西：你身上的日記，還有那張底片——不管你把它帶在身上，還是留在屋裡，他都有大門的鑰匙。',
+      '幾天後，山上的老宅發生了一場小火災。燒掉的，只有地下的暗房。',
+    ], [
+      'The front door opens. You walk down the stone steps; the night wind is cold.',
+      'The black car is parked right outside, headlights still on. The door opens and Han Yue steps out — he has been waiting all along. "Thank you for your trouble, Yao."',
+      'He says nothing more. He simply takes, one by one, what he came for: the diary you carry, and the plate — whether you have it with you or left it in the house, he has a key to the front door.',
+      'A few days later there is a small fire at the old house on the mountain. The only thing it burns is the darkroom underground.',
+    ]),
+  };
+  endings.G = {
+    fail: true,
+    title: L('最後一張廢片', 'The Last Scrap of Film'), rank: L('失敗', 'Failed'),
+    text: L([
+      '第三張廢片也毀了。避光盒裡只剩那張真正的底片——你不敢再拿它冒險。',
+      '你在紅燈下坐了很久，始終沒能讓那顆彗星浮現。',
+      '天亮時，門外的車燈還亮著。',
+    ], [
+      'The third scrap is ruined too. Only the real plate is left in the light-tight box — and you don\'t dare risk it.',
+      'You sit under the red light for a long time, but the comet never comes up out of the dark.',
+      'At dawn, the headlights outside are still on.',
+    ]),
+  };
+  // 大師：真結局、孤證、沉睡的星都只能從水道走；普通結局不提是哪一扇門
+  endings.A.textM = L([
+    '三枚徽章各歸其位，門內傳來一連串齒輪咬合的聲音。山間的晨霧從門縫湧了進來。',
+    '你回頭望了一眼。書房、溫室、天文台、閣樓——你走遍了它們，卻沒有帶走那個「光照不到的地方」裡的東西。',
+    '許多年後，教科書上那顆彗星依然叫做「韓嶽彗星」。偶爾在失眠的夜裡，你會想起信上那句話，想知道那裡究竟藏著什麼。',
+    '你始終沒有回去。',
+  ], [
+    'The three emblems settle into place, and a chain of gears engages inside the door. Mountain mist seeps in through the gap.',
+    'You look back once. The study, the greenhouse, the observatory, the attic — you walked through them all, but took nothing from "where the light cannot reach".',
+    'Years later, the comet in the textbooks is still called Comet Han Yue. Now and then, on sleepless nights, you remember that line in the letter and wonder what was hidden there.',
+    'You never went back.',
+  ]);
+  endings.B.textM = L([
+    '你沒有走大門。你帶著底片和那本拼完整的日記，彎著腰鑽進周伯的老水道，順著溪水聲一直走到山谷裡。天快亮時，溪邊亮起一盞燈——周伯在那裡等你。',
+    '大門外，韓嶽的車還停著，車燈照著一扇再也不會為他打開的門。',
+    '三個月後，天文學會公布了調查結果：底片上彗星與群星的相對位置，精確對應 1999 年 12 月 8 日的夜空——比韓嶽宣稱的發現早了整整兩天；韓嶽發表的坐標裡那個照抄的「7」，只可能來自陸觀的原始紀錄。周伯也站了出來，交出那張夾在舊月曆後面的掛號收據：1999 年 12 月 9 日，陸觀寄給韓嶽。',
+    '那顆彗星被正式更名為「陸觀彗星」。晴從國外趕了回來，把閣樓的音樂盒和那張窗邊的照片一起帶走了。',
+    '公布的那天晚上，你回到老宅，在天文台架起望遠鏡，把穹頂轉向東南。目鏡裡的星空是倒過來的。你笑了——這一次，你知道該怎麼看。',
+  ], [
+    'You don\'t take the front door. With the plate and the completed diary, you stoop into Old Zhou\'s old water channel and follow the sound of the creek down into the valley. Near dawn, a lamp comes on by the water — Old Zhou is waiting for you.',
+    'Outside the front door, Han Yue\'s car is still parked, its headlights on a door that will never open for him again.',
+    'Three months later, the Astronomical Society publishes its findings: the comet\'s position among the stars on the plate matches the sky of 8 December 1999 exactly — two full days before Han Yue\'s claimed discovery. And the copied "7" in Han Yue\'s published coordinates could only have come from Lu Guan\'s original notes. Old Zhou comes forward too, with the registered-mail receipt he kept behind the old calendar: 9 December 1999, from Lu Guan to Han Yue.',
+    'The comet is officially renamed Comet Lu Guan. Qing flies home from abroad and takes the attic music box and the photo by the window with her.',
+    'On the night of the announcement, you go back to the old house, set up the telescope in the observatory and turn the dome to the southeast. The stars in the eyepiece are upside down. You smile — this time, you know how to read them.',
+  ]);
+  endings.C.textM = L([
+    '你從周伯的老水道逃了出來，把底片交給了天文學會。底片上的彗星清清楚楚，可韓嶽的律師一口咬定：一張來歷不明的舊底片，誰能證明它不是事後偽造的？',
+    '周伯說他當年替陸觀寄過一封掛號給韓嶽——可一張收據，證明不了信封裡裝的是什麼。陸觀的日記你只找到了一部分，缺掉的那幾頁裡，也許正寫著讓這一切無可辯駁的關鍵。',
+    '爭論拖了兩年，最後不了了之。',
+    '（屋子裡還有你沒找到的日記殘頁。）',
+  ], [
+    'You escape through Old Zhou\'s water channel and hand the plate to the Astronomical Society. The comet on it is perfectly clear — but Han Yue\'s lawyers insist: an old plate of unknown origin — who can prove it wasn\'t faked after the fact?',
+    'Old Zhou says he once posted a registered letter from Lu Guan to Han Yue — but a receipt can\'t prove what was inside the envelope. You found only part of Lu Guan\'s diary; the missing pages might have held the key that would have made it all undeniable.',
+    'The dispute drags on for two years and fizzles out.',
+    '(There are diary pages in the house you never found.)',
+  ]);
+  endings.E.textM = L([
+    '水道的出口就在眼前，溪水聲清清楚楚。你看了很久手裡的底片。',
+    '最後，你走回暗房，把它放回避光盒，鎖上活板門，再從水道離開。大門外的車燈一直亮到天明，韓嶽始終不知道還有另一扇門。',
+    '真相還在那裡，只是從今以後，由你來守護。也許有一天你會回來帶走它，也許永遠不會。',
+    '陸觀說過：由你決定。',
+  ], [
+    'The mouth of the channel is right ahead; you can hear the creek clearly. You look at the plate in your hands for a long time.',
+    'In the end you go back to the darkroom, return it to the light-tight box, lock the trapdoor, and leave through the channel. The headlights outside the front door stay on until dawn; Han Yue never learns there was another way out.',
+    'The truth is still there — only now it\'s yours to guard. Maybe one day you\'ll come back for it; maybe you never will.',
+    'Lu Guan said it himself: it\'s up to you.',
+  ]);
+  const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D', 'H'];
 
   /* ================================================================
    * 九、階段與提示
@@ -2031,16 +2290,18 @@
     attic: { title: L('天花板上的活門', 'The Hatch in the Ceiling'), goal: L('想辦法上到閣樓。', 'Find a way up into the attic.'), done: s => F(s, 'atticOpen') },
     gate: { title: L('樓梯鐵門', 'The Stair Gate'), goal: L('找到樓梯鐵門的鑰匙，上天文台。', 'Find the key to the stair gate and go up to the observatory.'), done: s => F(s, 'gateOpen') },
     emblems: { title: L('日、月、星', 'Sun, Moon and Star'), goal: L('找齊日、月、星三枚徽章。', 'Find all three emblems: Sun, Moon and Star.'), done: emblemsFound },
+    escape: { title: L('另一條路', 'Another Way Out'), goal: L('大門也許不是唯一的出口。找出這棟屋子的另一條路。', 'The front door may not be the only way out. Find the house\'s other way out.'), done: s => F(s, 'tunnelOpen') },
     door: { title: L('大門', 'The Front Door'), goal: L('把三枚徽章嵌回門廳的大門。', 'Set the three emblems into the front door in the foyer.'), done: s => allInserted(s) },
     leave: { title: L('離開之前', 'Before You Go'), goal: L('決定要帶走什麼，然後離開。', 'Decide what to take with you, and leave.'), done: s => !!s.ending },
   };
   const STAGES = {
     novice: ['drawer', 'greenhouse', 'gate', 'emblems', 'door', 'leave'],
     veteran: ['drawer', 'greenhouse', 'storeroom', 'attic', 'gate', 'emblems', 'door', 'leave'],
+    master: ['drawer', 'greenhouse', 'storeroom', 'attic', 'gate', 'emblems', 'door', 'escape', 'leave'],
   };
   // 支線：不在主線階段裡，但有自己的目標與提示
   const SIDE_STAGE = { id: 'truth', title: L('光照不到的地方（選擇性）', 'Where the Light Cannot Reach (Optional)'), goal: L('信裡說，二十年前的真相藏在「光照不到的地方」。', 'The letter says the truth from twenty years ago is hidden "where the light cannot reach".'), done: s => F(s, 'plateDeveloped') };
-  const modeOf = s => (VET(s) ? 'veteran' : 'novice');
+  const modeOf = s => (s && STAGES[s.mode] ? s.mode : 'novice');
   function stageInfo(s) {
     const ids = STAGES[modeOf(s)];
     const index = ids.findIndex(id => !STAGE_DEFS[id].done(s));
@@ -2093,6 +2354,7 @@
     { hs: 't_balance', mode: 'veteran', done: s => seen(s, 'weight_box') },
     { hs: 't_cabinet', mode: 'veteran', done: s => seen(s, 'cabinet_note') || F(s, 'cabinetOpen') },
     { hs: 't_calendar', mode: 'veteran', done: s => seen(s, 'calendar') },
+    { hs: 't_shelf', mode: 'master', done: s => F(s, 'draftNoticed') || F(s, 'tunnelFound') },
     { hs: 'a_chest', mode: 'veteran', done: s => F(s, 'cardTaken') },
     { hs: 'a_photobox', mode: 'veteran', done: s => F(s, 'photosTaken') },
     { hs: 'a_marks', mode: 'veteran', done: s => seen(s, 'height_marks') },
@@ -2105,10 +2367,12 @@
     { hs: 'o_lamp', done: s => F(s, 'bulbTaken') },
     { hs: 'd_shelf', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card') || seen(s, 'bottle_card_v') },
     { hs: 'd_chart', mode: 'veteran', done: s => !F(s, 'darkroomLit') || seen(s, 'process_chart') },
+    { hs: 'd_card2', mode: 'master', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card_fake') },
     { hs: 'd_line', done: s => !F(s, 'darkroomLit') || F(s, 'p4Taken') },
   ];
   const DISCOVERIES = DISCOVERY_LIST.map(d => Object.assign(d, { room: hotspotById[d.hs].room, name: hotspotById[d.hs].name }));
-  const nextDiscovery = s => DISCOVERIES.find(d => (!d.mode || d.mode === modeOf(s)) && roomOpen(s, d.room) && !d.done(s));
+  // mode 是最低難度：資深的物件在大師模式也要列出來
+  const nextDiscovery = s => DISCOVERIES.find(d => modeOk(modeOf(s), d) && roomOpen(s, d.room) && !d.done(s));
   const ALL_SEEN = L('你已經把能到的地方都看過了。', 'You\'ve already looked at everything you can reach.');
   const roomIn = id => L(rooms[id].name.zh, rooms[id].name.en.toLowerCase());
 
@@ -2186,7 +2450,7 @@
       ],
     },
     {
-      id: 'pots', mode: 'novice', stage: 'gate', title: L('四個花盆', 'The Four Pots'),
+      id: 'pots', upTo: 'novice', stage: 'gate', title: L('四個花盆', 'The Four Pots'),
       avail: s => seen(s, 'pots_rule'), done: s => F(s, 'keyDug'),
       texts: [
         L('木牌說：四句話裡只有一句是真的。挖土需要工具——看看溫室的工具架。', 'The sign says only one of the four sentences is true. You\'ll need a tool to dig — check the greenhouse tool rack.'),
@@ -2244,7 +2508,7 @@
       ],
     },
     {
-      id: 'musicbox', mode: 'veteran', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
+      id: 'musicbox', mode: 'veteran', upTo: 'veteran', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
       avail: s => has(s, 'crank') || F(s, 'crankInserted') || seen(s, 'qing_letter'), done: s => F(s, 'musicSolved'),
       texts: [
         s => F(s, 'crankInserted') ? L('晴的信裡有一首用星座寫成的歌。', 'Qing\'s letter has a song written in constellations.') : L('發條鑰匙要插進閣樓的音樂盒。晴的信裡有一首用星座寫成的歌。', 'The winding key goes into the music box in the attic. Qing\'s letter has a song written in constellations.'),
@@ -2300,7 +2564,7 @@
       ],
     },
     {
-      id: 'mirrors', mode: 'novice', stage: 'emblems', title: L('天窗反光鏡', 'The Skylight Mirrors'),
+      id: 'mirrors', upTo: 'novice', stage: 'emblems', title: L('天窗反光鏡', 'The Skylight Mirrors'),
       avail: s => seen(s, 'garden_rules') || F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
       texts: [
         L('園丁守則說月光花只在月光照到時開花。天窗下的反光鏡可以轉動。', 'The gardener\'s rules say the moonflower only blooms in moonlight. The mirrors under the skylight can be turned.'),
@@ -2327,7 +2591,7 @@
       ],
     },
     {
-      id: 'door', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
+      id: 'door', upTo: 'veteran', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
       avail: s => EMBLEMS.some(e => has(s, e)), done: s => allInserted(s),
       texts: [
         L('大門的黃銅面板上有日、月、星三個凹槽。', 'The brass panel on the front door has three sockets: Sun, Moon and Star.'),
@@ -2336,7 +2600,7 @@
       ],
     },
     {
-      id: 'exit', stage: 'leave', title: L('離開之前', 'Before You Leave'),
+      id: 'exit', upTo: 'veteran', stage: 'leave', title: L('離開之前', 'Before You Leave'),
       avail: s => allInserted(s), done: () => false,
       texts: [
         s => {
@@ -2371,7 +2635,7 @@
       ],
     },
     {
-      id: 'develop', mode: 'novice', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      id: 'develop', upTo: 'novice', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
         L('拼好的便條寫了沖洗順序；藥瓶架上的卡片能推出每個瓶子裝的是什麼。', 'The mended note gives the developing order; the card on the bottle shelf tells you what is in each bottle.'),
@@ -2380,12 +2644,73 @@
       ],
     },
     {
-      id: 'develop_v', mode: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      id: 'develop_v', mode: 'veteran', upTo: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
         L('架上有六瓶，但只倒四步：拼好的便條給了順序，牆上的流程表說明哪兩種藥劑用不到，藥瓶架上的卡片有五條規則，能推出每一瓶是什麼。', 'There are six bottles but only four steps: the mended note gives the order, the chart on the wall says which two chemicals you won\'t need, and the card on the bottle shelf has five rules that tell you what each bottle holds.'),
         L('從卡片第一條和第三條開始：顯影液在一端，而洗淨液在它左邊，所以顯影液在最右邊。接著用第四條找定影液、第五條找清水，最後用第二條排出停影液和調色液。', 'Start with rules 1 and 3: the developer is at one end and the hypo clearing agent is to its left, so the developer is on the far right. Then rule 4 finds the fixer, rule 5 the water, and rule 2 places the stop bath and the toner.'),
         L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。用不到調色液和洗淨液。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. The toner and the hypo clearing agent aren\'t used. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+      ],
+    },
+    /* ---------- 大師模式 ---------- */
+    {
+      id: 'musicbox_m', mode: 'master', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
+      avail: s => has(s, 'crank') || F(s, 'crankInserted') || seen(s, 'qing_letter'), done: s => F(s, 'musicSolved'),
+      texts: [
+        s => F(s, 'crankInserted') ? L('晴的信說，那首歌從爸爸星盤上最高的那個星座開始。', 'Qing\'s letter says the song starts with the highest constellation on her father\'s star dial.') : L('發條鑰匙要插進閣樓的音樂盒。晴的信說，那首歌從爸爸星盤上最高的那個星座開始。', 'The winding key goes into the music box in the attic. Qing\'s letter says the song starts with the highest constellation on her father\'s star dial.'),
+        L('星盤三環是照「天空中的高低」對應的：外環最高、內環最低。先解開天文台的星盤，再用星座圖的星數換成音齒。', 'The dial\'s rings follow height in the sky: the outer ring is highest, the inner ring lowest. Solve the star dial in the observatory first, then turn each constellation into a tine using the star counts on the chart.'),
+        L(`星盤的答案是外環${CONSTELLATIONS[DIAL_ANSWER[0]].name.zh}（${CONSTELLATIONS[DIAL_ANSWER[0]].stars.length} 星）、中環${CONSTELLATIONS[DIAL_ANSWER[1]].name.zh}（${CONSTELLATIONS[DIAL_ANSWER[1]].stars.length} 星）、內環${CONSTELLATIONS[DIAL_ANSWER[2]].name.zh}（${CONSTELLATIONS[DIAL_ANSWER[2]].stars.length} 星）。每個撥兩下，再回到最高的那個：依序撥 ${MUSIC_ANSWER_M.join('、')}。`,
+          `The dial's answer is ${CONSTELLATIONS[DIAL_ANSWER[0]].name.en} on the outer ring (${CONSTELLATIONS[DIAL_ANSWER[0]].stars.length} stars), ${CONSTELLATIONS[DIAL_ANSWER[1]].name.en} in the middle (${CONSTELLATIONS[DIAL_ANSWER[1]].stars.length}), ${CONSTELLATIONS[DIAL_ANSWER[2]].name.en} on the inner ring (${CONSTELLATIONS[DIAL_ANSWER[2]].stars.length}). Twice each, then back to the highest: pluck ${MUSIC_ANSWER_M.join(', ')}.`),
+      ],
+    },
+    {
+      id: 'develop_m', mode: 'master', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
+      texts: [
+        L('架上有六瓶，只倒便條上的四步。架上和牆上各有一張卡片，推出來的答案不一樣——其中一張是假的。避光盒裡只剩三張廢片，別急著試。', 'Six bottles, but only the four steps on the note. There are two cards, one under the bottles and one on the wall, and they give different answers — one of them is a fake. Only three scraps of film are left, so don\'t rush.'),
+        L('誰有機會在陸觀死後進暗房？周伯日誌的最後幾頁記著老爺哪天走的、韓教授哪天來過；牆上那張卡片寫在哪一天的日曆紙上？流程表也說了顯影液的瓶口會結晶——架上哪一瓶有結晶？', 'Who could have got into the darkroom after Lu Guan died? The last pages of Old Zhou\'s log say when the master died and when Professor Han came; what date is on the calendar page the wall card is written on? The chart also says developer leaves crystals around the bottle neck — which bottle has them?'),
+        L(`牆上那張是韓嶽偽造的：它寫在 10 月 ${HAN_VISIT_DAY} 日的日曆紙上，陸觀 ${DEATH_DAY} 日就走了；照它推，顯影液也不是瓶口結晶的黑蓋。照架上那張舊卡片推：${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`,
+          `The wall card is Han Yue\'s forgery: it\'s written on the calendar page for ${HAN_VISIT_DAY} October, and Lu Guan died on the ${DEATH_DAY}th; its developer also isn\'t the black-capped bottle with the crystals. Use the old card under the bottles: ${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+      ],
+    },
+    {
+      id: 'door_m', mode: 'master', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
+      avail: s => EMBLEMS.some(e => has(s, e)), done: s => allInserted(s),
+      texts: [
+        L('大門的黃銅面板上有日、月、星三個凹槽。', 'The brass panel on the front door has three sockets: Sun, Moon and Star.'),
+        L('選中徽章，再點門廳的大門。', 'Select an emblem, then click the Front Door in the foyer.'),
+        L('三枚都嵌好，大門就能打開——嵌好時仔細聽，屋子裡不只一個地方有動靜。', 'Once all three are set the door will open — and listen carefully when you set the last one: something else in the house moves too.'),
+      ],
+    },
+    {
+      id: 'escape_find', mode: 'master', stage: 'escape', title: L('另一條路', 'Another Way Out'),
+      avail: s => allInserted(s), done: s => F(s, 'tunnelFound'),
+      texts: [
+        L('大門也許不是唯一的出口。周伯日誌的最後幾頁是今年寫的，讀讀看。', 'The front door may not be the only way out. The last pages of Old Zhou\'s log were written this year — read them.'),
+        L('日誌提到一條「老水道」。從閣樓的圓窗往下看，水道口在屋子的哪一頭？嵌好徽章時，屋子另一頭傳來的那一聲「喀」又是什麼？', 'The log mentions an "old water channel". Look down from the attic\'s round window: at which end of the house does it start? And what was that clunk from the far side of the house when you set the emblems?'),
+        L('到儲物間查看「雜物架」：三枚徽章嵌好後，卡住它的鐵栓就收回了，推開架子就是水道的鐵門。', 'Examine the Shelves in the storeroom: once all three emblems are set, the bolt pinning them is released, and behind them is the channel gate.'),
+      ],
+    },
+    {
+      id: 'tunnel', mode: 'master', stage: 'escape', title: L('水道鐵門', 'The Channel Gate'),
+      avail: s => F(s, 'tunnelFound'), done: s => F(s, 'tunnelOpen'),
+      texts: [
+        L('鎖旁刻著「那顆彗星真正的位置」。剪報上有韓嶽公布的位置——可他的數字全都可靠嗎？', 'Beside the lock: "where the comet truly was". The clipping gives the position Han Yue published — but can every one of his numbers be trusted?'),
+        L('日記三（或底片的紙套）說，那晚陸觀把赤緯 −16 誤寫成 −17、當場劃掉；韓嶽連那個 7 都照抄了。赤經只有剪報上有。', 'Diary Page III (or the plate\'s sleeve) says that night Lu Guan miswrote declination −16 as −17 and struck it out; Han Yue copied the 7 anyway. Only the clipping gives the right ascension.'),
+        L(`真正的位置是赤經 5 時 27 分、赤緯 −16 度。密碼是 ${TUNNEL_CODE}。`, `The true position is right ascension 5h 27m, declination −16°. The code is ${TUNNEL_CODE}.`),
+      ],
+    },
+    {
+      id: 'exit_m', mode: 'master', stage: 'leave', title: L('離開之前', 'Before You Leave'),
+      avail: s => allInserted(s), done: () => false,
+      texts: [
+        s => {
+          const n = countPages(s), plate = s.inv.includes('plate');
+          return L(`大門已經可以打開了。你目前有日記 ${n} / 4 頁${plate ? '，也帶著底片' : '，還沒找到信裡說的真相'}。`,
+            `The door can open now. You have ${n} / 4 diary pages${plate ? ' and the glass plate' : ', but you haven\'t found the truth the letter mentioned'}.`);
+        },
+        L('韓嶽守在大門外。只要底片沖出來了，從大門走就會被他截胡。', 'Han Yue is keeping watch outside the front door. Once the plate has been developed, leaving that way means he intercepts you.'),
+        L('真結局：沖出底片、收齊四頁日記，從儲物間的老水道離開，並選擇公開真相。', 'For the true ending: develop the plate, collect all four diary pages, leave through the old water channel in the storeroom, and choose to make the truth public.'),
       ],
     },
     {
@@ -2426,14 +2751,16 @@
     startRoom: 'foyer',
     startItems: ['letter'],
     roomOrder: ['foyer', 'study', 'greenhouse', 'storeroom', 'observatory', 'attic', 'darkroom'],
-    MODES: ['novice', 'veteran'],
+    MODES, RANK, isAdv, modeOk,
     rooms, items, docs, hotspots, recipes, puzzles, endings, ENDING_ORDER, hints, intro,
     // 依模式取用的內容
-    docBody: (d, mode) => (mode === 'veteran' && d.bodyV) || d.body,
-    endingText: (e, mode) => (mode === 'veteran' && e.textV) || e.text,
+    docBody: (d, mode) => (mode === 'master' && d.bodyM) || (isAdv(mode) && d.bodyV) || d.body,
+    endingText: (e, mode) => (mode === 'master' && e.textM) || (isAdv(mode) && e.textV) || e.text,
     variant: s => (VET(s)
       ? { pots: POTS_V, potAnswer: POT_ANSWER_V, mirrorGrid: MIRROR_GRID_V, bottles: BOTTLES_V, developAnswer: DEVELOP_ANSWER_V }
       : { pots: POTS, potAnswer: POT_ANSWER, mirrorGrid: MIRROR_GRID, bottles: BOTTLES, developAnswer: DEVELOP_ANSWER }),
+    // 可以「拿在手上」攤在畫面下方的東西：所有線索文件（圖像類的顯示圖），加上拼好的便條（顯示抄寫的文字）
+    holdable: id => !!docs[id] || id === 'note_full',
     STAGE_DEFS, STAGES, SIDE_STAGE, stageInfo,
     // 共用謎題資料（UI 繪圖與測試用）
     BOOKS, COLOR_NAMES, DRAWER_CODE, DRAWER_TRAP, GRID_DIGITS, TRANSPARENCY_STARS, SAFE_CODE, POTS, POT_ANSWER,
@@ -2442,9 +2769,12 @@
     NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
-    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady,
+    MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
     BOTTLES_V, BOTTLE_RULES_V, UNUSED_CHEMS_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
+    // 大師模式
+    MUSIC_ANSWER_M, FAKE_BOTTLE_RULES, DEV_MISS_LIMIT, DEATH_DAY, HAN_VISIT_DAY, TUNNEL_CODE, TUNNEL_TRAP,
   };
 }));

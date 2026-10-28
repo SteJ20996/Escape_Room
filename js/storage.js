@@ -52,14 +52,14 @@
   function getSetting(key) { return rawGet('setting.' + key); }
   function setSetting(key, value) { return rawSet('setting.' + key, String(value)); }
 
-  // 結局圖鑑：'endings' 記錄所有模式解鎖過的結局；資深模式另外記在 'endings.veteran'，讓圖鑑標出資深徽記
+  // 結局圖鑑：'endings' 記錄所有模式解鎖過的結局；資深、大師模式另外記在 'endings.veteran'、'endings.master'，讓圖鑑標出資深徽記
   function listOf(key) {
     try { const v = JSON.parse(rawGet(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
-  function getEndings(mode) { return listOf(mode === 'veteran' ? 'endings.veteran' : 'endings'); }
+  function getEndings(mode) { return listOf(mode === 'veteran' || mode === 'master' ? 'endings.' + mode : 'endings'); }
   function addEnding(id, mode) {
     const add = key => { const list = listOf(key); if (!list.includes(id)) { list.push(id); rawSet(key, JSON.stringify(list)); } return list; };
-    if (mode === 'veteran') add('endings.veteran');
+    if (mode === 'veteran' || mode === 'master') add('endings.' + mode);
     return add('endings');
   }
 

@@ -415,6 +415,10 @@ textarea.code {
 .mode-card .btn { justify-self: start; }
 .btn.vet { border-color: #8a4a3a; color: #f6c0a8; background: #3a1a14; }
 .btn.vet:hover { border-color: #f0a080; color: #fff0e8; }
+.mode-chip.master { color: #cdb6ff; border-color: #4e3d78; }
+.mode-card.mode-master h3 { color: #cdb6ff; }
+.btn.master { border-color: #5e4a8e; color: #ddd0ff; background: #221a3e; }
+.btn.master:hover { border-color: #cdb6ff; color: #fff; }
 .check { display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: .92rem; cursor: pointer; }
 .check input { width: 18px; height: 18px; accent-color: var(--brass); }
 
@@ -482,6 +486,8 @@ textarea.code {
 .pots.eight .pot q { font-size: 1rem; }
 .bottles.six { grid-template-columns: repeat(6, minmax(52px, 84px)); gap: 8px; }
 .badge-vet { margin-left: auto; font-size: .75rem; color: #f0a080; border: 1px solid #6a3a2a; border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
+.badge-vet.badge-master { color: #cdb6ff; border-color: #4e3d78; }
+.badge-vet + .badge-vet { margin-left: 6px; }
 
 /* ---------- 語言切換 ---------- */
 .lang-switch { display: inline-flex; }
@@ -525,6 +531,38 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- 拿在手上：最多三份文件並排在遊戲畫面下方，解謎視窗底部也有一份 ---------- */
+.hand-panel { margin-top: 16px; background: var(--night-2); border: 1px solid var(--brass); border-radius: var(--radius); padding: 12px; }
+.hand-panel h2 { font-size: .95rem; letter-spacing: .2em; color: var(--brass-hi); margin: 0 0 10px; font-weight: 600; }
+.hand-panel.empty { border: 1px dashed var(--rule); padding-block: 10px; }
+.hand-panel.empty h2 { color: var(--dim); margin-bottom: 4px; }
+.hand-empty { margin: 0; color: var(--dim); font-size: .9rem; }
+.hand-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.hand-card { min-width: 0; display: grid; gap: 6px; }
+.hand-card header { display: flex; align-items: center; gap: 8px; }
+.hand-card h3 { margin: 0; flex: 1; min-width: 0; font-size: .92rem; color: var(--star); letter-spacing: .06em; }
+.hand-body { max-height: 360px; overflow: auto; border-radius: 4px; overscroll-behavior: contain; }
+.hand-body:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+.hand-card .paper { padding: 12px 14px; font-size: .9rem; max-width: none; box-shadow: none; }
+.hand-card .paper.hand { font-size: 1rem; line-height: 1.7; }
+.hand-card .art-box { max-width: none; }
+.hand-strip { border: 1px solid var(--brass); border-radius: var(--radius); padding: 8px 12px; background: rgba(201, 162, 79, .06); }
+.hand-strip summary { cursor: pointer; color: var(--brass-hi); font-weight: 600; letter-spacing: .08em; }
+.hand-strip[open] summary { margin-bottom: 10px; }
+.hand-strip .hand-body { max-height: 260px; }
+.tag-hand { margin-left: auto; margin-right: 8px; font-size: .75rem; color: var(--brass-hi); border: 1px solid var(--brass); border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
+.btn.hold { border-color: var(--brass); color: var(--brass-hi); }
+.btn.hold[aria-pressed="true"] { background: var(--brass); color: var(--brass-ink); border-color: var(--brass-hi); }
+html:lang(en) .hand-card .paper.hand { font-size: 1.2rem; line-height: 1.4; }
+html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }
+@media (max-width: 960px) {
+  .hand-cards { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
+@media (max-width: 520px) {
+  .hand-cards { grid-template-columns: minmax(0, 1fr); }
+  .hand-body { max-height: 300px; }
 }
 </style>
 <div id="title" class="screen">
@@ -598,6 +636,10 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         </section>
       </aside>
     </div>
+    <section class="hand-panel empty" id="hand" aria-labelledby="hand-h">
+      <h2 id="hand-h" data-i18n="handTitle">拿在手上</h2>
+      <div class="hand-cards" id="hand-cards"></div>
+    </section>
   </div>
 </div>
 
@@ -832,7 +874,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     zh: NOTE_LINES.zh.map((l, i) => (i === 2 ? ['門鎖密碼是那', '個冬夜的月和日。'] : l)),
     en: NOTE_LINES.en.map((l, i) => (i === 2 ? ['Its code is the month and d', 'ay of that winter night.'] : l)),
   };
-  const noteLines = mode => (mode === 'veteran' ? NOTE_LINES_V : NOTE_LINES);
+  const noteLines = mode => (RANK[mode] >= 1 ? NOTE_LINES_V : NOTE_LINES);
   const NOTE_ORDER_TEXT = { zh: '顯影→停影→定影→清水', en: 'developer → stop bath → fixer → water' };
   const TRAPDOOR_CODE = '1208';
 
@@ -859,7 +901,14 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
    * 一之二、資深模式的謎題資料（新手模式完全不使用）
    * 這些數值都由程式搜尋產生，測試會逐一證明唯一解。
    * ================================================================ */
-  const VET = s => !!s && s.mode === 'veteran';
+  // 難度：新手 < 資深 < 大師。大師包含資深的全部內容，再加上自己的東西。
+  // 熱點、房間、提示的 mode 欄位表示「最低難度」；upTo 表示「最高難度」（給被大師版本取代的內容用）。
+  const MODES = ['novice', 'veteran', 'master'];
+  const RANK = { novice: 0, veteran: 1, master: 2 };
+  const isAdv = mode => RANK[mode] >= 1;      // 資深以上
+  const modeOk = (mode, x) => (!x.mode || RANK[mode] >= RANK[x.mode]) && (!x.upTo || RANK[mode] <= RANK[x.upTo]);
+  const VET = s => !!s && isAdv(s.mode);
+  const MASTER = s => !!s && s.mode === 'master';
 
   // 資深・花盆：八個盆、盆上漆著編號 1～8；八句話裡有幾句為真，只有周伯知道（答案：兩句）。
   // 不知道句數時，假設 2、3、4 句為真會分別指向三個不同的盆——所以一定要先問周伯。
@@ -999,6 +1048,24 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   const MUSIC_TINES = 10;
   const MUSIC_SCORE = ['boat', 'fish', 'tower', 'crown', 'fish', 'key', 'boat', 'fish'];
   const MUSIC_ANSWER = MUSIC_SCORE.map(id => CONSTELLATIONS[id].stars.length);
+
+  /* ---------------- 大師模式 ---------------- */
+  // 音樂盒：晴的信不再寫出星座，要用星盤的解答（由外到內＝天空中由高到低）——每個撥兩下，最後回到最高的那個
+  const MUSIC_ANSWER_M = DIAL_ANSWER.flatMap(id => [CONSTELLATIONS[id].stars.length, CONSTELLATIONS[id].stars.length])
+    .concat([CONSTELLATIONS[DIAL_ANSWER[0]].stars.length]);
+  // 牆上那張卡片是韓嶽在陸觀死後偽造的：自己推得出唯一的答案，但它是錯的（顯影液不是瓶口結晶的黑蓋）
+  const FAKE_BOTTLE_RULES = [
+    { k: 'immLeft', a: 'developer', b: 'stop' },
+    { k: 'gap', a: 'developer', b: 'toner', between: 2 },
+    { k: 'notCaps', a: 'stop', caps: ['red', 'white'] },
+    { k: 'leftOf', a: 'fixer', b: 'toner' },
+    { k: 'immLeft', a: 'stop', b: 'water' },
+  ];
+  const DEV_MISS_LIMIT = 3;        // 避光盒裡只剩三張廢片：三次都試壞就失敗
+  const DEATH_DAY = 10, HAN_VISIT_DAY = 17; // 陸觀今年 10 月 10 日過世（開場：三週前）；韓嶽 10 月 17 日進過暗房（周伯日誌）
+  // 水道鐵門：「那顆彗星真正的位置」＝赤經 5 時 27 分、赤緯 −16 度（剪報的 −17 是韓嶽照抄的錯字）
+  const TUNNEL_CODE = '52716';
+  const TUNNEL_TRAP = '52717';
 
   /* ================================================================
    * 二、線索文件（可在「線索筆記」中隨時重讀）
@@ -1278,6 +1345,22 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         '9 December — first thing, I posted a registered letter for the master, a thick one, to Professor Han in the city. The master said it was an important observation report. I tucked the receipt behind the calendar.',
         '12 December — the master didn\'t say a word all day, and didn\'t eat.',
       ]),
+      // 大師：日誌最後幾頁是今年寫的——老水道的交代（橋），以及陸觀死後韓嶽進過暗房（識破假卡片的證據）
+      bodyM: L([
+        '12 月 8 日　晴。夜裡老爺帶晴丫頭在閣樓的圓窗看星星，兩個人鬧到半夜。',
+        '12 月 9 日　一早替老爺寄了一封掛號，厚厚的，寄給城裡的韓教授。老爺說是要緊的觀測報告。收據我夾在月曆後面。',
+        '12 月 12 日　老爺一整天沒說話，飯也沒吃。',
+        '（日誌的最後幾頁，是今年寫的。）',
+        `10 月 ${DEATH_DAY} 日　老爺走了。走之前交代我：哪天大門外要是有人守著，就讓阿遙走我那條老水道。`,
+        `10 月 ${HAN_VISIT_DAY} 日　韓教授來了，說要借老爺的書。他一個人在暗房裡待了快一個鐘頭，出來時兩手空空，臉色很難看。`,
+      ], [
+        '8 December — clear. In the night the master and little Qing watched the stars from the attic\'s round window; the two of them were up past midnight.',
+        '9 December — first thing, I posted a registered letter for the master, a thick one, to Professor Han in the city. The master said it was an important observation report. I tucked the receipt behind the calendar.',
+        '12 December — the master didn\'t say a word all day, and didn\'t eat.',
+        '(The last few pages of the log were written this year.)',
+        `${DEATH_DAY} October — the master passed away. Before he went, he told me: if one day someone is keeping watch outside the front door, let Yao take my old water channel.`,
+        `${HAN_VISIT_DAY} October — Professor Han came, saying he wanted to borrow some of the master\'s books. He spent nearly an hour alone in the darkroom and came out empty-handed, looking grim.`,
+      ]),
     },
     calendar: {
       title: L('1999 年 12 月的舊月曆', 'An Old Calendar: December 1999'), style: 'plain',
@@ -1356,6 +1439,18 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         MUSIC_SCORE.map(id => CONSTELLATIONS[id].name.en).join(', '),
         '— Qing, December 1999',
       ]),
+      // 大師：不寫星座名字，要用星盤的解答（連鎖）
+      bodyM: L([
+        '爸爸：',
+        '你說，音樂盒的每一根音齒都對應一個星座——星座有幾顆星，就撥第幾根。',
+        '這次我不把星座寫出來了，考考你：我們的歌，從你星盤上最高的那個星座開始，照星盤由外到內，每個撥兩下；最後再回到最高的那一個。',
+        '晴　1999 年 12 月',
+      ], [
+        'Dad —',
+        'You said every tine of the music box belongs to a constellation: as many stars as it has, that\'s the tine you pluck.',
+        'This time I won\'t write the constellations down — here\'s a test: our song starts with the highest constellation on your star dial, then goes through the dial from the outside in, plucking each one twice, and finally comes back to the highest one.',
+        '— Qing, December 1999',
+      ]),
     },
     process_chart: {
       title: L('牆上的沖洗流程表', 'Developing Chart on the Wall'), style: 'hand',
@@ -1368,6 +1463,18 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         'A glass plate needs only four chemicals: developer, stop bath, fixer and water. The order is on my note to Yao.',
         'The other two bottles on the shelf — toner and hypo clearing agent — are for printing paper. You won\'t need them.',
       ]),
+      // 大師：多一條實物線索——只有顯影液的瓶口會結晶
+      bodyM: L([
+        '玻璃底片沖洗流程（陸觀手寫）',
+        '玻璃底片只用四種藥劑：顯影液、停影液、定影液、清水。順序寫在給阿遙的便條上。',
+        '架上另外兩瓶——調色液和洗淨液——是沖相紙用的，這次用不到。',
+        '顯影液放久了，瓶口會結一圈褐色的結晶。別的藥劑不會。',
+      ], [
+        'Developing a glass plate (in Lu Guan\'s hand)',
+        'A glass plate needs only four chemicals: developer, stop bath, fixer and water. The order is on my note to Yao.',
+        'The other two bottles on the shelf — toner and hypo clearing agent — are for printing paper. You won\'t need them.',
+        'Developer left standing grows a ring of brown crystals around the neck of its bottle. The other chemicals don\'t.',
+      ]),
     },
     bottle_card_v: {
       title: L('藥瓶架上的卡片', 'Card on the Bottle Shelf'), style: 'hand',
@@ -1377,6 +1484,34 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ], [
         `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
         ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+      ]),
+      bodyM: L([
+        `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
+        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六'[i]}、${bottleRuleText(r).zh}`),
+        '（泛黃的舊卡紙，邊角都磨圓了。）',
+      ], [
+        `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
+        ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+        '(Old yellowed card stock, its corners worn round.)',
+      ]),
+    },
+    tunnel_lock: {
+      title: L('水道鐵門上的刻字', 'Words on the Channel Gate'), style: 'plain',
+      body: L(['低矮的鐵門上有一個五位數的密碼鎖。鎖旁刻著一行字：', '「那顆彗星真正的位置。」'],
+        ['A five-digit combination lock is set into the low iron gate. Carved beside it:', '"Where the comet truly was."']),
+    },
+    // 大師：牆上釘著的另一張卡片（韓嶽偽造）。破綻：寫在今年 10 月 17 日撕下的日曆紙上——那時陸觀已經過世。
+    // 逐日撕的日曆要到那一天才會撕下（暗房門邊的日曆也正好撕到這一天），所以卡片不可能早於 17 日寫成
+    bottle_card_fake: {
+      title: L('牆上釘著的卡片', 'Card Pinned to the Wall'), style: 'hand',
+      body: L([
+        `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
+        ...FAKE_BOTTLE_RULES.map((r, i) => `${'一二三四五六'[i]}、${bottleRuleText(r).zh}`),
+        `（卡片很新，背面是一張撕下來的日曆紙，印著今年 10 月 ${HAN_VISIT_DAY} 日——暗房門邊那本逐日撕的日曆，也正好撕到這一天。）`,
+      ], [
+        `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
+        ...FAKE_BOTTLE_RULES.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
+        `(The card is new. On the back is a page torn from a day-by-day calendar, printed with ${HAN_VISIT_DAY} October of this year — and the tear-off calendar by the darkroom door has been torn off up to exactly that day.)`,
       ]),
     },
   };
@@ -1501,7 +1636,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     ctx.set('inserted_' + e);
     ctx.say(L(`你把${items[e].name.zh}按進大門上對應的凹槽，「喀」的一聲，嵌得嚴絲合縫。`,
       `You press the ${items[e].name.en} into its socket in the door. Click — a perfect fit.`), 'good');
-    if (allInserted(ctx.s)) ctx.say(L('三枚徽章全部歸位。門內傳來齒輪轉動的聲音——大門的鎖開了。', 'All three emblems are in place. Gears turn inside the door — the lock has opened.'), 'event');
+    if (allInserted(ctx.s)) {
+      ctx.say(L('三枚徽章全部歸位。門內傳來齒輪轉動的聲音——大門的鎖開了。', 'All three emblems are in place. Gears turn inside the door — the lock has opened.'), 'event');
+      // 大師：同一個機關也鬆開了儲物間雜物架底下的鐵栓（橋：屋子另一頭的聲音）
+      if (MASTER(ctx.s)) ctx.say(L('同一時間，屋子另一頭也傳來一聲沉重的「喀」——像是很遠的地方，有一根鐵栓收了回去。', 'At the same moment a heavy clunk sounds from the far side of the house — as if, somewhere distant, an iron bolt has slid back.'), 'event');
+    }
   };
   const DEAD_LIGHT = L('手電筒沒電，照不亮任何東西。', 'The flashlight is dead. It lights up nothing.');
 
@@ -1523,7 +1662,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     {
       id: 'f_mailslot', room: 'foyer', name: L('信件口', 'Mail Slot'),
       examine(ctx) {
-        if (ctx.flag('phoneDone')) ctx.say(L('信件口外一片漆黑。門外那輛車的引擎聲已經遠去了。', 'Beyond the mail slot there is only darkness. The car\'s engine has faded into the distance.'));
+        if (ctx.flag('phoneDone') && MASTER(ctx.s)) ctx.say(L('從信件口往外看，那輛黑色轎車還停在石階下，車燈照著大門。', 'Through the mail slot you can see the black car still parked below the steps, its headlights trained on the door.'));
+        else if (ctx.flag('phoneDone')) ctx.say(L('信件口外一片漆黑。門外那輛車的引擎聲已經遠去了。', 'Beyond the mail slot there is only darkness. The car\'s engine has faded into the distance.'));
         else ctx.say(L('門上的黃銅信件口。往外推只能推開一條細縫——夠塞進一封信，人是絕對過不去的。', 'A brass mail slot in the door. It only pushes open a crack — wide enough for a letter, never for a person.'));
       },
       use: {
@@ -1651,7 +1791,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
     {
       id: 's_clipping', room: 'study', name: L('牆上的剪報', 'Newspaper Clipping'),
-      examine(ctx) { ctx.note('clipping'); ctx.open({ view: 'doc', id: 'clipping' }); },
+      examine(ctx) { ctx.note('clipping'); ctx.set('clippingRead'); ctx.open({ view: 'doc', id: 'clipping' }); },
     },
     {
       id: 's_painting', room: 'study', name: L('星空油畫', 'Starry Painting'),
@@ -1945,7 +2085,12 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     {
       id: 'd_shelf', room: 'darkroom', name: L('藥瓶架', 'Bottle Shelf'),
       visible: s => !!s.flags.darkroomLit,
-      examine(ctx) { const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card'; ctx.note(id); ctx.set('bottleCardRead'); ctx.open({ view: 'doc', id }); },
+      examine(ctx) {
+        const id = VET(ctx.s) ? 'bottle_card_v' : 'bottle_card';
+        // 大師：兩張卡片（橋：內容對不上）；黑蓋瓶口的結晶是識破假卡片的實物證據
+        if (MASTER(ctx.s)) ctx.say(L('藥瓶架上壓著一張舊卡片；牆上還釘著另一張，筆跡很像，內容卻對不上。黑蓋那一瓶的瓶口，結著一圈褐色的結晶。', 'An old card is tucked under the bottles; another is pinned to the wall beside them. The handwriting is alike, but they don\'t agree. Around the neck of the black-capped bottle is a ring of brown crystals.'));
+        ctx.note(id); ctx.set('bottleCardRead'); ctx.open({ view: 'doc', id });
+      },
     },
     {
       id: 'd_tray', room: 'darkroom', name: L('顯影台', 'Developing Bench'),
@@ -1975,6 +2120,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       id: 'd_chart', room: 'darkroom', mode: 'veteran', name: L('牆上的流程表', 'Developing Chart'),
       visible: s => !!s.flags.darkroomLit,
       examine(ctx) { ctx.note('process_chart'); ctx.set('chartRead'); ctx.open({ view: 'doc', id: 'process_chart' }); },
+    },
+    {
+      id: 'd_card2', room: 'darkroom', mode: 'master', name: L('牆上的卡片', 'Card on the Wall'),
+      visible: s => !!s.flags.darkroomLit,
+      examine(ctx) { ctx.note('bottle_card_fake'); ctx.set('fakeCardRead'); ctx.open({ view: 'doc', id: 'bottle_card_fake' }); },
     },
 
     /* ---------------- 儲物間（資深） ---------------- */
@@ -2014,7 +2164,27 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
     {
       id: 't_shelf', room: 'storeroom', name: L('雜物架', 'Shelves'),
-      examine(ctx) { ctx.say(L('鋤頭、麻繩、一捆捆竹竿，每樣東西都擺得整整齊齊。周伯是個仔細的人。', 'Hoes, twine, bundles of bamboo canes — everything is put away neatly. Old Zhou is a careful man.')); },
+      examine(ctx) {
+        if (!MASTER(ctx.s)) { ctx.say(L('鋤頭、麻繩、一捆捆竹竿，每樣東西都擺得整整齊齊。周伯是個仔細的人。', 'Hoes, twine, bundles of bamboo canes — everything is put away neatly. Old Zhou is a careful man.')); return; }
+        // 大師：架子後面藏著老水道的鐵門；三枚徽章歸位時，卡住架子的鐵栓才會收回
+        if (ctx.flag('tunnelFound')) { ctx.say(L('雜物架推到了一邊，後面就是那扇低矮的鐵門。', 'The shelves stand pushed aside; behind them is the low iron gate.')); return; }
+        if (allInserted(ctx.s)) {
+          ctx.set('tunnelFound');
+          ctx.say(L('架子底下那根插進地板的鐵栓不見了。你把雜物架推開——後面是一扇低矮的鐵門，冷風夾著溪水的聲音從門縫裡灌進來。', 'The iron bolt that pinned the shelves to the floor is gone. You push the shelves aside — behind them is a low iron gate, and cold air carrying the sound of running water pours through the gap.'), 'event');
+          return;
+        }
+        ctx.set('draftNoticed');
+        ctx.say(L('鋤頭、麻繩、一捆捆竹竿，擺得整整齊齊。架子後面的牆縫裡透出一股濕冷的風，帶著溪水的味道。架子底下有一根鐵栓插進地板，推不動。', 'Hoes, twine, bundles of bamboo canes, all neatly put away. A damp, cold draft that smells of the creek seeps through a crack in the wall behind the shelves. An iron bolt pins the shelves to the floor; they won\'t budge.'));
+      },
+    },
+    {
+      id: 't_tunnel', room: 'storeroom', mode: 'master', name: L('水道鐵門', 'Channel Gate'),
+      visible: s => !!s.flags.tunnelFound,
+      examine(ctx) {
+        if (ctx.flag('tunnelOpen')) { ctx.open({ view: 'exit', via: 'tunnel' }); return; }
+        ctx.note('tunnel_lock');
+        ctx.open({ view: 'lock', id: 'tunnel' });
+      },
     },
     {
       id: 't_exit', room: 'storeroom', name: L('回到溫室', 'Back to the Greenhouse'),
@@ -2075,7 +2245,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
     {
       id: 'a_window', room: 'attic', name: L('圓窗', 'Round Window'),
-      examine(ctx) { ctx.say(L('圓窗朝著東南方的夜空。周伯家在山谷的另一頭，從這裡看不到——屋子最邊上那間儲物間的小窗才正對著那邊。', 'The round window faces the southeastern sky. Old Zhou\'s house is on the other side of the valley and can\'t be seen from here — only the little window of the storeroom, on the edge of the house, looks that way.')); },
+      examine(ctx) {
+        ctx.say(L('圓窗朝著東南方的夜空。周伯家在山谷的另一頭，從這裡看不到——屋子最邊上那間儲物間的小窗才正對著那邊。', 'The round window faces the southeastern sky. Old Zhou\'s house is on the other side of the valley and can\'t be seen from here — only the little window of the storeroom, on the edge of the house, looks that way.'));
+        // 大師：從高處往下看得到水道口（橋）
+        if (MASTER(ctx.s)) ctx.say(L('往下看，儲物間那頭的牆腳有一道石砌的水道口，一路穿過草坡，通到山谷裡的溪邊。', 'Looking down, you see a stone-lined water channel at the foot of the storeroom wall, running across the slope all the way to the creek in the valley.'));
+      },
     },
     {
       id: 'a_exit', room: 'attic', name: L('下梯子回門廳', 'Down the Ladder'),
@@ -2374,12 +2548,15 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     develop: {
       available: s => inRoom('darkroom')(s) && s.flags.darkroomLit && !s.flags.plateDeveloped,
-      clue: s => noteReady(s) && !!s.flags.bottleCardRead && (!VET(s) || !!s.flags.chartRead), // 便條的順序、藥瓶卡片（資深：加上流程表）
+      clue: s => noteReady(s) && !!s.flags.bottleCardRead && (!VET(s) || !!s.flags.chartRead), // 便條的順序、藥瓶卡片（資深以上：加上流程表）
       needClue: L('你還不知道哪一瓶是什麼、該照什麼順序倒。', 'You don\'t know which bottle is which, or what order to pour them in.'),
       vetWrong: L('你先拿一張廢片試了試——一片模糊。不對。', 'You try it on a scrap of film first — just a blur. Not right.'),
       check(ctx, seq) {
         const answer = VET(ctx.s) ? DEVELOP_ANSWER_V : DEVELOP_ANSWER;
-        const pick = Array.isArray(seq) ? seq.slice(0, answer.length) : [];
+        const bottles = VET(ctx.s) ? BOTTLES_V : BOTTLES;
+        // 不完整或不存在的瓶子：不算一次嘗試（大師模式每一次都會用掉一張廢片）
+        if (!Array.isArray(seq) || seq.length < answer.length || seq.slice(0, answer.length).some(id => !bottles.some(b => b.id === id))) return null;
+        const pick = seq.slice(0, answer.length);
         if (pick.join() === answer.join()) {
           ctx.set('plateDeveloped');
           ctx.say(L('你先用一張廢片試了一次——影像清清楚楚地浮現出來。順序對了。', 'First you try a scrap of film — the image comes up crisp and clear. The order is right.'), 'good');
@@ -2389,6 +2566,20 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         }
         ctx.wrong();
         ctx.say(L('你先拿一張廢片試了試——片子上一片模糊。順序不對。幸好沒有直接用那張底片。', 'You try it on a scrap of film first — the result is a blur. Wrong order. Good thing you didn\'t use the real plate.'), 'bad');
+        if (MASTER(ctx.s)) {
+          // 大師：避光盒裡只有三張廢片，三張都試壞就失敗（keep：資深以上答錯只說「不對」時，這句照樣保留）
+          const miss = (ctx.get('devMisses') || 0) + 1;
+          ctx.set('devMisses', miss);
+          if (miss >= DEV_MISS_LIMIT) {
+            ctx.say(L('第三張廢片也毀了。避光盒裡只剩那張真正的底片。', 'The third scrap is ruined too. Only the real plate is left in the light-tight box.'), 'bad', { keep: true });
+            ctx.end('G');
+            return false;
+          }
+          const left = DEV_MISS_LIMIT - miss;
+          ctx.say(left === 1
+            ? L('避光盒裡只剩最後一張廢片了。', 'Only one scrap of film is left in the light-tight box.')
+            : L(`避光盒裡還剩 ${left} 張廢片。`, `${left} scraps of film are left in the light-tight box.`), 'bad', { keep: true });
+        }
         return false;
       },
     },
@@ -2473,12 +2664,13 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     musicbox: {
       available: s => VET(s) && inRoom('attic')(s) && s.flags.crankInserted && !s.flags.musicSolved,
-      clue: s => s.inv.includes('qing_letter') && !!s.flags.posterRead, // 晴的星星譜＋星座圖的星數
+      // 晴的星星譜＋星座圖的星數（大師：晴的信指向星盤，要先解開星盤）
+      clue: s => s.inv.includes('qing_letter') && !!s.flags.posterRead && (!MASTER(s) || !!s.flags.starDialSolved),
       needClue: L('十根音齒，你不知道該彈哪一首曲子。', 'Ten tines — but you don\'t know which tune to play.'),
       vetWrong: L('音樂盒叮叮咚咚地響完，什麼也沒發生。不對。', 'The music box tinkles to the end, and nothing happens. Not right.'),
       check(ctx, notes) {
         if (!Array.isArray(notes) || !notes.length || notes.some(n => !Number.isInteger(n) || n < 1 || n > MUSIC_TINES)) return null;
-        if (notes.join() === MUSIC_ANSWER.join()) {
+        if (notes.join() === (MASTER(ctx.s) ? MUSIC_ANSWER_M : MUSIC_ANSWER).join()) {
           ctx.set('musicSolved');
           ctx.say(L('熟悉的旋律在閣樓裡響起。最後一個音落下，音樂盒的底座「喀」地彈出一個小抽屜：裡面是一張畫著星星的透明膠片，和一頁折起來的日記。', 'A familiar tune fills the attic. As the last note fades, a little drawer clicks out of the music box\'s base: inside are a sheet of clear film with stars drawn on it, and a folded diary page.'), 'good');
           ctx.give('transparency'); ctx.give('page2');
@@ -2503,7 +2695,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         if (choice === 'refuse') {
           ctx.set('phoneRinging', false);
           ctx.set('phoneDone');
-          ctx.say(L('「……你會後悔的。」電話被狠狠地掛斷了。過了一會兒，門外傳來汽車發動、駛遠的聲音。', '"…You\'ll regret this." The line goes dead with a slam. A moment later, a car engine starts outside the door and fades away.'), 'event');
+          if (MASTER(ctx.s)) ctx.say(L('「……隨你。我就在這裡等，等到天亮。」電話被掛斷了。門外那輛車沒有開走，車燈一直亮著。', '"…Suit yourself. I\'ll wait right here, until dawn." The line goes dead. The car outside doesn\'t leave; its headlights stay on.'), 'event');
+          else ctx.say(L('「……你會後悔的。」電話被狠狠地掛斷了。過了一會兒，門外傳來汽車發動、駛遠的聲音。', '"…You\'ll regret this." The line goes dead with a slam. A moment later, a car engine starts outside the door and fades away.'), 'event');
           return true;
         }
         return null;
@@ -2513,14 +2706,46 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     exit: {
       available: s => inRoom('foyer')(s) && allInserted(s),
       check(ctx, choice) {
-        const plate = ctx.has('plate');
-        if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
-        if (choice === 'publish' && plate) { ctx.end(countPages(ctx.s) === 4 ? 'B' : 'C'); return true; }
-        if (choice === 'leave_plate' && plate) { ctx.take('plate'); ctx.end('E'); return true; }
-        return null;
+        // 大師：韓嶽守在大門外。沖出底片之後從大門走（帶著或留在屋裡），一定會被截胡
+        if (MASTER(ctx.s)) {
+          const plate = ctx.has('plate');
+          if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
+          if ((choice === 'publish' || choice === 'leave_plate') && plate) { if (choice === 'leave_plate') ctx.take('plate'); ctx.end('H'); return true; }
+          return null;
+        }
+        return leaveWith(ctx, choice);
       },
     },
+
+    /* ---------- 大師模式 ---------- */
+    tunnel: Object.assign(lockPuzzle({
+      code: TUNNEL_CODE,
+      available: s => MASTER(s) && inRoom('storeroom')(s) && s.flags.tunnelFound && !s.flags.tunnelOpen,
+      success(ctx) {
+        ctx.set('tunnelOpen');
+        ctx.say(L('最後一位轉到定位，鐵門「喀」地彈開。門後是一條低矮的石砌水道，溪水聲從黑暗的另一頭傳來。', 'The last digit clicks into place and the iron gate springs open. Beyond it is a low, stone-lined channel; the sound of the creek comes from the dark at the far end.'), 'good');
+      },
+    }), {
+      // 剪報的赤經（只有剪報有）＋日記三或底片紙套上的修正（−17 是照抄的錯字，真的是 −16）
+      clue: s => !!s.flags.clippingRead && (s.inv.includes('plate') || s.inv.includes('page3') || (s.flags.diaryPages || []).includes('page3')),
+      needClue: L('鎖旁刻著「那顆彗星真正的位置」。你還不確定它真正在哪裡。', 'Beside the lock is carved "where the comet truly was". You aren\'t sure yet where that is.'),
+      digits: 5, title: L('水道鐵門', 'Channel Gate'),
+      prompt: L('低矮的鐵門上有一個五位數的密碼鎖。鎖旁刻著一行字：「那顆彗星真正的位置。」', 'A five-digit combination lock on the low iron gate. Carved beside it: "Where the comet truly was."'),
+    }),
+    escape: {
+      available: s => MASTER(s) && inRoom('storeroom')(s) && !!s.flags.tunnelOpen,
+      check: (ctx, choice) => leaveWith(ctx, choice),
+    },
   };
+
+  // 離開：帶著底片公開（日記齊全是真結局，否則孤證）、把底片留下，或沒有底片直接走
+  function leaveWith(ctx, choice) {
+    const plate = ctx.has('plate');
+    if (choice === 'leave' && !plate) { ctx.end('A'); return true; }
+    if (choice === 'publish' && plate) { ctx.end(countPages(ctx.s) === 4 ? 'B' : 'C'); return true; }
+    if (choice === 'leave_plate' && plate) { ctx.take('plate'); ctx.end('E'); return true; }
+    return null;
+  }
 
   function countPages(s) {
     const bound = (s.flags.diaryPages || []).length;
@@ -2639,7 +2864,83 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ]),
     },
   };
-  const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D'];
+  // 大師模式專屬的結局與失敗
+  endings.H = {
+    mode: 'master',
+    title: L('截胡', 'Intercepted'), rank: L('壞結局', 'Bad Ending'),
+    text: L([
+      '大門開了。你走下石階，夜風很冷。',
+      '那輛黑色轎車就停在門外，車燈一直亮著。車門打開，韓嶽走了下來——他一直在等。「辛苦了，阿遙。」',
+      '他沒有多說什麼，只是一樣一樣地拿走了他要的東西：你身上的日記，還有那張底片——不管你把它帶在身上，還是留在屋裡，他都有大門的鑰匙。',
+      '幾天後，山上的老宅發生了一場小火災。燒掉的，只有地下的暗房。',
+    ], [
+      'The front door opens. You walk down the stone steps; the night wind is cold.',
+      'The black car is parked right outside, headlights still on. The door opens and Han Yue steps out — he has been waiting all along. "Thank you for your trouble, Yao."',
+      'He says nothing more. He simply takes, one by one, what he came for: the diary you carry, and the plate — whether you have it with you or left it in the house, he has a key to the front door.',
+      'A few days later there is a small fire at the old house on the mountain. The only thing it burns is the darkroom underground.',
+    ]),
+  };
+  endings.G = {
+    fail: true,
+    title: L('最後一張廢片', 'The Last Scrap of Film'), rank: L('失敗', 'Failed'),
+    text: L([
+      '第三張廢片也毀了。避光盒裡只剩那張真正的底片——你不敢再拿它冒險。',
+      '你在紅燈下坐了很久，始終沒能讓那顆彗星浮現。',
+      '天亮時，門外的車燈還亮著。',
+    ], [
+      'The third scrap is ruined too. Only the real plate is left in the light-tight box — and you don\'t dare risk it.',
+      'You sit under the red light for a long time, but the comet never comes up out of the dark.',
+      'At dawn, the headlights outside are still on.',
+    ]),
+  };
+  // 大師：真結局、孤證、沉睡的星都只能從水道走；普通結局不提是哪一扇門
+  endings.A.textM = L([
+    '三枚徽章各歸其位，門內傳來一連串齒輪咬合的聲音。山間的晨霧從門縫湧了進來。',
+    '你回頭望了一眼。書房、溫室、天文台、閣樓——你走遍了它們，卻沒有帶走那個「光照不到的地方」裡的東西。',
+    '許多年後，教科書上那顆彗星依然叫做「韓嶽彗星」。偶爾在失眠的夜裡，你會想起信上那句話，想知道那裡究竟藏著什麼。',
+    '你始終沒有回去。',
+  ], [
+    'The three emblems settle into place, and a chain of gears engages inside the door. Mountain mist seeps in through the gap.',
+    'You look back once. The study, the greenhouse, the observatory, the attic — you walked through them all, but took nothing from "where the light cannot reach".',
+    'Years later, the comet in the textbooks is still called Comet Han Yue. Now and then, on sleepless nights, you remember that line in the letter and wonder what was hidden there.',
+    'You never went back.',
+  ]);
+  endings.B.textM = L([
+    '你沒有走大門。你帶著底片和那本拼完整的日記，彎著腰鑽進周伯的老水道，順著溪水聲一直走到山谷裡。天快亮時，溪邊亮起一盞燈——周伯在那裡等你。',
+    '大門外，韓嶽的車還停著，車燈照著一扇再也不會為他打開的門。',
+    '三個月後，天文學會公布了調查結果：底片上彗星與群星的相對位置，精確對應 1999 年 12 月 8 日的夜空——比韓嶽宣稱的發現早了整整兩天；韓嶽發表的坐標裡那個照抄的「7」，只可能來自陸觀的原始紀錄。周伯也站了出來，交出那張夾在舊月曆後面的掛號收據：1999 年 12 月 9 日，陸觀寄給韓嶽。',
+    '那顆彗星被正式更名為「陸觀彗星」。晴從國外趕了回來，把閣樓的音樂盒和那張窗邊的照片一起帶走了。',
+    '公布的那天晚上，你回到老宅，在天文台架起望遠鏡，把穹頂轉向東南。目鏡裡的星空是倒過來的。你笑了——這一次，你知道該怎麼看。',
+  ], [
+    'You don\'t take the front door. With the plate and the completed diary, you stoop into Old Zhou\'s old water channel and follow the sound of the creek down into the valley. Near dawn, a lamp comes on by the water — Old Zhou is waiting for you.',
+    'Outside the front door, Han Yue\'s car is still parked, its headlights on a door that will never open for him again.',
+    'Three months later, the Astronomical Society publishes its findings: the comet\'s position among the stars on the plate matches the sky of 8 December 1999 exactly — two full days before Han Yue\'s claimed discovery. And the copied "7" in Han Yue\'s published coordinates could only have come from Lu Guan\'s original notes. Old Zhou comes forward too, with the registered-mail receipt he kept behind the old calendar: 9 December 1999, from Lu Guan to Han Yue.',
+    'The comet is officially renamed Comet Lu Guan. Qing flies home from abroad and takes the attic music box and the photo by the window with her.',
+    'On the night of the announcement, you go back to the old house, set up the telescope in the observatory and turn the dome to the southeast. The stars in the eyepiece are upside down. You smile — this time, you know how to read them.',
+  ]);
+  endings.C.textM = L([
+    '你從周伯的老水道逃了出來，把底片交給了天文學會。底片上的彗星清清楚楚，可韓嶽的律師一口咬定：一張來歷不明的舊底片，誰能證明它不是事後偽造的？',
+    '周伯說他當年替陸觀寄過一封掛號給韓嶽——可一張收據，證明不了信封裡裝的是什麼。陸觀的日記你只找到了一部分，缺掉的那幾頁裡，也許正寫著讓這一切無可辯駁的關鍵。',
+    '爭論拖了兩年，最後不了了之。',
+    '（屋子裡還有你沒找到的日記殘頁。）',
+  ], [
+    'You escape through Old Zhou\'s water channel and hand the plate to the Astronomical Society. The comet on it is perfectly clear — but Han Yue\'s lawyers insist: an old plate of unknown origin — who can prove it wasn\'t faked after the fact?',
+    'Old Zhou says he once posted a registered letter from Lu Guan to Han Yue — but a receipt can\'t prove what was inside the envelope. You found only part of Lu Guan\'s diary; the missing pages might have held the key that would have made it all undeniable.',
+    'The dispute drags on for two years and fizzles out.',
+    '(There are diary pages in the house you never found.)',
+  ]);
+  endings.E.textM = L([
+    '水道的出口就在眼前，溪水聲清清楚楚。你看了很久手裡的底片。',
+    '最後，你走回暗房，把它放回避光盒，鎖上活板門，再從水道離開。大門外的車燈一直亮到天明，韓嶽始終不知道還有另一扇門。',
+    '真相還在那裡，只是從今以後，由你來守護。也許有一天你會回來帶走它，也許永遠不會。',
+    '陸觀說過：由你決定。',
+  ], [
+    'The mouth of the channel is right ahead; you can hear the creek clearly. You look at the plate in your hands for a long time.',
+    'In the end you go back to the darkroom, return it to the light-tight box, lock the trapdoor, and leave through the channel. The headlights outside the front door stay on until dawn; Han Yue never learns there was another way out.',
+    'The truth is still there — only now it\'s yours to guard. Maybe one day you\'ll come back for it; maybe you never will.',
+    'Lu Guan said it himself: it\'s up to you.',
+  ]);
+  const ENDING_ORDER = ['B', 'A', 'C', 'E', 'D', 'H'];
 
   /* ================================================================
    * 九、階段與提示
@@ -2659,16 +2960,18 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     attic: { title: L('天花板上的活門', 'The Hatch in the Ceiling'), goal: L('想辦法上到閣樓。', 'Find a way up into the attic.'), done: s => F(s, 'atticOpen') },
     gate: { title: L('樓梯鐵門', 'The Stair Gate'), goal: L('找到樓梯鐵門的鑰匙，上天文台。', 'Find the key to the stair gate and go up to the observatory.'), done: s => F(s, 'gateOpen') },
     emblems: { title: L('日、月、星', 'Sun, Moon and Star'), goal: L('找齊日、月、星三枚徽章。', 'Find all three emblems: Sun, Moon and Star.'), done: emblemsFound },
+    escape: { title: L('另一條路', 'Another Way Out'), goal: L('大門也許不是唯一的出口。找出這棟屋子的另一條路。', 'The front door may not be the only way out. Find the house\'s other way out.'), done: s => F(s, 'tunnelOpen') },
     door: { title: L('大門', 'The Front Door'), goal: L('把三枚徽章嵌回門廳的大門。', 'Set the three emblems into the front door in the foyer.'), done: s => allInserted(s) },
     leave: { title: L('離開之前', 'Before You Go'), goal: L('決定要帶走什麼，然後離開。', 'Decide what to take with you, and leave.'), done: s => !!s.ending },
   };
   const STAGES = {
     novice: ['drawer', 'greenhouse', 'gate', 'emblems', 'door', 'leave'],
     veteran: ['drawer', 'greenhouse', 'storeroom', 'attic', 'gate', 'emblems', 'door', 'leave'],
+    master: ['drawer', 'greenhouse', 'storeroom', 'attic', 'gate', 'emblems', 'door', 'escape', 'leave'],
   };
   // 支線：不在主線階段裡，但有自己的目標與提示
   const SIDE_STAGE = { id: 'truth', title: L('光照不到的地方（選擇性）', 'Where the Light Cannot Reach (Optional)'), goal: L('信裡說，二十年前的真相藏在「光照不到的地方」。', 'The letter says the truth from twenty years ago is hidden "where the light cannot reach".'), done: s => F(s, 'plateDeveloped') };
-  const modeOf = s => (VET(s) ? 'veteran' : 'novice');
+  const modeOf = s => (s && STAGES[s.mode] ? s.mode : 'novice');
   function stageInfo(s) {
     const ids = STAGES[modeOf(s)];
     const index = ids.findIndex(id => !STAGE_DEFS[id].done(s));
@@ -2721,6 +3024,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     { hs: 't_balance', mode: 'veteran', done: s => seen(s, 'weight_box') },
     { hs: 't_cabinet', mode: 'veteran', done: s => seen(s, 'cabinet_note') || F(s, 'cabinetOpen') },
     { hs: 't_calendar', mode: 'veteran', done: s => seen(s, 'calendar') },
+    { hs: 't_shelf', mode: 'master', done: s => F(s, 'draftNoticed') || F(s, 'tunnelFound') },
     { hs: 'a_chest', mode: 'veteran', done: s => F(s, 'cardTaken') },
     { hs: 'a_photobox', mode: 'veteran', done: s => F(s, 'photosTaken') },
     { hs: 'a_marks', mode: 'veteran', done: s => seen(s, 'height_marks') },
@@ -2733,10 +3037,12 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     { hs: 'o_lamp', done: s => F(s, 'bulbTaken') },
     { hs: 'd_shelf', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card') || seen(s, 'bottle_card_v') },
     { hs: 'd_chart', mode: 'veteran', done: s => !F(s, 'darkroomLit') || seen(s, 'process_chart') },
+    { hs: 'd_card2', mode: 'master', done: s => !F(s, 'darkroomLit') || seen(s, 'bottle_card_fake') },
     { hs: 'd_line', done: s => !F(s, 'darkroomLit') || F(s, 'p4Taken') },
   ];
   const DISCOVERIES = DISCOVERY_LIST.map(d => Object.assign(d, { room: hotspotById[d.hs].room, name: hotspotById[d.hs].name }));
-  const nextDiscovery = s => DISCOVERIES.find(d => (!d.mode || d.mode === modeOf(s)) && roomOpen(s, d.room) && !d.done(s));
+  // mode 是最低難度：資深的物件在大師模式也要列出來
+  const nextDiscovery = s => DISCOVERIES.find(d => modeOk(modeOf(s), d) && roomOpen(s, d.room) && !d.done(s));
   const ALL_SEEN = L('你已經把能到的地方都看過了。', 'You\'ve already looked at everything you can reach.');
   const roomIn = id => L(rooms[id].name.zh, rooms[id].name.en.toLowerCase());
 
@@ -2814,7 +3120,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'pots', mode: 'novice', stage: 'gate', title: L('四個花盆', 'The Four Pots'),
+      id: 'pots', upTo: 'novice', stage: 'gate', title: L('四個花盆', 'The Four Pots'),
       avail: s => seen(s, 'pots_rule'), done: s => F(s, 'keyDug'),
       texts: [
         L('木牌說：四句話裡只有一句是真的。挖土需要工具——看看溫室的工具架。', 'The sign says only one of the four sentences is true. You\'ll need a tool to dig — check the greenhouse tool rack.'),
@@ -2872,7 +3178,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'musicbox', mode: 'veteran', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
+      id: 'musicbox', mode: 'veteran', upTo: 'veteran', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
       avail: s => has(s, 'crank') || F(s, 'crankInserted') || seen(s, 'qing_letter'), done: s => F(s, 'musicSolved'),
       texts: [
         s => F(s, 'crankInserted') ? L('晴的信裡有一首用星座寫成的歌。', 'Qing\'s letter has a song written in constellations.') : L('發條鑰匙要插進閣樓的音樂盒。晴的信裡有一首用星座寫成的歌。', 'The winding key goes into the music box in the attic. Qing\'s letter has a song written in constellations.'),
@@ -2928,7 +3234,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'mirrors', mode: 'novice', stage: 'emblems', title: L('天窗反光鏡', 'The Skylight Mirrors'),
+      id: 'mirrors', upTo: 'novice', stage: 'emblems', title: L('天窗反光鏡', 'The Skylight Mirrors'),
       avail: s => seen(s, 'garden_rules') || F(s, 'greenhouseOpen'), done: s => F(s, 'lightOk'),
       texts: [
         L('園丁守則說月光花只在月光照到時開花。天窗下的反光鏡可以轉動。', 'The gardener\'s rules say the moonflower only blooms in moonlight. The mirrors under the skylight can be turned.'),
@@ -2955,7 +3261,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'door', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
+      id: 'door', upTo: 'veteran', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
       avail: s => EMBLEMS.some(e => has(s, e)), done: s => allInserted(s),
       texts: [
         L('大門的黃銅面板上有日、月、星三個凹槽。', 'The brass panel on the front door has three sockets: Sun, Moon and Star.'),
@@ -2964,7 +3270,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'exit', stage: 'leave', title: L('離開之前', 'Before You Leave'),
+      id: 'exit', upTo: 'veteran', stage: 'leave', title: L('離開之前', 'Before You Leave'),
       avail: s => allInserted(s), done: () => false,
       texts: [
         s => {
@@ -2999,7 +3305,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'develop', mode: 'novice', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      id: 'develop', upTo: 'novice', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
         L('拼好的便條寫了沖洗順序；藥瓶架上的卡片能推出每個瓶子裝的是什麼。', 'The mended note gives the developing order; the card on the bottle shelf tells you what is in each bottle.'),
@@ -3008,12 +3314,73 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ],
     },
     {
-      id: 'develop_v', mode: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      id: 'develop_v', mode: 'veteran', upTo: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
         L('架上有六瓶，但只倒四步：拼好的便條給了順序，牆上的流程表說明哪兩種藥劑用不到，藥瓶架上的卡片有五條規則，能推出每一瓶是什麼。', 'There are six bottles but only four steps: the mended note gives the order, the chart on the wall says which two chemicals you won\'t need, and the card on the bottle shelf has five rules that tell you what each bottle holds.'),
         L('從卡片第一條和第三條開始：顯影液在一端，而洗淨液在它左邊，所以顯影液在最右邊。接著用第四條找定影液、第五條找清水，最後用第二條排出停影液和調色液。', 'Start with rules 1 and 3: the developer is at one end and the hypo clearing agent is to its left, so the developer is on the far right. Then rule 4 finds the fixer, rule 5 the water, and rule 2 places the stop bath and the toner.'),
         L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。用不到調色液和洗淨液。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. The toner and the hypo clearing agent aren\'t used. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+      ],
+    },
+    /* ---------- 大師模式 ---------- */
+    {
+      id: 'musicbox_m', mode: 'master', stage: 'emblems', title: L('音樂盒', 'The Music Box'),
+      avail: s => has(s, 'crank') || F(s, 'crankInserted') || seen(s, 'qing_letter'), done: s => F(s, 'musicSolved'),
+      texts: [
+        s => F(s, 'crankInserted') ? L('晴的信說，那首歌從爸爸星盤上最高的那個星座開始。', 'Qing\'s letter says the song starts with the highest constellation on her father\'s star dial.') : L('發條鑰匙要插進閣樓的音樂盒。晴的信說，那首歌從爸爸星盤上最高的那個星座開始。', 'The winding key goes into the music box in the attic. Qing\'s letter says the song starts with the highest constellation on her father\'s star dial.'),
+        L('星盤三環是照「天空中的高低」對應的：外環最高、內環最低。先解開天文台的星盤，再用星座圖的星數換成音齒。', 'The dial\'s rings follow height in the sky: the outer ring is highest, the inner ring lowest. Solve the star dial in the observatory first, then turn each constellation into a tine using the star counts on the chart.'),
+        L(`星盤的答案是外環${CONSTELLATIONS[DIAL_ANSWER[0]].name.zh}（${CONSTELLATIONS[DIAL_ANSWER[0]].stars.length} 星）、中環${CONSTELLATIONS[DIAL_ANSWER[1]].name.zh}（${CONSTELLATIONS[DIAL_ANSWER[1]].stars.length} 星）、內環${CONSTELLATIONS[DIAL_ANSWER[2]].name.zh}（${CONSTELLATIONS[DIAL_ANSWER[2]].stars.length} 星）。每個撥兩下，再回到最高的那個：依序撥 ${MUSIC_ANSWER_M.join('、')}。`,
+          `The dial's answer is ${CONSTELLATIONS[DIAL_ANSWER[0]].name.en} on the outer ring (${CONSTELLATIONS[DIAL_ANSWER[0]].stars.length} stars), ${CONSTELLATIONS[DIAL_ANSWER[1]].name.en} in the middle (${CONSTELLATIONS[DIAL_ANSWER[1]].stars.length}), ${CONSTELLATIONS[DIAL_ANSWER[2]].name.en} on the inner ring (${CONSTELLATIONS[DIAL_ANSWER[2]].stars.length}). Twice each, then back to the highest: pluck ${MUSIC_ANSWER_M.join(', ')}.`),
+      ],
+    },
+    {
+      id: 'develop_m', mode: 'master', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
+      avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
+      texts: [
+        L('架上有六瓶，只倒便條上的四步。架上和牆上各有一張卡片，推出來的答案不一樣——其中一張是假的。避光盒裡只剩三張廢片，別急著試。', 'Six bottles, but only the four steps on the note. There are two cards, one under the bottles and one on the wall, and they give different answers — one of them is a fake. Only three scraps of film are left, so don\'t rush.'),
+        L('誰有機會在陸觀死後進暗房？周伯日誌的最後幾頁記著老爺哪天走的、韓教授哪天來過；牆上那張卡片寫在哪一天的日曆紙上？流程表也說了顯影液的瓶口會結晶——架上哪一瓶有結晶？', 'Who could have got into the darkroom after Lu Guan died? The last pages of Old Zhou\'s log say when the master died and when Professor Han came; what date is on the calendar page the wall card is written on? The chart also says developer leaves crystals around the bottle neck — which bottle has them?'),
+        L(`牆上那張是韓嶽偽造的：它寫在 10 月 ${HAN_VISIT_DAY} 日的日曆紙上，陸觀 ${DEATH_DAY} 日就走了；照它推，顯影液也不是瓶口結晶的黑蓋。照架上那張舊卡片推：${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`,
+          `The wall card is Han Yue\'s forgery: it\'s written on the calendar page for ${HAN_VISIT_DAY} October, and Lu Guan died on the ${DEATH_DAY}th; its developer also isn\'t the black-capped bottle with the crystals. Use the old card under the bottles: ${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+      ],
+    },
+    {
+      id: 'door_m', mode: 'master', stage: 'door', title: L('把徽章嵌回大門', 'Setting the Emblems'),
+      avail: s => EMBLEMS.some(e => has(s, e)), done: s => allInserted(s),
+      texts: [
+        L('大門的黃銅面板上有日、月、星三個凹槽。', 'The brass panel on the front door has three sockets: Sun, Moon and Star.'),
+        L('選中徽章，再點門廳的大門。', 'Select an emblem, then click the Front Door in the foyer.'),
+        L('三枚都嵌好，大門就能打開——嵌好時仔細聽，屋子裡不只一個地方有動靜。', 'Once all three are set the door will open — and listen carefully when you set the last one: something else in the house moves too.'),
+      ],
+    },
+    {
+      id: 'escape_find', mode: 'master', stage: 'escape', title: L('另一條路', 'Another Way Out'),
+      avail: s => allInserted(s), done: s => F(s, 'tunnelFound'),
+      texts: [
+        L('大門也許不是唯一的出口。周伯日誌的最後幾頁是今年寫的，讀讀看。', 'The front door may not be the only way out. The last pages of Old Zhou\'s log were written this year — read them.'),
+        L('日誌提到一條「老水道」。從閣樓的圓窗往下看，水道口在屋子的哪一頭？嵌好徽章時，屋子另一頭傳來的那一聲「喀」又是什麼？', 'The log mentions an "old water channel". Look down from the attic\'s round window: at which end of the house does it start? And what was that clunk from the far side of the house when you set the emblems?'),
+        L('到儲物間查看「雜物架」：三枚徽章嵌好後，卡住它的鐵栓就收回了，推開架子就是水道的鐵門。', 'Examine the Shelves in the storeroom: once all three emblems are set, the bolt pinning them is released, and behind them is the channel gate.'),
+      ],
+    },
+    {
+      id: 'tunnel', mode: 'master', stage: 'escape', title: L('水道鐵門', 'The Channel Gate'),
+      avail: s => F(s, 'tunnelFound'), done: s => F(s, 'tunnelOpen'),
+      texts: [
+        L('鎖旁刻著「那顆彗星真正的位置」。剪報上有韓嶽公布的位置——可他的數字全都可靠嗎？', 'Beside the lock: "where the comet truly was". The clipping gives the position Han Yue published — but can every one of his numbers be trusted?'),
+        L('日記三（或底片的紙套）說，那晚陸觀把赤緯 −16 誤寫成 −17、當場劃掉；韓嶽連那個 7 都照抄了。赤經只有剪報上有。', 'Diary Page III (or the plate\'s sleeve) says that night Lu Guan miswrote declination −16 as −17 and struck it out; Han Yue copied the 7 anyway. Only the clipping gives the right ascension.'),
+        L(`真正的位置是赤經 5 時 27 分、赤緯 −16 度。密碼是 ${TUNNEL_CODE}。`, `The true position is right ascension 5h 27m, declination −16°. The code is ${TUNNEL_CODE}.`),
+      ],
+    },
+    {
+      id: 'exit_m', mode: 'master', stage: 'leave', title: L('離開之前', 'Before You Leave'),
+      avail: s => allInserted(s), done: () => false,
+      texts: [
+        s => {
+          const n = countPages(s), plate = s.inv.includes('plate');
+          return L(`大門已經可以打開了。你目前有日記 ${n} / 4 頁${plate ? '，也帶著底片' : '，還沒找到信裡說的真相'}。`,
+            `The door can open now. You have ${n} / 4 diary pages${plate ? ' and the glass plate' : ', but you haven\'t found the truth the letter mentioned'}.`);
+        },
+        L('韓嶽守在大門外。只要底片沖出來了，從大門走就會被他截胡。', 'Han Yue is keeping watch outside the front door. Once the plate has been developed, leaving that way means he intercepts you.'),
+        L('真結局：沖出底片、收齊四頁日記，從儲物間的老水道離開，並選擇公開真相。', 'For the true ending: develop the plate, collect all four diary pages, leave through the old water channel in the storeroom, and choose to make the truth public.'),
       ],
     },
     {
@@ -3054,14 +3421,16 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     startRoom: 'foyer',
     startItems: ['letter'],
     roomOrder: ['foyer', 'study', 'greenhouse', 'storeroom', 'observatory', 'attic', 'darkroom'],
-    MODES: ['novice', 'veteran'],
+    MODES, RANK, isAdv, modeOk,
     rooms, items, docs, hotspots, recipes, puzzles, endings, ENDING_ORDER, hints, intro,
     // 依模式取用的內容
-    docBody: (d, mode) => (mode === 'veteran' && d.bodyV) || d.body,
-    endingText: (e, mode) => (mode === 'veteran' && e.textV) || e.text,
+    docBody: (d, mode) => (mode === 'master' && d.bodyM) || (isAdv(mode) && d.bodyV) || d.body,
+    endingText: (e, mode) => (mode === 'master' && e.textM) || (isAdv(mode) && e.textV) || e.text,
     variant: s => (VET(s)
       ? { pots: POTS_V, potAnswer: POT_ANSWER_V, mirrorGrid: MIRROR_GRID_V, bottles: BOTTLES_V, developAnswer: DEVELOP_ANSWER_V }
       : { pots: POTS, potAnswer: POT_ANSWER, mirrorGrid: MIRROR_GRID, bottles: BOTTLES, developAnswer: DEVELOP_ANSWER }),
+    // 可以「拿在手上」攤在畫面下方的東西：所有線索文件（圖像類的顯示圖），加上拼好的便條（顯示抄寫的文字）
+    holdable: id => !!docs[id] || id === 'note_full',
     STAGE_DEFS, STAGES, SIDE_STAGE, stageInfo,
     // 共用謎題資料（UI 繪圖與測試用）
     BOOKS, COLOR_NAMES, DRAWER_CODE, DRAWER_TRAP, GRID_DIGITS, TRANSPARENCY_STARS, SAFE_CODE, POTS, POT_ANSWER,
@@ -3070,10 +3439,13 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
-    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady,
+    MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
     BOTTLES_V, BOTTLE_RULES_V, UNUSED_CHEMS_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
+    // 大師模式
+    MUSIC_ANSWER_M, FAKE_BOTTLE_RULES, DEV_MISS_LIMIT, DEATH_DAY, HAN_VISIT_DAY, TUNNEL_CODE, TUNNEL_TRAP,
   };
 }));
 </script>
@@ -3103,10 +3475,10 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       hotspotById[h.id] = h;
     }
 
-    // mode：'novice'（新手）或 'veteran'（資深）。舊存檔沒有這個欄位，讀取時一律視為新手。
+    // mode：'novice'（新手）、'veteran'（資深）或 'master'（大師）。舊存檔沒有這個欄位，讀取時一律視為新手。
     function newState(mode) {
-      const m = mode === 'veteran' ? 'veteran' : 'novice';
-      const grid = m === 'veteran' ? G.MIRROR_GRID_V : G.MIRROR_GRID;
+      const m = G.MODES.includes(mode) ? mode : 'novice';
+      const grid = G.isAdv(m) ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       return {
         v: G.saveVersion,
         mode: m,
@@ -3118,8 +3490,21 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         hints: {},
         visited: { [G.startRoom]: true },
         stats: { actions: 0, wrong: 0, hints: 0, playMs: 0 },
+        hand: [],
         ending: null,
       };
+    }
+
+    /* ---------- 拿在手上：最多三份文件攤在畫面下方（純顯示，不影響遊戲邏輯） ---------- */
+    const HAND_MAX = 3;
+    // 回傳拿起之後是否在手上；手上已滿時換掉最早拿起的那一份
+    function toggleHand(s, id) {
+      if (!G.holdable(id)) return false;
+      const i = s.hand.indexOf(id);
+      if (i >= 0) { s.hand.splice(i, 1); return false; }
+      s.hand.push(id);
+      while (s.hand.length > HAND_MAX) s.hand.shift();
+      return true;
     }
 
     const NOT_HERE = L('這裡沒有那樣東西。', 'That isn\'t here.');
@@ -3173,13 +3558,13 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     }
 
     /* ---------- 查詢 ---------- */
-    function isVisible(s, h) { return h.room === s.room && (!h.mode || h.mode === s.mode) && (!h.visible || !!h.visible(s)); }
+    function isVisible(s, h) { return h.room === s.room && G.modeOk(s.mode, h) && (!h.visible || !!h.visible(s)); }
     function visibleHotspots(s) { return G.hotspots.filter(h => isVisible(s, h)); }
     function canEnter(s, room) { return !!G.rooms[room] && G.rooms[room].accessible(s); }
     // 房間按鈕要不要出現在畫面上（還沒發現的房間不顯示）
     function roomShown(s, room) {
       const R = G.rooms[room];
-      if (!R || (R.mode && R.mode !== s.mode)) return false;
+      if (!R || !G.modeOk(s.mode, R)) return false;
       return R.navVisible ? !!R.navVisible(s) : true;
     }
     function itemName(s, id) {
@@ -3267,8 +3652,9 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       if (solved === null) return fail(L('這個選項現在不能用。', 'That option isn\'t available right now.')); // 不合法的輸入：不改變任何狀態
       out.solved = !!solved;
       // 資深模式：答錯時把「錯在哪」的說明換成一句簡短的回應（前置條件不足的說明，例如沒有鏟子，照樣保留）
-      if (!solved && s.mode === 'veteran' && out.wrongAt != null && !p.vetKeep) {
-        out.messages = out.messages.slice(0, out.wrongAt).concat([{ text: p.vetWrong || WRONG, kind: 'bad' }]);
+      if (!solved && G.isAdv(s.mode) && out.wrongAt != null && !p.vetKeep) {
+        // 標了 keep 的訊息（例如大師模式「還剩幾張廢片」）照樣保留
+        out.messages = out.messages.slice(0, out.wrongAt).concat([{ text: p.vetWrong || WRONG, kind: 'bad' }], out.messages.slice(out.wrongAt).filter(m => m.keep));
       }
       delete out.wrongAt;
       if (p.silent && !out.messages.length) return out; // 純介面狀態（閥門開關、鏡子角度）不計入行動次數
@@ -3279,8 +3665,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     // 目前的主線階段（第一個還沒完成的階段）
     function stage(s) { return G.stageInfo(s); }
     // 資深模式：第一階段不開放提示
-    function hintsLocked(s) { return s.mode === 'veteran' && stage(s).index === 0; }
-    function hintOpen(s, h) { return (!h.mode || h.mode === s.mode) && h.avail(s) && !h.done(s); }
+    function hintsLocked(s) { return G.isAdv(s.mode) && stage(s).index === 0; }
+    function hintOpen(s, h) { return G.modeOk(s.mode, h) && h.avail(s) && !h.done(s); }
     // 回傳目前可用的提示；group 是 'current'（目前階段）、'side'（支線）、'explore' 或 'other'（已發現、但屬於之後的階段）
     function hintList(s) {
       if (hintsLocked(s)) return [];
@@ -3340,9 +3726,14 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push(L('物品重複', 'duplicate items'));
       // 資深模式的花盆：挖錯過的盆（不重複、都不是答案）；挖錯第三盆就是失敗結局 F
       const pd = s.flags && s.flags.potsDug;
-      if (pd !== undefined && (s.mode !== 'veteran' || !Array.isArray(pd) || !pd.length || pd.length > G.POT_MISS_LIMIT || new Set(pd).size !== pd.length
+      if (pd !== undefined && (!G.isAdv(s.mode) || !Array.isArray(pd) || !pd.length || pd.length > G.POT_MISS_LIMIT || new Set(pd).size !== pd.length
         || pd.some(id => id === G.POT_ANSWER_V || !G.POTS_V.some(p => p.id === id)) || (pd.length === G.POT_MISS_LIMIT) !== (s.ending === 'F'))) errs.push(L('花盆紀錄無效', 'invalid pot record'));
       if (s.ending === 'F' && !(Array.isArray(pd) && pd.length === G.POT_MISS_LIMIT)) errs.push(L('結局無效', 'invalid ending'));
+      // 大師模式的廢片：試壞 1～2 張；第三張就是失敗 G
+      const dm = s.flags && s.flags.devMisses;
+      if (dm !== undefined && (s.mode !== 'master' || !Number.isInteger(dm) || dm < 1 || dm > G.DEV_MISS_LIMIT || (dm === G.DEV_MISS_LIMIT) !== (s.ending === 'G'))) errs.push(L('廢片紀錄無效', 'invalid scrap-film record'));
+      if (s.ending === 'G' && dm !== G.DEV_MISS_LIMIT) errs.push(L('結局無效', 'invalid ending'));
+      if (s.ending && G.endings[s.ending] && G.endings[s.ending].mode && !G.modeOk(s.mode, G.endings[s.ending])) errs.push(L('結局無效', 'invalid ending'));
       if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push(L('所在房間尚未解鎖', 'current room is not unlocked yet'));
       return errs;
     }
@@ -3351,7 +3742,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       if (!s || typeof s !== 'object') return s;
       const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
       if (s.mode === undefined) s.mode = 'novice'; // 加入難度之前的存檔都是新手模式
-      const grid = s.mode === 'veteran' ? G.MIRROR_GRID_V : G.MIRROR_GRID;
+      const grid = G.isAdv(s.mode) ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       s.hints = obj(s.hints);
       s.visited = obj(s.visited);
       s.visited[s.room] = true;
@@ -3376,13 +3767,15 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const st = obj(s.stats);
       s.stats = {};
       for (const k of ['actions', 'wrong', 'hints', 'playMs']) s.stats[k] = Number.isFinite(+st[k]) && +st[k] >= 0 ? +st[k] : 0;
+      const hand = Array.isArray(s.hand) ? s.hand : [];
+      s.hand = hand.filter((id, i) => typeof id === 'string' && G.holdable(id) && hand.indexOf(id) === i).slice(-HAND_MAX);
       return s;
     }
 
     return {
       G, newState, interact, useItem, combine, move, submit,
       hintList, revealHint, hintsLocked, stage, progress, visibleHotspots, canEnter, roomShown, itemName, pageCount,
-      validate, normalize, findRecipe,
+      validate, normalize, findRecipe, toggleHand, HAND_MAX,
       hotspot: id => hotspotById[id],
       clone: s => JSON.parse(JSON.stringify(s)),
     };
@@ -3446,14 +3839,14 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   function getSetting(key) { return rawGet('setting.' + key); }
   function setSetting(key, value) { return rawSet('setting.' + key, String(value)); }
 
-  // 結局圖鑑：'endings' 記錄所有模式解鎖過的結局；資深模式另外記在 'endings.veteran'，讓圖鑑標出資深徽記
+  // 結局圖鑑：'endings' 記錄所有模式解鎖過的結局；資深、大師模式另外記在 'endings.veteran'、'endings.master'，讓圖鑑標出資深徽記
   function listOf(key) {
     try { const v = JSON.parse(rawGet(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
-  function getEndings(mode) { return listOf(mode === 'veteran' ? 'endings.veteran' : 'endings'); }
+  function getEndings(mode) { return listOf(mode === 'veteran' || mode === 'master' ? 'endings.' + mode : 'endings'); }
   function addEnding(id, mode) {
     const add = key => { const list = listOf(key); if (!list.includes(id)) { list.push(id); rawSet(key, JSON.stringify(list)); } return list; };
-    if (mode === 'veteran') add('endings.veteran');
+    if (mode === 'veteran' || mode === 'master') add('endings.' + mode);
     return add('endings');
   }
 
@@ -3532,7 +3925,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     loadGame: L('讀取存檔', 'Load Game'),
     endingsGallery: L('結局圖鑑', 'Endings'),
     howToPlay: L('遊戲說明', 'How to Play'),
-    titleFoot: L('兩種難度・最多七個房間・五種結局', 'Two difficulties · up to seven rooms · five endings'),
+    titleFoot: L('三種難度・最多七個房間・六種結局', 'Three difficulties · up to seven rooms · six endings'),
 
     // 難度
     modeTitle: L('選擇難度', 'Choose a Difficulty'),
@@ -3540,6 +3933,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     modeVeteran: L('資深', 'Veteran'),
     modeNoviceDesc: L('五個房間、十一道謎題。答錯時會告訴你哪裡不對，提示隨時可用。第一次來建議選這個。', 'Five rooms and eleven puzzles. Wrong answers tell you what went wrong, and hints are always there. Recommended for a first visit.'),
     modeVeteranDesc: L('七個房間、十五道謎題：多了閣樓、儲物間和兩位新角色；八個花盆、六瓶藥劑，反光鏡十六面。答錯只會說「不對」，看不到光路，提示從第二階段起才開放。八個花盆挖錯三盆就失敗，整局作廢。', 'Seven rooms and fifteen puzzles: an attic, a storeroom and two more characters; eight pots, six bottles and sixteen mirrors. Wrong answers only say "not right", you can\'t watch the light, and hints only open from the second stage. Dig up three wrong pots and the game is lost.'),
+    modeMaster: L('大師', 'Master'),
+    modeMasterDesc: L('資深的全部內容，再往上一層：線索彼此牽連，有些看似可信的東西是假的，要對照別處才看得穿；出口不只一扇，而大門外有人在等。沖洗只有三張廢片，三張都試壞就失敗。提示一樣從第二階段開放。', 'Everything in Veteran, and one level deeper: clues lean on one another, some convincing things are fakes you can only see through by checking them against something else, there is more than one way out — and someone is waiting outside the front door. The darkroom has only three scraps of film; spoil all three and the game is lost. Hints open from the second stage, as in Veteran.'),
     modeStart: L('以「{mode}」開始', 'Start as {mode}'),
     tutorialToggle: L('顯示操作教學（隨時可以跳過）', 'Show the tutorial (you can skip it any time)'),
     modeChip: L('難度：{mode}', 'Difficulty: {mode}'),
@@ -3598,7 +3993,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     cancel: L('取消', 'Cancel'),
 
     // 物品檢視
-    holdIt: L('拿在手上', 'Hold it'),
+    holdIt: L('拿去用', 'Use on…'),
     combineWith: L('和其他物品組合…', 'Combine with…'),
     overlayLead: L('三個圈起來的星星底下，各有一個數字。', 'Under each of the three circled stars is a digit.'),
     noteLeftLead: L('只有左半邊，每一行都斷在撕口。', 'Only the left half — every line breaks off at the tear.'),
@@ -3733,6 +4128,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     readCard: L('看藥瓶卡片', 'Read the bottle card'),
     readChart: L('看流程表', 'Read the chart'),
     readNote: L('看拼好的便條', 'Read the mended note'),
+    readCard2: L('看牆上的卡片', 'Read the card on the wall'),
+    devFilms: L('避光盒裡的廢片還剩 {n} / {total} 張。三張都試壞，就只剩那張真正的底片——這一局就失敗了。', '{n} of {total} scraps of film are left in the light-tight box. Spoil all three and only the real plate remains — and the game is lost.'),
+    devFilmsLast: L('只剩最後一張廢片。再錯一次，這一局就失敗了。', 'Only one scrap of film is left. One more mistake and the game is lost.'),
+    devConfirm: L('這是最後一張廢片。這個順序真的確定了嗎？', 'This is your last scrap of film. Are you sure of this order?'),
+    devConfirmYes: L('確定，沖洗', 'Yes, develop'),
 
     // 電話
     phoneTitle: L('電話', 'Telephone'),
@@ -3765,10 +4165,23 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     exitLeave: L('推開大門，離開這棟屋子', 'Push the door open and leave the house'),
     exitStay: L('先不走，我還想在屋裡看看', 'Not yet — I want to look around some more'),
     exitConfirm: L('「{choice}」——離開之後，故事就結束了。確定嗎？', '"{choice}" — once you leave, the story ends. Are you sure?'),
+    exitLeadM: L('三枚徽章都已歸位，沉重的大門只要輕輕一推就會打開。門縫外，那輛黑色轎車的車燈還亮著。', 'All three emblems are in place; the heavy door will open at a touch. Through the gap, the black car\'s headlights are still on.'),
+    tunnelTitle: L('老水道', 'The Old Channel'),
+    tunnelLead: L('鐵門開著。低矮的石砌水道彎進黑暗裡，溪水聲從另一頭傳來。這就是周伯日誌裡說的那條老水道，一路通到山谷裡的溪邊——從大門那邊看不到。', 'The iron gate stands open. The low, stone-lined channel bends away into the dark, and the sound of the creek comes from the far end. This is the old water channel from Old Zhou\'s log; it runs all the way down to the creek in the valley — out of sight of the front door.'),
+    tunnelLeave: L('鑽進水道，離開這棟屋子', 'Crawl into the channel and leave the house'),
 
     // 筆記與提示
     notesTitle: L('線索筆記', 'Notebook'),
     notesLead: L('你讀過、看過的線索都會自動記在這裡，隨時可以重讀。（物品本身請在物品欄「查看」。）', 'Every clue you read or look at is recorded here automatically, so you can reread it any time. (To look at an item itself, use "Examine" in your inventory.)'),
+    handTitle: L('拿在手上', 'In Hand'),
+    handEmpty: L('讀文件時按「拿在手上」，它就會攤開在這裡；最多三份並排，不必來回切換。', 'While reading a document, press "Hold in hand" and it stays open here — up to three side by side, so you don\'t have to keep switching.'),
+    handHold: L('拿在手上', 'Hold in hand'),
+    handHoldSwap: L('拿在手上（放下「{doc}」）', 'Hold in hand (put down "{doc}")'),
+    handDrop: L('從手上放下', 'Put it down'),
+    handDropShort: L('放下', 'Put down'),
+    handDropAria: L('放下「{doc}」', 'Put down "{doc}"'),
+    handHeld: L('在手上', 'In hand'),
+    handStrip: L('手上的文件（{n}）', 'In hand ({n})'),
     hintsTitle: L('提示', 'Hints'),
     hintsLead: L('每個目標的提示分三段：先給方向，再指出線索在哪，最後才是答案。用過的提示次數會出現在結算畫面上。', 'Each goal has three hints: first a direction, then where the clues are, and finally the answer. The number of hints you use is shown at the end.'),
     hintAsk: L('要看第 {n} 段提示嗎？（共 {max} 段；用過的提示會記在結算畫面）', 'Show hint {n} of {max}? (Hints you use are shown on the ending screen.)'),
@@ -3780,7 +4193,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     hintMore: L('再多一點（{n}/{max}）', 'A bit more ({n}/{max})'),
     hintDone: L('已經是答案了', 'That\'s the answer'),
     hintNone: L('目前沒有可以提示的目標。', 'Nothing to hint at right now.'),
-    hintsLocked: L('資深模式：第一階段不開放提示。先靠自己找到一盞能用的燈、打開書房的抽屜吧。', 'Veteran mode: no hints in the first stage. Find a working light and open the study drawer on your own.'),
+    hintsLocked: L('{mode}模式：第一階段不開放提示。先靠自己找到一盞能用的燈、打開書房的抽屜吧。', '{mode} mode: no hints in the first stage. Find a working light and open the study drawer on your own.'),
     hintsStage: L('目前階段 {n}/{total}：{title}', 'Stage {n}/{total}: {title}'),
     hintsGoal: L('目標：{goal}', 'Goal: {goal}'),
     hintGroupCurrent: L('這個階段', 'This stage'),
@@ -3797,11 +4210,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     tutDone: L('開始探索', 'Start exploring'),
     tutStep: L('教學 {i}/{n}', 'Tutorial {i}/{n}'),
     tut1: L('發亮的東西都可以點。先看看左邊的「衣帽架」。', 'Anything that lights up can be clicked. Start with the Coat Rack on the left.'),
-    tut2: L('找到的東西會放進物品欄。點一下物品，可以查看、拿在手上，或和別的物品組合。', 'What you find goes into your inventory. Click an item to examine it, hold it, or combine it with another.'),
+    tut2: L('找到的東西會放進物品欄。點一下物品，可以查看、拿去用，或和別的物品組合。', 'What you find goes into your inventory. Click an item to examine it, hold it, or combine it with another.'),
     tut3: L('場景下方列出這裡所有能互動的東西。手上拿著物品時，點它們就是「使用」。', 'Below the scene is everything you can interact with here. While you\'re holding an item, clicking one of these uses the item on it.'),
     tut4: L('從這裡前往其他房間。鎖著的房間要先找到辦法打開。', 'Go to other rooms from here. Locked rooms need a way in first.'),
     tut5: L('右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來，告訴你下一步。卡關時可以一段一段展開提示。', 'Hints, at the top right, shows your current stage and goal; it lights up whenever you finish a stage. If you\'re stuck, reveal hints one step at a time.'),
-    tut5v: L('資深模式：第一階段不開放提示。', 'Veteran mode: there are no hints in the first stage.'),
+    tut5v: L('{mode}模式：第一階段不開放提示。', '{mode} mode: there are no hints in the first stage.'),
     tut6: L('讀過的文件都會記在「線索筆記」；每一步都會自動存檔。祝你好運！', 'Everything you read is kept in the Notebook, and the game saves after every action. Good luck!'),
     replayTutorial: L('重看操作教學', 'Replay the tutorial'),
 
@@ -3815,25 +4228,27 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     help: L([
       ['目標', '找回日、月、星三枚徽章，嵌回門廳的大門就能離開。屋裡還藏著另一個秘密，它決定你會看到哪一個結局。'],
       ['查看', '點擊場景裡發亮的物件，或點場景下方的物件名稱。'],
-      ['使用物品', '在右邊的物品欄點一下物品（拿在手上），再點場景裡的物件。'],
+      ['使用物品', '在右邊的物品欄點一下物品（拿起來），再點場景裡的物件。'],
       ['組合線索', '點選物品後按「組合…」，再點另一個物品。撕開的紙、疊在一起的圖、裝電池……很多線索要合在一起才看得懂。'],
       ['線索筆記', '讀過的文件會自動記下，隨時能重讀。'],
-      ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗，整局作廢（手動存檔不受影響）。'],
+      ['拿在手上', '讀文件時按「拿在手上」，它會攤開在畫面最下方，最多三份並排；解謎的視窗裡也看得到，不必來回切換。'],
+      ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗，整局作廢（手動存檔不受影響）。大師：資深的全部，加上互相牽連的線索、會騙人的假線索和另一個出口；沖洗只有三張廢片。'],
       ['提示', '右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來。每個目標分三段，從方向到答案；每一段都要先確認，會公布答案的那一段，確認框會閃紅色。'],
       ['存檔', '每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。'],
-      ['公平原則', '所有謎題的答案都能在遊戲裡找到（資深模式有一件事要問周伯），不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死——唯一的例外是資深模式的八個花盆：挖錯三盆就失敗，木牌上事先寫明。'],
+      ['公平原則', '所有謎題的答案都能在遊戲裡找到（資深以上有一件事要問周伯），不需要任何外部知識；大師模式的假線索，一定有別的線索能拆穿。答錯不會有懲罰，也不會讓遊戲卡死——例外是資深以上的八個花盆（挖錯三盆就失敗，木牌上事先寫明），以及大師模式的沖洗（三張廢片用完就失敗，畫面上會倒數）。'],
       ['語言', '在標題畫面或「選單」裡可以隨時切換中文與英文，進度不受影響。'],
       ['鍵盤', 'Tab 移動、Enter 選擇、Esc 關閉視窗或放下手上的物品；數字鎖可以直接打數字。'],
     ], [
       ['Goal', 'Find the Sun, Moon and Star emblems and set them back into the front door to leave. The house also hides another secret, and it decides which ending you see.'],
       ['Look', 'Click anything in the scene that lights up, or the object names below the scene.'],
-      ['Use items', 'Click an item in your inventory to hold it, then click something in the scene.'],
+      ['Use items', 'Click an item in your inventory to pick it up, then click something in the scene.'],
       ['Combine clues', 'Select an item, press "Combine…", then click another item. Torn paper, overlapping charts, batteries… many clues only make sense together.'],
       ['Notebook', 'Every document you read is recorded automatically so you can reread it.'],
-      ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game (your manual saves are kept).'],
+      ['In hand', 'While reading a document, press "Hold in hand" and it stays open at the bottom of the screen, up to three side by side. They also show inside puzzle windows, so you don\'t have to keep switching.'],
+      ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game (your manual saves are kept). Master: all of Veteran, plus clues that depend on each other, fakes that lie to you, and another way out; the darkroom has only three scraps of film.'],
       ['Hints', 'Hints, at the top right, shows your current stage goal and lights up whenever you finish a stage. Each goal has three steps, from a nudge to the answer. You confirm each step first, and the confirmation flashes red when the next step gives away the answer.'],
       ['Saving', 'The game autosaves after every action. You can also save to three slots, or copy a save code to carry your progress elsewhere.'],
-      ['Fair play', 'Every answer can be found in the game (in Veteran mode, one thing has to be asked of Old Zhou) — no outside knowledge needed. Wrong answers are never punished and can never leave you stuck, with one exception: in Veteran mode, digging up three wrong pots of the eight loses the game, as the sign on the shelf warns.'],
+      ['Fair play', 'Every answer can be found in the game (from Veteran up, one thing has to be asked of Old Zhou) — no outside knowledge needed — and every fake in Master mode can be exposed by another clue. Wrong answers are never punished and can never leave you stuck, with two exceptions: from Veteran up, digging up three wrong pots of the eight loses the game, as the sign on the shelf warns; and in Master mode, spoiling all three scraps of film in the darkroom loses the game (the screen counts them down).'],
       ['Language', 'Switch between Chinese and English any time from the title screen or the Menu. Your progress is kept.'],
       ['Keyboard', 'Tab to move, Enter to choose, Esc to close a window or put an item away. You can type digits straight into locks.'],
     ]),
@@ -3843,6 +4258,9 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     galleryUnknown: L('？？？', '???'),
     galleryVeteran: L('資深', 'Veteran'),
     galleryVeteranTip: L('在資深模式達成過', 'Reached in Veteran mode'),
+    galleryMaster: L('大師', 'Master'),
+    galleryMasterTip: L('在大師模式達成過', 'Reached in Master mode'),
+    galleryMasterOnly: L('尚未解鎖・大師模式限定', 'Not found yet · Master mode only'),
 
     // 存讀檔
     saveTitle: L('存檔 / 讀檔', 'Save / Load'),
@@ -4213,7 +4631,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     <polygon points="560,300 640,300 610,246 590,246" fill="url(#st-cone)"/>
     ${H(v, 's_desk', `<rect x="356" y="300" width="288" height="18" fill="url(#st-wood)"/><rect x="356" y="300" width="288" height="2" fill="#8a6a32" opacity=".6"/>
       <rect x="380" y="292" width="200" height="8" fill="#2f4a3a" opacity=".85"/>
-      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>${v.s.mode === 'veteran' ? `<path d="M462 300 q0 -12 10 -12 q10 0 10 12 z" fill="url(#fy-brass)"/><circle cx="472" cy="286" r="2.5" fill="#c9a24f"/>` : ''}`}
+      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>${G.isAdv(v.s.mode) ? `<path d="M462 300 q0 -12 10 -12 q10 0 10 12 z" fill="url(#fy-brass)"/><circle cx="472" cy="286" r="2.5" fill="#c9a24f"/>` : ''}`}
       <rect x="500" y="288" width="40" height="12" fill="#c9bfa4" transform="skewX(-20)"/>
       <rect x="392" y="280" width="34" height="8" fill="#5b3a2a"/><rect x="394" y="272" width="30" height="8" fill="#3e4a5e"/>
       <path d="M548 300 l-4 -12 h14 l-4 12 z" fill="#1d1d22"/><path d="M552 290 l18 -30" stroke="#e8e1cc" stroke-width="2"/><path d="M566 262 q10 -6 8 4 q-6 6 -8 -4" fill="#e8e1cc"/>
@@ -4233,7 +4651,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   /* ---------------- 溫室 ---------------- */
   function greenhouse(v) {
     const f = v.s.flags;
-    const vet = v.s.mode === 'veteran';
+    const vet = G.isAdv(v.s.mode);
     const bloom = f.moonTaken || (f.waterOk && f.lightOk);
     const r = rng(73);
     let drops = '';
@@ -4402,7 +4820,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   function darkroom(v) {
     const f = v.s.flags;
     const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K') };
-    const vet = v.s.mode === 'veteran';
+    const vet = G.isAdv(v.s.mode), master = v.s.mode === 'master';
     if (!f.darkroomLit) {
       const r = rng(5);
       let dust = '';
@@ -4434,11 +4852,12 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     ${H(v, 'd_vent', `<rect x="820" y="40" width="90" height="50" fill="#050101"/><path d="M820 40 L910 40 L910 72 L882 90 L820 90 Z" fill="#140404"/>${[50, 60, 70].map(y => `<line x1="826" y1="${y}" x2="${y < 72 ? 904 : 896}" y2="${y}" stroke="#2a0806" stroke-width="2"/>`).join('')}<path d="M882 90 L910 72 L910 90 Z" fill="#050101"/>${headlights ? `<circle cx="901" cy="85" r="7" fill="#ffe9a8" opacity=".25"/><circle cx="897" cy="86" r="2" fill="#ffe9a8"/><circle cx="905" cy="86" r="2" fill="#ffe9a8"/>` : ''}<path d="M882 90 L910 72" stroke="#3a0d0a" stroke-width="2"/>${hit(814, 34, 102, 62)}`)}
     ${H(v, 'd_shelf', vet
       ? `<rect x="700" y="250" width="240" height="10" fill="#3a0d0a"/><rect x="700" y="250" width="240" height="2" fill="#6a2018"/>
-        ${G.BOTTLES_V.map((b, i) => `<rect x="${708 + i * 38}" y="198" width="26" height="52" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${711 + i * 38}" y="202" width="5" height="42" fill="#ff6a50" opacity=".15"/><rect x="${710 + i * 38}" y="188" width="22" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${721 + i * 38}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
+        ${G.BOTTLES_V.map((b, i) => `<rect x="${708 + i * 38}" y="198" width="26" height="52" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${711 + i * 38}" y="202" width="5" height="42" fill="#ff6a50" opacity=".15"/><rect x="${710 + i * 38}" y="188" width="22" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${721 + i * 38}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>${master && b.id === 'black' ? crustPath(708 + i * 38, 198, 26) : ''}`).join('')}
         <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(696, 180, 248, 126)}`
       : `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/><rect x="740" y="250" width="190" height="2" fill="#6a2018"/>
       ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${759 + i * 44}" y="200" width="5" height="44" fill="#ff6a50" opacity=".15"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
       <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(736, 180, 198, 126)}`)}
+    ${H(v, 'd_card2', `<g transform="rotate(-5 750 136)"><rect x="722" y="110" width="58" height="50" fill="#efe2c4" opacity=".9"/><rect x="722" y="110" width="58" height="9" fill="#b0453a" opacity=".85"/><text x="770" y="155" text-anchor="end" font-size="13" fill="#9a3a2a" opacity=".55" class="t-mono">17</text>${[126, 134, 142].map(y => `<line x1="728" y1="${y}" x2="764" y2="${y}" stroke="#7a3a2a" stroke-width="1.4" opacity=".6"/>`).join('')}</g><circle cx="750" cy="112" r="2.5" fill="#8a929b"/>${hit(714, 102, 74, 66)}`)}
     ${H(v, 'd_chart', `<rect x="610" y="34" width="84" height="74" fill="#e8c8b8" opacity=".78" transform="rotate(2 652 71)"/><g transform="rotate(2 652 71)"><rect x="618" y="42" width="52" height="6" fill="#7a3a2a" opacity=".7"/>${[56, 66, 76, 86, 96].map(y => `<line x1="618" y1="${y}" x2="686" y2="${y}" stroke="#7a3a2a" stroke-width="1.5" opacity=".6"/>`).join('')}</g><circle cx="652" cy="36" r="2.5" fill="#8a929b"/>${hit(604, 28, 96, 86)}`)}
     ${H(v, 'd_tray', `<rect x="230" y="320" width="460" height="16" fill="#3a0d0a"/><rect x="230" y="320" width="460" height="2" fill="#6a2018"/><rect x="250" y="336" width="12" height="104" fill="#2a0806"/><rect x="658" y="336" width="12" height="104" fill="#2a0806"/>
       <rect x="236" y="250" width="10" height="70" fill="#2a0806"/><path d="M226 250 h40 v24 h-40 z" fill="#3a0d0a"/><rect x="238" y="274" width="16" height="10" fill="#1a0404"/><rect x="226" y="314" width="34" height="6" fill="#2a0806"/>
@@ -4453,6 +4872,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     const r = rng(91);
     let dust = '';
     for (let i = 0; i < 22; i++) dust += `<circle cx="${(400 + r() * 260).toFixed(1)}" cy="${(220 + r() * 220).toFixed(1)}" r="${(0.6 + r()).toFixed(1)}" fill="#e8dcc0" opacity="${(0.08 + r() * 0.2).toFixed(2)}"/>`;
+    // 大師：雜物架被插進地板的鐵栓卡住；三枚徽章歸位、架子推開後，露出老水道的鐵門
+    const master = v.s.mode === 'master', moved = master && !!f.tunnelFound, bolt = master && !moved && !G.allInserted(v.s);
     const tin = (x, y, body, lid, label) => `<rect x="${x}" y="${y}" width="26" height="30" rx="3" fill="${body}"/><rect x="${x - 1}" y="${y - 4}" width="28" height="6" rx="2" fill="${lid}"/><rect x="${x + 4}" y="${y + 10}" width="18" height="10" fill="#e8dcc0" opacity=".8"/><text x="${x + 13}" y="${y + 18.5}" text-anchor="middle" font-size="7" fill="#3b2a10">${label}</text>`;
     const drawers = [];
     for (let rr = 0; rr < 6; rr++) for (let c = 0; c < 4; c++) {
@@ -4479,8 +4900,15 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     <rect y="436" width="960" height="6" fill="#2a1d12"/>
     <!-- 月光 -->
     <polygon points="444,222 540,222 660,540 380,540" fill="url(#sr-moon)"/>${dust}
+    <!-- 大師：老水道的鐵門（雜物架推開之後才看得到） -->
+    ${moved ? `<rect x="92" y="250" width="100" height="186" fill="#0d0907"/><path d="M92 250 q50 -34 100 0" fill="#0d0907"/>` : ''}
+    ${H(v, 't_tunnel', `<path d="M100 436 L100 262 q42 -28 84 0 L184 436 Z" fill="#050403" stroke="#4a4f55" stroke-width="4"/>
+      ${f.tunnelOpen
+        ? `<path d="M100 262 L72 274 L72 432 L100 436 Z" fill="#2a2d31" stroke="#4a4f55" stroke-width="3"/>${[80, 88].map(x => `<line x1="${x}" y1="272" x2="${x}" y2="432" stroke="#4a4f55" stroke-width="3"/>`).join('')}<path d="M110 436 q32 -40 64 0" fill="#1a2a3a" opacity=".55"/><path d="M118 430 q24 -14 48 0" fill="none" stroke="#9ab6d8" stroke-width="1.5" opacity=".5"/>`
+        : `${[114, 128, 142, 156, 170].map(x => `<line x1="${x}" y1="${x === 142 ? 250 : 258}" x2="${x}" y2="436" stroke="#5a5f66" stroke-width="4"/>`).join('')}<line x1="100" y1="320" x2="184" y2="320" stroke="#5a5f66" stroke-width="4"/><rect x="132" y="330" width="22" height="26" rx="3" fill="#8a929b" stroke="#c7ccd4"/>${[0, 1, 2, 3, 4].map(i => `<rect x="${134 + i * 4}" y="340" width="3" height="9" fill="#1a1a1a"/>`).join('')}`}
+      ${hit(92, 236, 100, 204)}`)}
     <!-- 雜物架 -->
-    ${H(v, 't_shelf', `<rect x="30" y="110" width="140" height="322" fill="#2a1c12"/>${[150, 230, 310, 390].map(y => `<rect x="26" y="${y}" width="148" height="8" fill="#5a3d22"/>`).join('')}
+    ${H(v, 't_shelf', `<g ${moved ? 'transform="translate(-96 0)"' : ''}><rect x="30" y="110" width="140" height="322" fill="#2a1c12"/>${[150, 230, 310, 390].map(y => `<rect x="26" y="${y}" width="148" height="8" fill="#5a3d22"/>`).join('')}
       ${[44, 70, 96, 124].map((x, i) => `<rect x="${x}" y="${126 + (i % 2) * 4}" width="18" height="${24 - (i % 2) * 4}" rx="3" fill="${['#6b5a3a', '#4f6a5a', '#7a5a3a', '#5a5a6a'][i]}"/>`).join('')}
       <circle cx="70" cy="214" r="13" fill="none" stroke="#b59a5e" stroke-width="5"/><circle cx="70" cy="214" r="6" fill="none" stroke="#b59a5e" stroke-width="3"/>
       <rect x="104" y="196" width="50" height="34" fill="#4a3a22"/><path d="M104 196 l25 -10 l25 10" fill="#5a4630"/>
@@ -4488,7 +4916,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       <rect x="100" y="270" width="56" height="40" fill="#3a2a1a"/><rect x="104" y="274" width="48" height="10" fill="#6b5a3a"/>
       <path d="M40 390 h120 l-8 -40 h-104 z" fill="#4a3220"/>${[50, 76, 102, 128].map(x => `<ellipse cx="${x + 10}" cy="350" rx="11" ry="5" fill="#6b4a2c"/>`).join('')}
       <line x1="160" y1="120" x2="176" y2="420" stroke="#6b5a3a" stroke-width="5"/><path d="M168 118 l18 -10 l4 8 z" fill="#8a929b"/>
-      ${hit(26, 104, 160, 330)}`)}
+      ${bolt ? `<rect x="92" y="424" width="12" height="18" rx="2" fill="#8a929b" stroke="#c7ccd4"/><rect x="88" y="420" width="20" height="5" rx="2" fill="#5a5f66"/>` : ''}</g>
+      ${moved ? hit(0, 104, 92, 330) : hit(26, 104, 160, 330)}`)}
     <!-- 小窗：山谷對面的燈 -->
     ${H(v, 't_window', `<rect x="436" y="124" width="112" height="104" fill="#3a2818" stroke="#5a3d22" stroke-width="5"/>
       <rect x="444" y="132" width="96" height="88" fill="#0b1226"/>${starfield(17, 14, 446, 134, 92, 46)}
@@ -4965,9 +5394,16 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       <path d="M150 1 l-10 -16 h20 z" fill="#7a1c14" stroke="#f3d68f" stroke-width="1"/></svg>`;
   }
 
-  function bottleSvg(b) {
-    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6', green: '#4f9a5b', black: '#1c1c1c', orange: '#e8873a', purple: '#8a5ac0' }[b.id];
-    return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="16" y="30" width="6" height="56" fill="#ff7a60" opacity=".15"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/></svg>`;
+  // crust：瓶口結了一圈褐色結晶（大師模式的黑蓋瓶——放久氧化的顯影液）
+  function bottleSvg(b, { crust = false } = {}) {
+    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6', green: '#4f9a5b', black: '#1c1c1c' }[b.id];
+    return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="16" y="30" width="6" height="56" fill="#ff7a60" opacity=".15"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/>${crust ? crustPath(12, 24, 36) : ''}</svg>`;
+  }
+  // 一圈不規則的褐色結晶，貼在瓶肩上（x、y 是瓶身左上角，w 是瓶身寬）
+  function crustPath(x, y, w) {
+    const k = w / 36;
+    return `<path d="M${x + 2 * k} ${y + 2 * k} q${4 * k} ${-4 * k} ${8 * k} 0 q${4 * k} ${-5 * k} ${8 * k} ${-1 * k} q${4 * k} ${-4 * k} ${8 * k} 0 q${4 * k} ${-4 * k} ${8 * k} ${1 * k} l0 ${5 * k} q${-4 * k} ${3 * k} ${-8 * k} 0 q${-4 * k} ${4 * k} ${-8 * k} 0 q${-4 * k} ${3 * k} ${-8 * k} 0 q${-4 * k} ${3 * k} ${-8 * k} 0 z" fill="#8a5a2a"/>` +
+      [[8, 7, 1.6], [21, 8, 1.3], [30, 6, 1.5]].map(([dx, dy, r]) => `<circle cx="${x + dx * k}" cy="${y + dy * k}" r="${r * k}" fill="#c08a46"/>`).join('');
   }
 
   /* ------------------------------------------------------------
@@ -5147,6 +5583,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   // 變數本身是 HTML（例如 <strong>）時用這個：只跳脫範本
   const TH = (key, html) => I.fmt(esc(I.tr(I.UI[key], LANG)), html);
   const cap = s => (LANG === 'en' && s ? s[0].toUpperCase() + s.slice(1) : s);
+  // 難度名稱（雙語原文，可以直接當作 T 的變數）
+  const MODE_KEY = { novice: 'modeNovice', veteran: 'modeVeteran', master: 'modeMaster' };
+  const MODE_DESC = { novice: 'modeNoviceDesc', veteran: 'modeVeteranDesc', master: 'modeMasterDesc' };
+  const modeL = m => I.UI[MODE_KEY[m] || 'modeNovice'];
+  const modeName = m => tr(modeL(m));
   const joinL = arr => {
     const out = {};
     for (const l of I.LANGS) out[l] = arr.map(x => I.tr(x, l)).join(I.tr(I.UI.listSep, l));
@@ -5220,9 +5661,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     tutPending: false,    // 開場的信關上之後才開始教學
     hintPulse: false,     // 完成一個階段後，提示按鈕會亮起來，直到玩家打開它
     modeTut: null,
+    handKey: null,        // 「拿在手上」上次畫的內容（沒變就不重畫，保留捲動位置）
+    handStripOpen: true,  // 謎題視窗裡「手上的文件」是否展開
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null, hintAsk: null };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null, hintAsk: null, devConfirm: false };
   }
 
   /* ================= 畫面切換 ================= */
@@ -5401,7 +5844,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'nearest' });
     el.hidden = false;
     $('tut-count').textContent = T('tutStep', { i: app.tut + 1, n: TUT.length });
-    $('tut-text').textContent = T(step.key) + (step.key === 'tut5' && app.s.mode === 'veteran' ? (LANG === 'en' ? ' ' : '') + T('tut5v') : '');
+    $('tut-text').textContent = T(step.key) + (step.key === 'tut5' && G.isAdv(app.s.mode) ? (LANG === 'en' ? ' ' : '') + T('tut5v', { mode: modeL(app.s.mode) }) : '');
     $('tut-next').hidden = !!step.until;
     $('tut-next').textContent = T(app.tut === TUT.length - 1 ? 'tutDone' : 'tutNext');
     $('tut-skip').textContent = T('tutSkip');
@@ -5522,7 +5965,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   }
 
   function submit(pid, answer, { closeOnSolve = true } = {}) {
-    if (pid === 'exit' || (pid === 'phone' && answer === 'accept')) checkpoint();
+    if (pid === 'exit' || pid === 'escape' || (pid === 'phone' && answer === 'accept')) checkpoint();
     const r = act(() => E.submit(app.s, pid, answer), { noOpen: true });
     if (!r || r.ending) return r;
     app.ui.confirm = null;
@@ -5553,9 +5996,10 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     $('chip-plate').hidden = !p.plate;
     $('chip-plate').classList.toggle('on', p.plate);
     $('chip-time').textContent = fmtTime(s.stats.playMs);
-    $('chip-mode').textContent = T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice');
-    $('chip-mode').title = T('modeChip', { mode: T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice') });
+    $('chip-mode').textContent = modeName(s.mode);
+    $('chip-mode').title = T('modeChip', { mode: modeL(s.mode) });
     $('chip-mode').classList.toggle('vet', s.mode === 'veteran');
+    $('chip-mode').classList.toggle('master', s.mode === 'master');
     const st = E.stage(s), locked = E.hintsLocked(s);
     $('hint-label').textContent = locked ? T('hintsBtnLocked') : T('hintsBtn', { n: st.index + 1, total: st.total });
     $('btn-hints').classList.toggle('locked', locked);
@@ -5566,13 +6010,14 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     renderNav();
     renderInventory();
     renderLog();
+    renderHand();
     $('narration').innerHTML = app.latest.map(m => msgHtml(m)).join('');
     renderTutorial();
   }
 
   function visible(id) {
     const h = E.hotspot(id);
-    return !!h && h.room === app.s.room && (!h.visible || !!h.visible(app.s));
+    return !!h && h.room === app.s.room && G.modeOk(app.s.mode, h) && (!h.visible || !!h.visible(app.s));
   }
   function renderScene() {
     const wrap = $('scene').parentElement;
@@ -5687,7 +6132,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     const V = VIEWS[view.view];
     const out = V ? V(view) : { title: '?', html: `<p>${tx('missingView')}</p>` };
     $('modal-title').textContent = out.title;
-    $('modal-body').innerHTML = out.html;
+    keepScroll($('modal-body'), () => { $('modal-body').innerHTML = out.html + handStrip(view.view); });
+    const strip = $('modal-body').querySelector('.hand-strip');
+    if (strip) strip.addEventListener('toggle', () => { app.handStripOpen = strip.open; Store.setSetting('handStrip', strip.open ? '1' : '0'); });
+    $('modal-body').querySelectorAll('[data-hold]').forEach(b => { b.onclick = () => toggleHand(b.dataset.hold); });
+    $('modal-body').querySelectorAll('[data-unhold]').forEach(b => { b.onclick = () => toggleHand(b.dataset.unhold); });
     $('modal').dataset.view = view.view;
     $('modal-back-btn').hidden = app.stack.length < 2;
     back.hidden = false;
@@ -5700,7 +6149,57 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   function docView(id) {
     const d = G.docs[id];
     if (d.view) return VIEWS[d.view]({});
-    return { title: tr(d.title), html: paper(d) };
+    return { title: tr(d.title), html: paper(d) + holdButton(id) };
+  }
+
+  /* ================= 拿在手上 ================= */
+  // 最多三份文件攤在畫面最下方；解謎的視窗裡也看得到（不必在筆記和謎題之間來回切換）
+  function noteTranscript(head = '') {
+    const all = G.noteLines(app.s.mode), lines = (all[LANG] || all.zh).map(l => l[0] + l[1]).filter(Boolean);
+    return `<div class="paper hand">${head}<p>${lines.map(esc).join('<br>')}</p></div>`;
+  }
+  const handTitle = id => tr(id === 'note_full' ? E.itemName(app.s, id) : G.docs[id].title);
+  const handBody = id => {
+    const d = G.docs[id];
+    if (!d) return noteTranscript();
+    return d.view ? `<div class="art-box">${Art[d.view]()}</div>` : paper(d);
+  };
+  const handCard = id => `<article class="hand-card"><header><h3>${esc(handTitle(id))}</h3><button class="btn small ghost" type="button" data-unhold="${id}" aria-label="${tx('handDropAria', { doc: handTitle(id) })}">${tx('handDropShort')}</button></header>
+    <div class="hand-body" data-hand-id="${id}" tabindex="0" role="region" aria-label="${esc(handTitle(id))}">${handBody(id)}</div></article>`;
+  function holdButton(id) {
+    if (!app.s || app.screen !== 'game' || !G.holdable(id)) return '';
+    const held = app.s.hand.includes(id), full = !held && app.s.hand.length >= E.HAND_MAX;
+    const label = held ? T('handDrop') : full ? T('handHoldSwap', { doc: handTitle(app.s.hand[0]) }) : T('handHold');
+    return center(`<button class="btn small hold" type="button" data-hold="${id}" aria-pressed="${held}">${esc(label)}</button>`);
+  }
+  function toggleHand(id) {
+    E.toggleHand(app.s, id);
+    autosave();
+    renderHand();
+    if (app.stack.length) renderModal();
+  }
+  // 重畫時保留每份文件捲動到的位置（長的日誌常常要捲到中間才看得到重點）
+  function keepScroll(root, draw) {
+    const pos = {};
+    root.querySelectorAll('[data-hand-id]').forEach(el => { pos[el.dataset.handId] = el.scrollTop; });
+    draw();
+    root.querySelectorAll('[data-hand-id]').forEach(el => { if (pos[el.dataset.handId]) el.scrollTop = pos[el.dataset.handId]; });
+  }
+  function renderHand() {
+    if (!app.s) return;
+    const hand = app.s.hand, key = [LANG, app.s.mode, ...hand].join('|');
+    if (app.handKey === key) return;
+    app.handKey = key;
+    $('hand').classList.toggle('empty', !hand.length);
+    keepScroll($('hand'), () => {
+      $('hand-cards').innerHTML = hand.length ? hand.map(handCard).join('') : `<p class="hand-empty">${tx('handEmpty')}</p>`;
+    });
+  }
+  // 謎題視窗底部的「手上的文件」（讀文件、看物品、選單之類的視窗不需要）
+  const NO_HAND_STRIP = new Set(['doc', 'item', 'notes', 'hints', 'menu', 'save', 'load', 'help', 'gallery', 'mode', 'exit', 'phone']);
+  function handStrip(view) {
+    if (!app.s || app.screen !== 'game' || NO_HAND_STRIP.has(view) || !app.s.hand.length) return '';
+    return `<details class="hand-strip" ${app.handStripOpen ? 'open' : ''}><summary>${tx('handStrip', { n: app.s.hand.length })}</summary><div class="hand-cards">${app.s.hand.map(handCard).join('')}</div></details>`;
   }
 
   function itemContent(id) {
@@ -5712,13 +6211,10 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       case 'overlay': return `<div class="art-box narrow">${Art.gridSvg({ digits: true, stars: true })}</div><p class="lead">${tx('overlayLead')}</p>`;
       case 'note_left': return `<div class="art-box narrow">${Art.note('left', app.s.mode)}</div><p class="lead">${tx('noteLeftLead')}</p>`;
       case 'note_right': return `<div class="art-box narrow">${Art.note('right', app.s.mode)}</div><p class="lead">${tx('noteRightLead')}</p>`;
-      case 'note_full': {
-        const all = G.noteLines(app.s.mode), lines = (all[LANG] || all.zh).map(l => l[0] + l[1]).filter(Boolean);
-        return `<div class="art-box">${Art.note('full', app.s.mode)}</div><div class="paper hand"><h3>${tx('transcript')}</h3><p>${lines.map(esc).join('<br>')}</p></div>`;
-      }
+      case 'note_full': return `<div class="art-box">${Art.note('full', app.s.mode)}</div>${noteTranscript(`<h3>${tx('transcript')}</h3>`)}`;
       case 'diary': {
         const pages = app.s.flags.diaryPages || [];
-        return pages.map(p => paper(G.docs[p], `<h3>${esc(tr(G.docs[p].title))}</h3>`)).join('') +
+        return pages.map(p => paper(G.docs[p], `<h3>${esc(tr(G.docs[p].title))}</h3>`) + holdButton(p)).join('') +
           `<p class="lead">${pages.length < 4 ? tx('diaryMissing', { n: 4 - pages.length }) : tx('diaryComplete')}</p>`;
       }
       case 'plate': return `<div class="art-box narrow" style="max-width:440px">${Art.plate()}</div><p class="lead">${tx('plateLead')}</p>`;
@@ -5739,7 +6235,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const held = app.s && app.s.inv.includes(id);
       return {
         title: tr(E.itemName(app.s, id)),
-        html: `<p class="lead">${esc(tr(it.desc))}</p>${itemContent(id)}
+        html: `<p class="lead">${esc(tr(it.desc))}</p>${itemContent(id)}${holdButton(it.doc || id)}
           ${held ? center(`<button class="btn" type="button" data-act="hold">${tx('holdIt')}</button><button class="btn" type="button" data-act="combine">${tx('combineWith')}</button>`) : ''}`,
         bind(root) {
           const hold = root.querySelector('[data-act=hold]');
@@ -5752,12 +6248,12 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     bookshelf: () => ({
       title: T('shelfTitle'),
-      html: `<p class="lead">${tx('shelfLead')}</p><div class="art-box">${Art.bookshelf()}</div>`,
+      html: `<p class="lead">${tx('shelfLead')}</p><div class="art-box">${Art.bookshelf()}</div>${holdButton('bookshelf')}`,
     }),
 
     poster: () => ({
       title: tr(G.docs.poster.title),
-      html: `<p class="lead">${tx('posterLead')}</p><div class="art-box">${Art.poster()}</div>`,
+      html: `<p class="lead">${tx('posterLead')}</p><div class="art-box">${Art.poster()}</div>${holdButton('poster')}`,
     }),
 
     eyepiece: () => {
@@ -5831,7 +6327,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         },
         keys(e) {
           if (/^[0-9]$/.test(e.key)) { cur.shift(); cur.push(+e.key); app.ui.feedback = []; renderModal(); return true; }
-          if (e.key === 'Enter' && !(e.target && e.target.tagName === 'BUTTON')) { submit(id, cur.join('')); return true; }
+          // 焦點在按鈕或「手上的文件」上時，Enter 照常按下它們
+          if (e.key === 'Enter' && !(e.target && /^(BUTTON|SUMMARY)$/.test(e.target.tagName))) { submit(id, cur.join('')); return true; }
           return false;
         },
       };
@@ -5839,7 +6336,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     pots: () => {
       const trowel = app.s.inv.includes('trowel');
-      const vet = app.s.mode === 'veteran';
+      const vet = G.isAdv(app.s.mode);
       const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'];
       const head = vet ? 3 : 2; // 資深模式多一行：挖錯三盆就失敗
       // 資深模式：剩下幾次機會；最後一次要再確認一次，避免手滑
@@ -5894,7 +6391,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     },
 
     mirrors: () => {
-      const vet = app.s.mode === 'veteran';
+      const vet = G.isAdv(app.s.mode);
       const grid = vet ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       const cfg = Object.assign({}, grid.initial, app.s.puz.mirrors);
       const hit = G.traceBeam(cfg, grid).hit;
@@ -5952,23 +6449,34 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const V = G.variant(app.s), steps = V.developAnswer.length;
       const name = id => tr(V.bottles.find(b => b.id === id).name);
       const hasNote = app.s.inv.includes('note_full');
+      const adv = G.isAdv(app.s.mode), master = app.s.mode === 'master';
+      // 大師：避光盒裡只有三張廢片；倒數顯示在畫面上，最後一張要再確認一次
+      const left = G.DEV_MISS_LIMIT - (app.s.flags.devMisses || 0);
+      const confirm = master && app.ui.devConfirm && seq.length >= steps;
       return {
         title: T('devTitle'),
         html: `<p class="lead">${tx(V.bottles.length > steps ? 'devLeadV' : 'devLead')}</p>
-          <div class="bottles ${V.bottles.length > 4 ? 'six' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
+          ${master ? `<p class="notice ${left === 1 ? 'warn' : ''}" role="status">${tx(left === 1 ? 'devFilmsLast' : 'devFilms', { n: left, total: G.DEV_MISS_LIMIT })}</p>` : ''}
+          <div class="bottles ${V.bottles.length > 4 ? 'six' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b, { crust: master && b.id === 'black' })}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
           <div class="slots">${[...Array(steps).keys()].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
-          ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
-          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}${app.s.mode === 'veteran' ? `<button class="btn small" type="button" data-chart="1">${tx('readChart')}</button>` : ''}`)}`,
+          ${confirm
+            ? `<div class="confirm"><p style="margin:0"><strong>${tx('devConfirm')}</strong></p>
+                <div class="row"><button class="btn danger" type="button" data-act="dev-yes">${tx('devConfirmYes')}</button><button class="btn" type="button" data-act="dev-no" data-autofocus>${tx('thinkAgain')}</button></div></div>`
+            : center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
+          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${master ? `<button class="btn small" type="button" data-card2="1">${tx('readCard2')}</button>` : ''}${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}${adv ? `<button class="btn small" type="button" data-chart="1">${tx('readChart')}</button>` : ''}`)}`,
         bind(root) {
+          const go = () => { app.ui.devConfirm = false; const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r && !r.ending) renderModal(); };
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
-          root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
-          root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
+          const on = (sel, f) => { const b = root.querySelector(sel); if (b) b.onclick = f; };
+          on('[data-act=clear]', () => { seq.length = 0; app.ui.feedback = []; renderModal(); });
+          on('[data-act=go]', () => { if (master && left === 1) { app.ui.devConfirm = true; app.ui.feedback = []; renderModal(true); } else go(); });
+          on('[data-act=dev-yes]', go);
+          on('[data-act=dev-no]', () => { app.ui.devConfirm = false; renderModal(true); });
           // 透過「查看藥瓶架」讀卡片，遊戲才會記得你讀過（沖洗台要讀過卡片才能作答）
-          root.querySelector('[data-doc]').onclick = () => act(() => E.interact(app.s, 'd_shelf'));
-          const chart = root.querySelector('[data-chart]');
-          if (chart) chart.onclick = () => act(() => E.interact(app.s, 'd_chart'));
-          const n = root.querySelector('[data-note]');
-          if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
+          on('[data-doc]', () => act(() => E.interact(app.s, 'd_shelf')));
+          on('[data-card2]', () => act(() => E.interact(app.s, 'd_card2')));
+          on('[data-chart]', () => act(() => E.interact(app.s, 'd_chart')));
+          on('[data-note]', () => openView({ view: 'item', id: 'note_full' }));
         },
       };
     },
@@ -5999,14 +6507,18 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       };
     },
 
-    exit: () => {
+    // 大門；大師模式的老水道也用這個畫面（via: 'tunnel'），送出的謎題是 escape
+    exit: ({ via }) => {
       const s = app.s, plate = s.inv.includes('plate'), pages = E.pageCount(s);
-      const opts = plate ? [['publish', 'exitPublish'], ['leave_plate', 'exitLeavePlate']] : [['leave', 'exitLeave']];
+      const tunnel = via === 'tunnel';
+      const opts = plate ? [['publish', 'exitPublish'], ['leave_plate', 'exitLeavePlate']] : [['leave', tunnel ? 'tunnelLeave' : 'exitLeave']];
       const c = app.ui.confirm;
       const label = c && opts.find(o => o[0] === c);
+      // 大師：韓嶽的車一直停在門外（沖出底片或接過電話之後，從大門縫看得見）
+      const lead = tunnel ? 'tunnelLead' : s.mode === 'master' && (plate || s.flags.phoneDone) ? 'exitLeadM' : 'exitLead';
       return {
-        title: T('exitTitle'),
-        html: `<p class="lead">${tx('exitLead')}</p>
+        title: T(tunnel ? 'tunnelTitle' : 'exitTitle'),
+        html: `<p class="lead">${tx(lead)}</p>
           <p class="lead">${tx('exitCarrying', { n: pages, plate: plate ? T('exitCarryingPlate') : '' })}</p>
           ${label
             ? `<div class="confirm"><p style="margin:0">${tx('exitConfirm', { choice: T(label[1]) })}</p>
@@ -6016,7 +6528,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         bind(root) {
           root.querySelectorAll('[data-choice]').forEach(b => { b.onclick = () => { app.ui.confirm = b.dataset.choice; renderModal(true); }; });
           const yes = root.querySelector('[data-yes]');
-          if (yes) yes.onclick = () => submit('exit', yes.dataset.yes);
+          if (yes) yes.onclick = () => submit(tunnel ? 'escape' : 'exit', yes.dataset.yes);
           const no = root.querySelector('[data-act=no]');
           if (no) no.onclick = () => { app.ui.confirm = null; renderModal(true); };
           const stay = root.querySelector('[data-act=stay]');
@@ -6030,7 +6542,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       return {
         title: T('notesTitle'),
         html: `<p class="lead">${tx('notesLead')}</p>
-          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(tr(G.docs[id].title))}</span><span aria-hidden="true">›</span></button>`).join('')}</div>`,
+          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(tr(G.docs[id].title))}</span>${app.s.hand.includes(id) ? `<span class="tag-hand">${tx('handHeld')}</span>` : ''}<span aria-hidden="true">›</span></button>`).join('')}</div>`,
         bind(root) {
           root.querySelectorAll('[data-note]').forEach(b => { b.onclick = () => openView(b.dataset.note === 'letter' ? { view: 'item', id: 'letter' } : { view: 'doc', id: b.dataset.note }); });
         },
@@ -6042,7 +6554,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const head = `<div class="stage-head"><p class="stage-n">${tx('hintsStage', { n: st.index + 1, total: st.total, title: st.stage.title })}</p>
         <p class="stage-goal">${tx('hintsGoal', { goal: st.stage.goal })}</p>
         <div class="stage-bar" aria-hidden="true">${st.ids.map((id, i) => `<span class="${i < st.index ? 'done' : i === st.index ? 'cur' : ''}"></span>`).join('')}</div></div>`;
-      if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked')}</p>` };
+      if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked', { mode: modeL(app.s.mode) })}</p>` };
       const list = E.hintList(app.s);
       // 每一段提示都要先確認；下一段會公布答案時，確認框是閃動的紅色
       const ask = app.ui.hintAsk && list.find(h => h.id === app.ui.hintAsk && h.level < h.max);
@@ -6082,11 +6594,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const auto = Store.read('auto');
       const live = auto && auto.state && !auto.state.ending;
       const tut = app.modeTut != null ? app.modeTut : Store.getSetting('tutorialSeen') !== '1';
-      const card = m => `<div class="mode-card mode-${m}"><h3>${tx(m === 'veteran' ? 'modeVeteran' : 'modeNovice')}</h3><p>${tx(m === 'veteran' ? 'modeVeteranDesc' : 'modeNoviceDesc')}</p>
-        <button class="btn ${m === 'novice' ? 'primary' : 'vet'}" type="button" data-mode="${m}" ${m === 'novice' ? 'data-autofocus' : ''}>${tx('modeStart', { mode: T(m === 'veteran' ? 'modeVeteran' : 'modeNovice') })}</button></div>`;
+      const card = m => `<div class="mode-card mode-${m}"><h3>${esc(modeName(m))}</h3><p>${tx(MODE_DESC[m])}</p>
+        <button class="btn ${m === 'novice' ? 'primary' : m === 'master' ? 'master' : 'vet'}" type="button" data-mode="${m}" ${m === 'novice' ? 'data-autofocus' : ''}>${tx('modeStart', { mode: modeL(m) })}</button></div>`;
       return {
         title: T('modeTitle'),
-        html: `<div class="modes">${card('novice')}${card('veteran')}</div>
+        html: `<div class="modes">${G.MODES.map(card).join('')}</div>
           <label class="check"><input type="checkbox" id="tut-toggle" ${tut ? 'checked' : ''}> ${tx('tutorialToggle')}</label>
           ${live ? `<p class="notice warn">${tx('confirmNew')}</p>` : ''}`,
         bind(root) {
@@ -6257,7 +6769,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
     gallery: () => {
       const got = Store.getEndings();
-      const vet = Store.getEndings('veteran');
+      const vet = Store.getEndings('veteran'), mas = Store.getEndings('master');
       const excerpt = s => {
         if (LANG !== 'en') return s.slice(0, 26) + '……';
         if (s.length <= 90) return s;
@@ -6269,7 +6781,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         html: `<p class="lead">${tx('galleryCount', { n: got.length, total: G.ENDING_ORDER.length })}</p>
           <div class="gallery">${G.ENDING_ORDER.map(id => {
             const e = G.endings[id], ok = got.includes(id);
-            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(e.text)[0]))}` : tx('galleryLocked')}</span>${vet.includes(id) ? `<span class="badge-vet" title="${tx('galleryVeteranTip')}">${tx('galleryVeteran')}</span>` : ''}</div>`;
+            // 只在大師模式出現的結局：未解鎖時就先標明，免得玩家在別的難度裡白找
+            const only = e.mode === 'master';
+            const badges = (vet.includes(id) && !only ? `<span class="badge-vet" title="${tx('galleryVeteranTip')}">${tx('galleryVeteran')}</span>` : '') +
+              (mas.includes(id) ? `<span class="badge-vet badge-master" title="${tx('galleryMasterTip')}">${tx('galleryMaster')}</span>` : '');
+            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(G.endingText(e, only ? 'master' : 'novice'))[0]))}` : tx(only ? 'galleryMasterOnly' : 'galleryLocked')}</span>${badges}</div>`;
           }).join('')}</div>`,
       };
     },
@@ -6411,7 +6927,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     const got = Store.getEndings();
     const stats = [
       [fmtTime(s.stats.playMs), 'statTime'], [s.stats.actions, 'statActions'], [s.stats.wrong, 'statWrong'],
-      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice'), 'statMode'],
+      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [esc(modeName(s.mode)), 'statMode'],
     ];
     $('ending-card').classList.toggle('fail', !!e.fail);
     $('ending-card').innerHTML = `
@@ -6486,6 +7002,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       if (b && !b.disabled) { app.selected = null; app.combining = false; act(() => E.move(app.s, b.dataset.room)); }
     });
     $('inventory').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (b) onItem(b.dataset.item); });
+    $('hand').addEventListener('click', e => { const b = e.target.closest('[data-unhold]'); if (b && app.s) toggleHand(b.dataset.unhold); });
     $('item-detail').addEventListener('click', e => {
       const b = e.target.closest('[data-detail]');
       if (!b || !app.selected) return;
@@ -6528,6 +7045,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   /* ================= 啟動 ================= */
   function start(data) {
     bindStatic();
+    app.handStripOpen = Store.getSetting('handStrip') !== '0';
     setLang(initialLang(), { persist: false });
     show('title');
     if (data && data.state) loadState(data.state, I.UI.beforeUpdate);

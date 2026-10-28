@@ -142,3 +142,66 @@ test('資深模式的花盆紀錄：挖錯一、兩盆可以存讀；失敗只�
   const f = Object.assign(v(), { ending: 'F', flags: { potsDug: ['mint', 'rose', 'basil'] } });
   assert.deepEqual(load(f).errs, []);
 });
+
+test('大師模式跟著存檔走：匯出再匯入仍是大師，可以接著打開老水道離開', () => {
+  const { masterMainPath, masterTunnel } = require('./helpers');
+  const P = makeGame('master');
+  masterMainPath(P);
+  const { s, errs } = load(Store.decode(Store.encode(P.s)));
+  assert.deepEqual(errs, []);
+  assert.equal(s.mode, 'master');
+  const Q = makeGame('master');
+  Object.assign(Q.s, s);
+  masterTunnel(Q);
+  assert.ok(Q.s.flags.tunnelOpen);
+  assert.equal(Q.solve('escape', 'leave').ending, 'A');
+});
+
+test('大師模式的廢片紀錄：用掉一、兩張可以存讀；失敗（G）只能伴隨三張；其他難度不會有這項紀錄', () => {
+  const m = () => E.newState('master');
+  for (const n of [1, 2]) assert.deepEqual(load(Object.assign(m(), { flags: { devMisses: n } })).errs, [], `用掉 ${n} 張`);
+  const bad = [
+    Object.assign(m(), { flags: { devMisses: 3 } }),                       // 三張卻沒有失敗
+    Object.assign(m(), { ending: 'G' }),                                   // 失敗卻沒有紀錄
+    Object.assign(m(), { ending: 'G', flags: { devMisses: 2 } }),
+    Object.assign(m(), { flags: { devMisses: 0 } }),
+    Object.assign(m(), { flags: { devMisses: 1.5 } }),
+    Object.assign(m(), { flags: { devMisses: '1' } }),
+    Object.assign(E.newState('veteran'), { flags: { devMisses: 1 } }),     // 資深沒有廢片限制
+    Object.assign(E.newState('veteran'), { ending: 'H' }),                 // 被截胡只發生在大師模式
+  ];
+  for (const st of bad) assert.ok(load(st).errs.length > 0, JSON.stringify(st.flags) + ' ' + st.ending);
+  assert.deepEqual(load(Object.assign(m(), { ending: 'G', flags: { devMisses: 3 } })).errs, []);
+  assert.deepEqual(load(Object.assign(m(), { ending: 'H' })).errs, []);
+});
+
+test('拿在手上：最多三份，第四份換掉最早的那份；再按一次就放下；讀檔時清掉不存在或重複的項目', () => {
+  const s = E.newState('master');
+  assert.deepEqual(s.hand, []);
+  for (const id of ['letter', 'clipping', 'zhou_log']) assert.equal(E.toggleHand(s, id), true);
+  assert.equal(E.toggleHand(s, 'note_full'), true);
+  assert.deepEqual(s.hand, ['clipping', 'zhou_log', 'note_full']);
+  assert.equal(E.toggleHand(s, 'zhou_log'), false);
+  assert.deepEqual(s.hand, ['clipping', 'note_full']);
+  assert.equal(E.toggleHand(s, 'no_such_doc'), false);
+  assert.equal(E.toggleHand(s, 'plate'), false, '物品本身不能攤在手上（拼好的便條例外，顯示抄本）');
+  assert.ok(G.holdable('poster') && G.holdable('bookshelf'), '圖像類的線索也能拿在手上');
+  // 純顯示欄位：不影響驗證；舊存檔沒有這個欄位
+  const old = E.newState();
+  delete old.hand;
+  assert.deepEqual(load(old).s.hand, []);
+  const messy = Object.assign(E.newState(), { hand: ['letter', 'letter', 'ghost', 7, 'clipping', 'poster', 'calendar'] });
+  const { s: fixed, errs } = load(messy);
+  assert.deepEqual(errs, []);
+  assert.deepEqual(fixed.hand, ['clipping', 'poster', 'calendar']);
+  assert.deepEqual(load(Object.assign(E.newState(), { hand: 'letter' })).s.hand, []);
+});
+
+test('結局圖鑑分難度記錄：大師達成的結局同時記在總表與大師表', () => {
+  Store.addEnding('H', 'master');
+  Store.addEnding('B', 'master');
+  Store.addEnding('B', 'veteran');
+  assert.ok(Store.getEndings().includes('H'));
+  assert.deepEqual(Store.getEndings('master').filter(x => x === 'H' || x === 'B').sort(), ['B', 'H']);
+  assert.ok(!Store.getEndings('veteran').includes('H'));
+});

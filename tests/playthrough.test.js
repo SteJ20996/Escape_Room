@@ -2,7 +2,7 @@
 // 以玩家身分逐一走完五個結局的關鍵路線。
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { G, makeGame, mainPath, darkroomPath, vetMainPath, vetDarkroomPath, insertAll, txt } = require('./helpers');
+const { G, makeGame, mainPath, darkroomPath, vetMainPath, vetDarkroomPath, masterMainPath, masterTunnel, insertAll, txt } = require('./helpers');
 
 test('結局 A「破曉」：只拿三枚徽章離開', () => {
   const P = makeGame();
@@ -396,6 +396,10 @@ test('拿到線索才能作答：沒有線索時，正確答案也被拒絕（�
     ['veteran', 'seedlock', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true, rulesRead: true } }, s => { s.inv.push('paperweight'); }, G.SEED_CODE, '473'],
     ['veteran', 'signal', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true }, inv: ['flashlight'] }, s => { s.inv.push('code_card'); }, ['.-.'], ['---', '...']],
     ['veteran', 'musicbox', 'attic', { flags: { atticOpen: true, crankInserted: true }, inv: ['qing_letter'] }, s => { s.flags.posterRead = true; }, G.MUSIC_ANSWER, [1, 2, 3]],
+    // 大師：音樂盒的旋律要先解開星盤；水道的鎖要讀過剪報；沒有線索時倒藥也不會用掉廢片（狀態不變）
+    ['master', 'musicbox', 'attic', { flags: { atticOpen: true, crankInserted: true, posterRead: true }, inv: ['qing_letter'] }, s => { s.flags.starDialSolved = true; }, G.MUSIC_ANSWER_M, [1, 2, 3]],
+    ['master', 'tunnel', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true, tunnelFound: true }, inv: ['page3'] }, s => { s.flags.clippingRead = true; }, G.TUNNEL_CODE, G.TUNNEL_TRAP],
+    ['master', 'develop', 'darkroom', { flags: { trapdoorOpen: true, darkroomLit: true, bottleCardRead: true }, inv: ['note_full'] }, s => { s.flags.chartRead = true; }, G.DEVELOP_ANSWER_V, ['blue', 'yellow', 'red', 'white']],
   ];
   for (const [mode, pid, room, pre, addClue, right, wrongAns] of cases) {
     const tag = `${mode}/${pid}`;
@@ -418,4 +422,168 @@ test('拿到線索才能作答：沒有線索時，正確答案也被拒絕（�
   // 線索就畫在謎題上的（新手花盆、鏡子、閥門、相框）不設門檻
   for (const pid of ['mirrors', 'skylight', 'valves', 'photos']) assert.equal(G.puzzles[pid].clue, undefined, pid);
   assert.ok(G.puzzles.pots.clue(E.newState('novice')), '新手花盆的線索就是木牌本身');
+});
+
+/* ================= 大師模式 ================= */
+const master = () => makeGame('master');
+// 大師主線＋暗房：沖出底片、收齊四頁日記，回到門廳拒絕交易（停在嵌徽章之前）
+function masterReady(P, opts) {
+  masterMainPath(P);
+  vetDarkroomPath(P, opts);
+  P.go('foyer');
+  P.solve('phone', 'refuse');
+}
+
+test('［大師］結局 B：大門外有人守著，從儲物間的老水道帶著底片和四頁日記離開', () => {
+  const P = master();
+  masterReady(P);
+  assert.equal(G.countPages(P.s), 4);
+  // 掛斷電話後，車子沒有開走；從信件口看得見
+  assert.ok(P.log.some(l => /作答 phone/.test(l) && /車/.test(l)), '大師：掛斷後車子還在');
+  assert.ok(/轎車/.test(P.look('f_mailslot').messages.map(txt).join()));
+  // 嵌好最後一枚徽章時，屋子另一頭傳來鐵栓收回的聲音（橋）
+  const last = G.EMBLEMS.map(e => P.use(e, 'f_door')).pop();
+  assert.ok(last.messages.some(m => /鐵栓/.test(txt(m))));
+  masterTunnel(P);
+  assert.deepEqual(P.look('t_tunnel').open, { view: 'exit', via: 'tunnel' });
+  assert.equal(P.solve('escape', 'publish').ending, 'B');
+});
+
+test('［大師］結局 H：沖出底片之後從大門走，不論帶著或留下底片，都會被韓嶽截胡', () => {
+  const P = master();
+  masterReady(P);
+  insertAll(P);
+  assert.deepEqual(P.look('f_door').open, { view: 'exit' });
+  const before = P.E.clone(P.s);
+  assert.equal(P.solve('exit', 'publish').ending, 'H');
+  const Q = master();
+  Object.assign(Q.s, P.E.clone(before));
+  assert.equal(Q.solve('exit', 'leave_plate').ending, 'H');
+  assert.ok(!Q.s.inv.includes('plate'));
+  // 沒有底片時不能選「公開」；有底片時不能選「直接離開」
+  const R = master();
+  Object.assign(R.s, P.E.clone(before));
+  assert.equal(R.E.submit(R.s, 'exit', 'leave').ending, null);
+});
+
+test('［大師］結局 A：沒有底片時，從大門或水道離開都是 A（韓嶽只要底片）', () => {
+  const P = master();
+  masterMainPath(P);
+  P.go('foyer');
+  insertAll(P);
+  const before = P.E.clone(P.s);
+  assert.equal(P.solve('exit', 'leave').ending, 'A');
+  const Q = master();
+  Object.assign(Q.s, before);
+  masterTunnel(Q);
+  assert.equal(Q.solve('escape', 'leave').ending, 'A');
+});
+
+test('［大師］結局 C、D、E：日記不全從水道公開是 C；接受交易是 D；從水道離開但留下底片是 E', () => {
+  const P = master();
+  masterMainPath(P);
+  vetDarkroomPath(P, { dryingLine: false });
+  P.go('foyer');
+  const beforePhone = P.E.clone(P.s);
+  P.solve('phone', 'refuse');
+  masterTunnel(P);
+  const atGate = P.E.clone(P.s);
+  assert.equal(P.solve('escape', 'publish').ending, 'C');
+  const Q = master();
+  Object.assign(Q.s, atGate);
+  assert.equal(Q.solve('escape', 'leave_plate').ending, 'E');
+  const R = master();
+  Object.assign(R.s, beforePhone);
+  assert.equal(R.solve('phone', 'accept').ending, 'D');
+});
+
+test('［大師］沖洗只有三張廢片：倒錯會倒數；第三張試壞就失敗（G），之後所有動作都被拒絕', () => {
+  const P = master();
+  masterMainPath(P);
+  const real = P.solve;
+  // 走到暗房、讀過線索，但先不沖洗
+  P.solve = (pz, ans) => (pz === 'develop' ? { ok: true, messages: [] } : real(pz, ans));
+  vetDarkroomPath(P);
+  P.solve = real;
+  assert.equal(P.s.room, 'darkroom');
+  const fake = ['blue', 'yellow', 'red', 'white'];
+  // 不完整的輸入不算一次嘗試
+  assert.equal(P.E.submit(P.s, 'develop', ['black', 'red']).ok, false);
+  assert.equal(P.s.flags.devMisses, undefined);
+  const r1 = P.solve('develop', fake);
+  assert.equal(P.s.flags.devMisses, 1);
+  assert.ok(r1.messages.some(m => /還剩 2 張/.test(txt(m))), '剩下幾張要說出來（資深以上答錯只說「不對」時也保留）');
+  const r2 = P.solve('develop', G.DEVELOP_ANSWER);
+  assert.ok(r2.messages.some(m => /最後一張/.test(txt(m))));
+  const before = P.E.clone(P.s);
+  const r3 = P.solve('develop', fake);
+  assert.equal(r3.ending, 'G');
+  assert.equal(P.s.stats.wrong, 3);
+  assert.ok(G.endings.G.fail);
+  assert.equal(P.E.interact(P.s, 'd_tray').ok, false);
+  // 用掉兩張之後倒對，照樣沖得出底片
+  const Q = master();
+  Object.assign(Q.s, before);
+  assert.equal(Q.solve('develop', G.DEVELOP_ANSWER_V).solved, true);
+  assert.ok(Q.has('plate'));
+});
+
+test('［大師］老水道：徽章歸位前架子推不動；歸位後才找得到鐵門；照抄剪報的 −17 打不開', () => {
+  const P = master();
+  masterMainPath(P);
+  P.go('storeroom');
+  const shelf = P.look('t_shelf');
+  assert.ok(/推不動/.test(shelf.messages.map(txt).join()));
+  assert.ok(!P.E.visibleHotspots(P.s).some(h => h.id === 't_tunnel'));
+  P.go('foyer');
+  insertAll(P);
+  P.go('storeroom');
+  P.look('t_shelf');
+  assert.ok(P.s.flags.tunnelFound);
+  P.look('t_tunnel');
+  // 還沒讀剪報：連正確密碼也打不開（不透露答案）
+  const noClue = P.E.submit(P.s, 'tunnel', G.TUNNEL_CODE);
+  assert.equal(noClue.ok, false);
+  P.go('study'); P.look('s_clipping'); P.go('storeroom');
+  const trap = P.solve('tunnel', G.TUNNEL_TRAP);
+  assert.equal(trap.solved, false);
+  assert.ok(!P.s.flags.tunnelOpen);
+  assert.equal(P.solve('tunnel', G.TUNNEL_CODE).solved, true);
+  assert.ok(P.s.flags.tunnelOpen);
+});
+
+test('［大師］音樂盒：資深的旋律在大師模式是錯的；要用星盤的答案', () => {
+  const P = master();
+  let tried = null;
+  const real = P.solve;
+  P.solve = (pz, ans) => {
+    if (pz === 'musicbox') { tried = P.E.submit(P.s, 'musicbox', G.MUSIC_ANSWER); return real(pz, G.MUSIC_ANSWER_M); }
+    return real(pz, ans);
+  };
+  vetMainPath(P);
+  assert.equal(tried.solved, false);
+  assert.ok(P.s.flags.musicSolved);
+});
+
+test('［大師］階段依序推進，最後多一個「另一條路」；資深模式沒有這些東西', () => {
+  const P = master();
+  const seen = [P.E.stage(P.s).id];
+  for (const k of ['look', 'use', 'combine', 'go', 'solve']) {
+    const f = P[k];
+    P[k] = (...a) => { const r = f(...a); const id = P.E.stage(P.s).id; if (seen[seen.length - 1] !== id) seen.push(id); return r; };
+  }
+  masterMainPath(P);
+  masterTunnel(P);
+  assert.deepEqual(seen, G.STAGES.master);
+  // 資深：同樣的地方沒有鐵門、沒有第二張卡片，大門照常可以走
+  const V = makeGame('veteran');
+  vetMainPath(V);
+  vetDarkroomPath(V);
+  V.go('foyer'); V.solve('phone', 'refuse'); insertAll(V);
+  V.go('storeroom'); V.look('t_shelf');
+  assert.ok(!V.s.flags.tunnelFound && !V.s.flags.draftNoticed);
+  V.go('darkroom');
+  assert.ok(!V.E.visibleHotspots(V.s).some(h => h.id === 'd_card2'));
+  V.go('foyer');
+  assert.equal(V.solve('exit', 'publish').ending, 'B');
 });

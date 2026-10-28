@@ -66,6 +66,19 @@ const VET_DARKROOM_CODE = (() => {
   return Store.encode(P.s);
 })();
 
+// 大師模式「三枚徽章到手、暗房紅燈已亮、還沒讀卡片」的存檔碼
+const MASTER_DARKROOM_CODE = (() => {
+  const { makeGame, masterMainPath } = require('./helpers');
+  const Store = require('../js/storage.js');
+  const P = makeGame('master');
+  masterMainPath(P);
+  P.go('study'); P.look('s_waste'); P.go('observatory'); P.look('o_lamp'); P.combine('note_left', 'note_right');
+  P.go('greenhouse'); P.use('flashlight', 'g_bench'); P.solve('trapdoor', G.TRAPDOOR_CODE); P.look('g_trapdoor');
+  P.use('red_bulb', 'd_socket');
+  return Store.encode(P.s);
+})();
+const MODE_KEY = { novice: 'modeNovice', veteran: 'modeVeteran', master: 'modeMaster' };
+
 async function setup(browser, lang, viewport = { width: 1280, height: 860 }) {
   // 用瀏覽器語言測試預設語言的偵測；之後仍透過標題畫面的語言按鈕確認一次
   const ctx = await browser.newContext({ viewport, locale: lang === 'zh' ? 'zh-TW' : 'en-US' });
@@ -223,7 +236,7 @@ async function newGame(P, { mode = 'novice', tutorial = false } = {}) {
   const { page } = P;
   await page.click('#btn-new');
   ok(await P.modalOpen(), '「新遊戲」應先打開難度選擇');
-  await P.modalHas(X(/新手[\s\S]*資深/, /Novice[\s\S]*Veteran/), '兩種難度');
+  await P.modalHas(X(/新手[\s\S]*資深[\s\S]*大師/, /Novice[\s\S]*Veteran[\s\S]*Master/), '三種難度');
   await P.check('mode');
   const box = page.locator('#tut-toggle');
   if ((await box.isChecked()) !== tutorial) await box.click();
@@ -232,11 +245,11 @@ async function newGame(P, { mode = 'novice', tutorial = false } = {}) {
   for (let i = 0; i < 6 && await page.locator('#intro').isVisible(); i++) await page.click('#btn-intro-next');
   ok(await P.modalOpen(), '開場後應該打開信');
   await P.modalHas(X(/三枚徽章/, /Three emblems/), '信的內容');
-  if (mode === 'veteran') await P.modalHas(X(/周伯/, /Old Zhou/), '資深模式的信提到周伯');
+  if (mode !== 'novice') await P.modalHas(X(/周伯/, /Old Zhou/), '資深以上的信提到周伯');
   await P.check('letter');
   await P.close();
   const chip = (await page.locator('#chip-mode').innerText()).trim();
-  ok(chip === ui(mode === 'veteran' ? 'modeVeteran' : 'modeNovice', P.lang), `狀態列應顯示難度，實際「${chip}」`);
+  ok(chip === ui(MODE_KEY[mode], P.lang), `狀態列應顯示難度，實際「${chip}」`);
   ok((await page.locator('#tutorial').isVisible()) === tutorial, tutorial ? '應出現操作教學' : '關掉教學時不應出現教學');
 }
 
@@ -437,7 +450,7 @@ async function tutorial(P) {
   ok((await text()) === ui('tut2', P.lang), '點了衣帽架之後前進到第二步');
   for (const k of ['tut3', 'tut4', 'tut5']) {
     await page.click('#tut-next');
-    const want = ui(k, P.lang) + (k === 'tut5' ? (P.lang === 'en' ? ' ' : '') + ui('tut5v', P.lang) : '');
+    const want = ui(k, P.lang) + (k === 'tut5' ? (P.lang === 'en' ? ' ' : '') + ui('tut5v', P.lang, { mode: ui('modeVeteran', P.lang) }) : '');
     ok((await text()) === want, `教學 ${k}：${await text()}`);
   }
   await page.waitForTimeout(300); // 等圈選框移動到位
@@ -886,7 +899,7 @@ async function fullRun(browser, lang) {
     results.push('D');
     // 結局圖鑑
     await page.click('#btn-end-gallery');
-    ok((await page.locator('#modal-body').innerText()).includes(ui('galleryCount', lang, { n: 3, total: 5 })), '圖鑑計數');
+    ok((await page.locator('#modal-body').innerText()).includes(ui('galleryCount', lang, { n: 3, total: G.ENDING_ORDER.length })), '圖鑑計數');
     await P.shot('gallery');
     await P.close();
 
@@ -1132,6 +1145,161 @@ async function noteLayoutRun(browser) {
   }
 }
 
+/* ---------- 大師模式 ---------- */
+const handCount = page => page.locator('#hand .hand-card').count();
+const handTitles = page => page.locator('#hand .hand-card h3').allInnerTexts();
+async function loadCode(P, code) {
+  const { page } = P;
+  // 標題畫面用「讀取存檔」，遊戲中用「存檔」視窗裡的存檔碼匯入
+  await page.click(await page.locator('#btn-load').isVisible() ? '#btn-load' : '#btn-save');
+  await page.fill('#code-in', code);
+  await page.click('#modal-body [data-act=import]');
+}
+// 在目前打開的文件上按「拿在手上」
+async function holdThis(P) {
+  const b = P.page.locator('#modal-body [data-hold]');
+  ok(await b.count() === 1, '文件上應有「拿在手上」');
+  await b.click();
+  ok(await b.getAttribute('aria-pressed') === 'true', '拿起後按鈕顯示為已拿在手上');
+}
+
+// 大師：牆上的假卡片、拿在手上、三張廢片、門外的車、大門被截胡（H）、老水道的真結局（B）
+async function masterRun(browser, lang) {
+  const results = [];
+  const page = await setup(browser, lang);
+  const P = player(page, lang);
+  await newGame(P, { mode: 'master' });
+  await hintsLocked(P);
+  ok(await handCount(page) === 0 && await page.locator('#hand .hand-empty').isVisible(), '一開始手上沒有東西，面板顯示用法');
+  await loadCode(P, MASTER_DARKROOM_CODE);
+  ok((await page.locator('#room-name').innerText()).trim() === G.rooms.darkroom.name[lang], '存檔碼的進度停在暗房');
+  ok((await page.locator('#chip-mode').innerText()).trim() === ui('modeMaster', lang), '匯入大師模式的存檔碼');
+  ok(await page.locator('#scene [data-hs="d_card2"]').count() === 1, '大師的暗房牆上多一張卡片');
+  // 兩張卡片＋流程表，拿在手上並排
+  await P.obj('d_shelf');
+  await P.said(X(/褐色的結晶/, /brown crystals/));
+  await holdThis(P); await P.close();
+  await P.obj('d_card2');
+  await P.modalHas(X(/日曆紙/, /calendar/), '假卡片寫在日曆紙上');
+  await holdThis(P); await P.close();
+  await P.obj('d_chart');
+  await P.modalHas(X(/褐色的結晶/, /brown crystals/), '大師的流程表多一條結晶的說明');
+  await holdThis(P); await P.close();
+  ok(await handCount(page) === 3, '手上三份');
+  ok(JSON.stringify(await handTitles(page)) === JSON.stringify(['bottle_card_v', 'bottle_card_fake', 'process_chart'].map(id => G.docs[id].title[lang])), '依拿起的順序排列');
+  // 第四份：按鈕寫明會換掉最早的那份
+  await page.click('#btn-notes');
+  ok(await page.locator('#modal-body .tag-hand').count() === 3, '筆記清單標出已拿在手上的三份');
+  await page.click('#modal-body [data-note="zhou_log"]');
+  const swap = ui('handHoldSwap', lang, { doc: G.docs.bottle_card_v.title[lang] });
+  ok((await page.locator('#modal-body [data-hold]').innerText()).trim() === swap, `手上已滿時按鈕寫明換掉哪一份：${swap}`);
+  await page.click('#modal-body [data-hold]');
+  await P.close();
+  ok(JSON.stringify(await handTitles(page)) === JSON.stringify(['bottle_card_fake', 'process_chart', 'zhou_log'].map(id => G.docs[id].title[lang])), '換掉最早的那份');
+  await P.shot('hand-panel');
+  // 從面板上放下一份
+  await page.click('#hand [data-unhold="process_chart"]');
+  ok(await handCount(page) === 2, '放下之後剩兩份');
+  // 顯影台：廢片倒數；解謎視窗裡也看得到手上的文件
+  await P.obj('d_tray');
+  const notice = () => page.locator('#modal-body .notice').first().innerText();
+  ok((await notice()) === ui('devFilms', lang, { n: 3, total: 3 }), '一開始有三張廢片');
+  ok(await page.locator('#modal-body .hand-strip .hand-card').count() === 2, '顯影台底部看得到手上的兩份文件');
+  ok(await page.locator('#modal-body [data-card2]').count() === 1, '顯影台可以直接看牆上的卡片');
+  for (const b of ['blue', 'yellow', 'red', 'white']) await page.click(`#modal-body [data-bottle="${b}"]`);   // 照假卡片倒
+  await page.click('#modal-body [data-act=go]');
+  await P.feedback(X(/不對。[\s\S]*還剩 2 張/, /Not right\.[\s\S]*2 scraps of film are left/));
+  ok((await notice()) === ui('devFilms', lang, { n: 2, total: 3 }), '用掉一張');
+  for (const b of G.DEVELOP_ANSWER) await page.click(`#modal-body [data-bottle="${b}"]`);
+  await page.click('#modal-body [data-act=go]');
+  await P.feedback(X(/最後一張廢片/, /Only one scrap of film is left/));
+  ok((await notice()) === ui('devFilmsLast', lang), '只剩最後一張');
+  // 最後一張要再確認；「再想想」不會用掉
+  for (const b of G.DEVELOP_ANSWER_V) await page.click(`#modal-body [data-bottle="${b}"]`);
+  await page.click('#modal-body [data-act=go]');
+  await P.modalHas(X(/最後一張廢片。這個順序真的確定了嗎/, /last scrap of film\. Are you sure/), '最後一張要確認');
+  await P.shot('develop-last-film');
+  await page.click('#modal-body [data-act=dev-no]');
+  ok((await notice()) === ui('devFilmsLast', lang) && !(await P.has('plate')), '再想想：沒有沖洗');
+  await page.click('#modal-body [data-act=go]');
+  await page.click('#modal-body [data-act=dev-yes]');
+  await P.said(X(/彗星/, /comet/));
+  ok(await P.has('plate'), '底片');
+  await P.obj('d_line');
+  // 讀剪報，也拿在手上（水道的鎖要用）
+  await P.room('study');
+  await P.obj('s_clipping');
+  await holdThis(P); await P.close();
+  // 門外的車：掛斷電話後沒有開走
+  await P.room('foyer');
+  await P.obj('f_phone');
+  await page.click('#modal-body [data-act=refuse]');
+  await P.said(X(/車燈一直亮著/, /headlights stay on/));
+  await P.obj('f_mailslot');
+  await P.said(X(/黑色轎車還停在石階下/, /black car still parked/));
+  for (const e of ['emblem_sun', 'emblem_moon', 'emblem_star']) await P.use(e, 'f_door');
+  await P.said(X(/鐵栓收了回去/, /iron bolt has slid back/));
+  // 從大門走：車燈還亮著——帶著底片就被截胡
+  await P.obj('f_door');
+  await P.modalHas(X(/車燈還亮著/, /headlights are still on/), '大門的畫面提醒門外有車');
+  await P.close();
+  await exitWith(P, 'publish', 'H');
+  results.push('H');
+  await page.click('#btn-preend');
+  // 改走老水道
+  await P.room('storeroom');
+  await P.obj('t_shelf');
+  await P.said(X(/低矮的鐵門/, /low iron gate/));
+  ok(await page.locator('#scene [data-hs="t_tunnel"]').count() === 1, '場景裡畫出鐵門');
+  await P.obj('t_tunnel');
+  ok(await page.locator('#modal-body .digit').count() === 5, '五位數的鎖');
+  ok(await page.locator('#modal-body .hand-strip').isVisible(), '鎖的畫面也看得到手上的剪報');
+  await P.lockType(G.TUNNEL_TRAP);                              // 照抄剪報的 −17
+  await P.feedback(X(/^鎖紋絲不動。$/, /^The lock doesn't budge\.$/));
+  await P.shot('tunnel-lock');
+  await P.lockType(G.TUNNEL_CODE);
+  await P.said(X(/鐵門「喀」地彈開/, /iron gate springs open/));
+  await P.obj('t_tunnel');
+  ok((await page.locator('#modal-title').innerText()).trim() === ui('tunnelTitle', lang), '老水道的離開畫面');
+  await page.click('#modal-body [data-choice="publish"]');
+  await page.click('#modal-body [data-yes]');
+  await page.waitForSelector('#ending:not([hidden])');
+  ok(await page.locator('.ending-title').innerText() === G.endings.B.title[lang], '從老水道公開：結局 B');
+  await P.modalHasEnding(X(/老水道/, /water channel/), '大師的真結局寫的是從水道離開');
+  ok((await page.locator('.stats').innerText()).includes(ui('modeMaster', lang)), '結局統計顯示大師');
+  await P.shot('ending-B-master');
+  results.push('B');
+  await page.click('#btn-end-gallery');
+  ok(await page.locator('#modal-body .badge-master').count() === 2, '圖鑑上 B、H 有大師徽記');
+  await P.close();
+  await page.context().close();
+  return results;
+}
+
+// 大師：三張廢片都試壞 → 失敗（G），整局作廢
+async function masterFailRun(browser, lang) {
+  const page = await setup(browser, lang);
+  const P = player(page, lang);
+  await loadCode(P, MASTER_DARKROOM_CODE);
+  await P.obj('d_shelf'); await P.close();
+  await P.obj('d_chart'); await P.close();
+  await P.obj('d_tray');
+  const pour = async seq => { for (const b of seq) await page.click(`#modal-body [data-bottle="${b}"]`); await page.click('#modal-body [data-act=go]'); };
+  await pour(['blue', 'yellow', 'red', 'white']);
+  await pour(['blue', 'yellow', 'red', 'white']);
+  await pour(['blue', 'yellow', 'red', 'white']);
+  await page.click('#modal-body [data-act=dev-yes]');
+  await page.waitForSelector('#ending:not([hidden])');
+  ok((await page.locator('.ending-title').innerText()) === G.endings.G.title[lang], '失敗：最後一張廢片');
+  ok(await page.locator('#btn-preend').count() === 0, '失敗不能回到之前');
+  await P.shot('develop-failed');
+  await page.click('#btn-end-gallery');
+  ok(!(await page.locator('#modal-body').innerText()).includes(G.endings.G.title[lang]), '失敗不進結局圖鑑');
+  ok((await page.locator('#modal-body').innerText()).includes(ui('galleryMasterOnly', lang)), '大師限定的結局在圖鑑上註明');
+  await P.close();
+  await page.context().close();
+}
+
 /* ---------- 主流程 ---------- */
 (async () => {
   const browser = await chromium.launch();
@@ -1140,19 +1308,20 @@ async function noteLayoutRun(browser) {
   for (const lang of LANGS) {
     const results = await fullRun(browser, lang);
     const vet = await vetRun(browser, lang);
+    const mas = await masterRun(browser, lang);
     await keyboardRun(browser, lang);
     await mobileRun(browser, lang);
     for (const [m, got] of [['novice', results], ['veteran', vet]]) {
       const missing = ['A', 'B', 'C', 'D', 'E'].filter(e => !got.includes(e));
       if (missing.length) { console.error(`[${lang}/${m}] 沒有走到的結局：`, missing); process.exit(1); }
     }
-    summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}`);
+    summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}／大師：${mas.join('、')}`);
   }
   if (LANGS.length > 1) await switchRun(browser);
-  for (const lang of LANGS) await potsFailRun(browser, lang);
+  for (const lang of LANGS) { await potsFailRun(browser, lang); await masterFailRun(browser, lang); }
   await noteLayoutRun(browser);
   await browser.close();
   console.log(`走完的結局 ${summary.join('；')}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);
   if (errors.length) { console.error('主控台錯誤：', errors); process.exit(1); }
-  console.log(`端對端測試通過：${LANGS.join(' / ')}${LANGS.length > 1 ? ' 兩種語言' : ''}、新手與資深兩種難度，都能只靠介面操作玩到五個結局；英文畫面沒有任何中文，主控台沒有錯誤。`);
+  console.log(`端對端測試通過：${LANGS.join(' / ')}${LANGS.length > 1 ? ' 兩種語言' : ''}、新手與資深都能只靠介面操作玩到五個結局，大師玩到截胡與老水道的真結局；英文畫面沒有任何中文，主控台沒有錯誤。`);
 })().catch(e => { console.error(e); console.error('主控台錯誤：', errors); process.exit(1); });

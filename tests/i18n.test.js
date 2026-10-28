@@ -97,10 +97,11 @@ test('美術：英文模式下，所有場景與謎題圖裡都沒有中文；�
   global.self = prev;
   const all = Object.fromEntries(Object.keys({ greenhouseOpen: 1, phoneRinging: 1, trapdoorFound: 1, gateOpen: 1, clockSolved: 1, paintingMoved: 1, safeOpen: 1, lightOk: 1, waterOk: 1, wheelInstalled: 1, trapdoorOpen: 1, darkroomLit: 1, plateDeveloped: 1, inserted_emblem_sun: 1, eyepieceInstalled: 1, eyepieceFound: 1, starDialSolved: 1, bulbTaken: 1, moonTaken: 1, keyDug: 1, drawerOpen: 1 }).map(k => [k, true]));
   Object.assign(all, { storeroomOpen: true, atticOpen: true, cabinetOpen: true, photosSolved: true, photosTaken: true, crankInserted: true, musicSolved: true });
-  const states = [{}, all];
+  // 大師：儲物間的鐵門（找到、打開）
+  const states = [{}, all, Object.assign({}, all, { tunnelFound: true }), Object.assign({}, all, { tunnelFound: true, tunnelOpen: true })];
   const render = () => {
     const out = [];
-    for (const mode of ['novice', 'veteran']) for (const flags of states) {
+    for (const mode of G.MODES) for (const flags of states) {
       for (const room of G.roomOrder) {
         const s = { room, flags, mode, puz: { dome: 'SE' }, inv: [] };
         out.push([`scene ${mode} ${room}`, Art.scene(room, { s, vis: () => true, label: id => G.hotspots.find(h => h.id === id).name[Art.lang] })]);
@@ -109,11 +110,11 @@ test('美術：英文模式下，所有場景與謎題圖裡都沒有中文；�
     for (const p of G.PHOTOS) out.push(['photo ' + p.id, Art.photoSvg(p) + Art.photoSvg(p, { back: true })]);
     out.push(['balance', Art.balanceSvg({ tin_moon: 'L', w2: 'L', w5: 'R' }) + Art.balanceSvg({})], ['musicbox', Art.musicBoxSvg(3)], ['signal', Art.signalSvg()]);
     out.push(['mirrors v', Art.mirrorsSvg(G.MIRROR_SOLUTION_V, { grid: G.MIRROR_GRID_V }) + Art.mirrorsSvg(G.MIRROR_GRID_V.initial, { grid: G.MIRROR_GRID_V, beam: false })]);
-    for (const b of G.BOTTLES_V) out.push(['bottle ' + b.id, Art.bottleSvg(b)]);
+    for (const b of G.BOTTLES_V) out.push(['bottle ' + b.id, Art.bottleSvg(b) + Art.bottleSvg(b, { crust: true })]);
     out.push(['poster', Art.poster()], ['bookshelf', Art.bookshelf()], ['plate', Art.plate()]);
     for (const d of G.DIRECTIONS) out.push(['eyepiece ' + d.id, Art.eyepiece(d.id)]);
     for (const o of [{ digits: true }, { digits: false, stars: true }, { digits: true, stars: true }]) out.push(['grid', Art.gridSvg(o)]);
-    for (const w of ['left', 'right', 'full']) for (const m of ['novice', 'veteran']) out.push([`note ${w} ${m}`, Art.note(w, m)]);
+    for (const w of ['left', 'right', 'full']) for (const m of G.MODES) out.push([`note ${w} ${m}`, Art.note(w, m)]);
     out.push(['valves', Art.valvesSvg({ V1: true }, false)], ['mirrors', Art.mirrorsSvg(G.MIRROR_GRID.initial)], ['clock', Art.clockSvg(3, 15)], ['dial', Art.dialSvg(['key', 'boat', 'bird'])]);
     for (const id of Object.keys(G.items)) out.push(['icon ' + id, Art.icon(id)]);
     return out;
@@ -127,4 +128,27 @@ test('美術：英文模式下，所有場景與謎題圖裡都沒有中文；�
   assert.ok(zh.every(([, svg]) => !/undefined|\[object Object\]|NaN/.test(svg)));
   // 每個物品都有圖示
   for (const id of Object.keys(G.items)) assert.ok(/<(path|rect|circle|polygon|g)\b/.test(Art.icon(id)), id + ' 沒有圖示');
+});
+
+test('美術：每個難度只畫出這個難度有的物件（例如新手的暗房沒有流程表，資深的暗房沒有第二張卡片）', () => {
+  const prev = global.self;
+  global.self = { GAME_DATA: G };
+  delete require.cache[require.resolve('../js/art.js')];
+  require('../js/art.js');
+  const Art = global.self.Art;
+  global.self = prev;
+  const { create } = require('./helpers');
+  const E = create(G);
+  const flags = { trapdoorOpen: true, darkroomLit: true, storeroomOpen: true, greenhouseOpen: true, tunnelFound: true };
+  for (const mode of G.MODES) {
+    for (const room of ['darkroom', 'storeroom']) {
+      const s = Object.assign(E.newState(mode), { room, flags });
+      // 和介面一樣：熱點要符合難度、也要符合自己的可見條件
+      const vis = id => { const h = E.hotspot(id); return h.room === room && G.modeOk(mode, h) && (!h.visible || !!h.visible(s)); };
+      const svg = Art.scene(room, { s, vis, label: id => E.hotspot(id).name.zh });
+      const drawn = [...svg.matchAll(/data-hs="(\w+)"/g)].map(m => m[1]).sort();
+      const want = E.visibleHotspots(s).map(h => h.id).sort();
+      assert.deepEqual(drawn, want, `${mode} ${room}`);
+    }
+  }
 });

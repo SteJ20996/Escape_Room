@@ -1,7 +1,7 @@
 {
   "name": "stargazers-house",
   "version": "1.0.0",
-  "description": "觀星者之屋：瀏覽器密室逃脫遊戲（新手／資深兩種難度、最多七個房間、十五道謎題、五種結局）",
+  "description": "觀星者之屋：瀏覽器密室逃脫遊戲（新手／資深／大師三種難度、最多七個房間、十六道謎題、六種結局）",
   "private": true,
   "license": "MIT",
   "scripts": {

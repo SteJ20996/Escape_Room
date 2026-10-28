@@ -339,3 +339,62 @@ test('資深・音樂盒：晴的星星譜照星座的星數換成音齒號碼',
     for (const id of G.MUSIC_SCORE) assert.ok(letter.includes(G.CONSTELLATIONS[id].name[lang]), id);
   }
 });
+
+/* ---------------- 大師模式 ---------------- */
+test('大師・假卡片：牆上那張自成一套、也只有一種擺法，但倒出來的順序是錯的；兩個實物證據都能拆穿它', () => {
+  const all = permute(CHEMS_V);
+  const fits = rules => all.filter(P => rules.every(r => bottleRuleHolds(r, P)));
+  const answerOf = P => G.DEVELOP_SEQUENCE_V.map(c => G.BOTTLES_V[P.indexOf(c)].id);
+  // 假卡片看起來和真的一樣可信：規則彼此不矛盾、答案唯一
+  const fake = fits(G.FAKE_BOTTLE_RULES);
+  assert.equal(fake.length, 1, '假卡片也只有一種擺法');
+  assert.deepEqual(answerOf(fake[0]), ['blue', 'yellow', 'red', 'white']);
+  assert.notDeepEqual(answerOf(fake[0]), G.DEVELOP_ANSWER_V, '照假卡片倒是錯的');
+  const real = fits(G.BOTTLE_RULES_V)[0];
+  // 證據一：流程表說只有顯影液的瓶口會結晶；暗房裡結晶的是黑蓋瓶。真卡片的黑蓋是顯影液，假卡片不是
+  const black = G.BOTTLES_V.findIndex(b => b.id === 'black');
+  assert.equal(real[black], 'developer');
+  assert.notEqual(fake[0][black], 'developer');
+  const chart = G.docBody(G.docs.process_chart, 'master');
+  assert.ok(chart.zh.join('').includes('褐色的結晶') && /brown crystals/.test(chart.en.join('')));
+  assert.ok(!G.docBody(G.docs.process_chart, 'veteran').zh.join('').includes('結晶'), '結晶這條線索只在大師模式出現');
+  // 證據二：假卡片寫在今年 10 月 17 日撕下的日曆紙上；周伯的日誌寫著陸觀 10 日就過世了，17 日韓嶽進過暗房
+  assert.ok(G.HAN_VISIT_DAY > G.DEATH_DAY);
+  for (const lang of ['zh', 'en']) {
+    assert.ok(G.docs.bottle_card_fake.body[lang].join('').includes(String(G.HAN_VISIT_DAY)), lang);
+    const log = G.docBody(G.docs.zhou_log, 'master')[lang].join('\n');
+    assert.ok(log.includes(String(G.DEATH_DAY)) && log.includes(String(G.HAN_VISIT_DAY)), lang);
+  }
+  // 兩張卡片的開頭一模一樣（筆跡很像），只有規則不同
+  assert.equal(G.docs.bottle_card_fake.body.zh[0], G.docs.bottle_card_v.body.zh[0]);
+});
+
+test('大師・音樂盒：旋律藏在星盤的答案裡（信裡不寫出星座名稱），由外到內每個兩下、再回到最高的那一個', () => {
+  const n = id => G.CONSTELLATIONS[id].stars.length;
+  assert.deepEqual(G.MUSIC_ANSWER_M, [...G.DIAL_ANSWER.flatMap(id => [n(id), n(id)]), n(G.DIAL_ANSWER[0])]);
+  assert.notDeepEqual(G.MUSIC_ANSWER_M, G.MUSIC_ANSWER);
+  assert.ok(G.MUSIC_ANSWER_M.every(x => x >= 1 && x <= G.MUSIC_TINES));
+  for (const lang of ['zh', 'en']) {
+    const letter = G.docBody(G.docs.qing_letter, 'master')[lang].join('\n');
+    for (const id of Object.keys(G.CONSTELLATIONS)) assert.ok(!letter.includes(G.CONSTELLATIONS[id].name[lang]), `大師的信不應寫出星座名稱：${id}`);
+  }
+});
+
+test('大師・老水道的鎖：「那顆彗星真正的位置」＝剪報的赤經＋改正後的赤緯；照抄剪報的 −17 是陷阱', () => {
+  const ra = G.docs.clipping.body.en.join('').match(/right ascension (\d+)h (\d+)m/);
+  assert.ok(ra, '剪報寫有赤經');
+  assert.ok(G.docs.clipping.body.zh.join('').includes(`赤經 ${ra[1]} 時 ${ra[2]} 分`));
+  // 剪報寫 −17；日記三與底片紙套都說 7 是誤寫，真的是 −16
+  assert.equal(G.TUNNEL_TRAP, ra[1] + ra[2] + '17');
+  assert.equal(G.TUNNEL_CODE, ra[1] + ra[2] + '16');
+  for (const lang of ['zh', 'en']) assert.ok(G.docs.tunnel_lock.body[lang].join('').length > 0);
+});
+
+test('大師・門外有人：周伯的日誌交代了老水道；被截胡（H）是結局、三張廢片用完（G）是失敗', () => {
+  const log = G.docBody(G.docs.zhou_log, 'master');
+  assert.ok(log.zh.join('').includes('大門外') && log.zh.join('').includes('老水道'));
+  assert.ok(/front door/.test(log.en.join('')) && /water channel/.test(log.en.join('')));
+  assert.equal(G.endings.H.mode, 'master');
+  assert.ok(!G.endings.H.fail, '被截胡是結局，不是失敗');
+  assert.ok(G.endings.G.fail, '三張廢片用完是失敗');
+});

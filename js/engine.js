@@ -23,10 +23,10 @@
       hotspotById[h.id] = h;
     }
 
-    // mode：'novice'（新手）或 'veteran'（資深）。舊存檔沒有這個欄位，讀取時一律視為新手。
+    // mode：'novice'（新手）、'veteran'（資深）或 'master'（大師）。舊存檔沒有這個欄位，讀取時一律視為新手。
     function newState(mode) {
-      const m = mode === 'veteran' ? 'veteran' : 'novice';
-      const grid = m === 'veteran' ? G.MIRROR_GRID_V : G.MIRROR_GRID;
+      const m = G.MODES.includes(mode) ? mode : 'novice';
+      const grid = G.isAdv(m) ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       return {
         v: G.saveVersion,
         mode: m,
@@ -38,8 +38,21 @@
         hints: {},
         visited: { [G.startRoom]: true },
         stats: { actions: 0, wrong: 0, hints: 0, playMs: 0 },
+        hand: [],
         ending: null,
       };
+    }
+
+    /* ---------- 拿在手上：最多三份文件攤在畫面下方（純顯示，不影響遊戲邏輯） ---------- */
+    const HAND_MAX = 3;
+    // 回傳拿起之後是否在手上；手上已滿時換掉最早拿起的那一份
+    function toggleHand(s, id) {
+      if (!G.holdable(id)) return false;
+      const i = s.hand.indexOf(id);
+      if (i >= 0) { s.hand.splice(i, 1); return false; }
+      s.hand.push(id);
+      while (s.hand.length > HAND_MAX) s.hand.shift();
+      return true;
     }
 
     const NOT_HERE = L('這裡沒有那樣東西。', 'That isn\'t here.');
@@ -93,13 +106,13 @@
     }
 
     /* ---------- 查詢 ---------- */
-    function isVisible(s, h) { return h.room === s.room && (!h.mode || h.mode === s.mode) && (!h.visible || !!h.visible(s)); }
+    function isVisible(s, h) { return h.room === s.room && G.modeOk(s.mode, h) && (!h.visible || !!h.visible(s)); }
     function visibleHotspots(s) { return G.hotspots.filter(h => isVisible(s, h)); }
     function canEnter(s, room) { return !!G.rooms[room] && G.rooms[room].accessible(s); }
     // 房間按鈕要不要出現在畫面上（還沒發現的房間不顯示）
     function roomShown(s, room) {
       const R = G.rooms[room];
-      if (!R || (R.mode && R.mode !== s.mode)) return false;
+      if (!R || !G.modeOk(s.mode, R)) return false;
       return R.navVisible ? !!R.navVisible(s) : true;
     }
     function itemName(s, id) {
@@ -187,8 +200,9 @@
       if (solved === null) return fail(L('這個選項現在不能用。', 'That option isn\'t available right now.')); // 不合法的輸入：不改變任何狀態
       out.solved = !!solved;
       // 資深模式：答錯時把「錯在哪」的說明換成一句簡短的回應（前置條件不足的說明，例如沒有鏟子，照樣保留）
-      if (!solved && s.mode === 'veteran' && out.wrongAt != null && !p.vetKeep) {
-        out.messages = out.messages.slice(0, out.wrongAt).concat([{ text: p.vetWrong || WRONG, kind: 'bad' }]);
+      if (!solved && G.isAdv(s.mode) && out.wrongAt != null && !p.vetKeep) {
+        // 標了 keep 的訊息（例如大師模式「還剩幾張廢片」）照樣保留
+        out.messages = out.messages.slice(0, out.wrongAt).concat([{ text: p.vetWrong || WRONG, kind: 'bad' }], out.messages.slice(out.wrongAt).filter(m => m.keep));
       }
       delete out.wrongAt;
       if (p.silent && !out.messages.length) return out; // 純介面狀態（閥門開關、鏡子角度）不計入行動次數
@@ -199,8 +213,8 @@
     // 目前的主線階段（第一個還沒完成的階段）
     function stage(s) { return G.stageInfo(s); }
     // 資深模式：第一階段不開放提示
-    function hintsLocked(s) { return s.mode === 'veteran' && stage(s).index === 0; }
-    function hintOpen(s, h) { return (!h.mode || h.mode === s.mode) && h.avail(s) && !h.done(s); }
+    function hintsLocked(s) { return G.isAdv(s.mode) && stage(s).index === 0; }
+    function hintOpen(s, h) { return G.modeOk(s.mode, h) && h.avail(s) && !h.done(s); }
     // 回傳目前可用的提示；group 是 'current'（目前階段）、'side'（支線）、'explore' 或 'other'（已發現、但屬於之後的階段）
     function hintList(s) {
       if (hintsLocked(s)) return [];
@@ -260,9 +274,14 @@
       if (Array.isArray(s.inv) && new Set(s.inv).size !== s.inv.length) errs.push(L('物品重複', 'duplicate items'));
       // 資深模式的花盆：挖錯過的盆（不重複、都不是答案）；挖錯第三盆就是失敗結局 F
       const pd = s.flags && s.flags.potsDug;
-      if (pd !== undefined && (s.mode !== 'veteran' || !Array.isArray(pd) || !pd.length || pd.length > G.POT_MISS_LIMIT || new Set(pd).size !== pd.length
+      if (pd !== undefined && (!G.isAdv(s.mode) || !Array.isArray(pd) || !pd.length || pd.length > G.POT_MISS_LIMIT || new Set(pd).size !== pd.length
         || pd.some(id => id === G.POT_ANSWER_V || !G.POTS_V.some(p => p.id === id)) || (pd.length === G.POT_MISS_LIMIT) !== (s.ending === 'F'))) errs.push(L('花盆紀錄無效', 'invalid pot record'));
       if (s.ending === 'F' && !(Array.isArray(pd) && pd.length === G.POT_MISS_LIMIT)) errs.push(L('結局無效', 'invalid ending'));
+      // 大師模式的廢片：試壞 1～2 張；第三張就是失敗 G
+      const dm = s.flags && s.flags.devMisses;
+      if (dm !== undefined && (s.mode !== 'master' || !Number.isInteger(dm) || dm < 1 || dm > G.DEV_MISS_LIMIT || (dm === G.DEV_MISS_LIMIT) !== (s.ending === 'G'))) errs.push(L('廢片紀錄無效', 'invalid scrap-film record'));
+      if (s.ending === 'G' && dm !== G.DEV_MISS_LIMIT) errs.push(L('結局無效', 'invalid ending'));
+      if (s.ending && G.endings[s.ending] && G.endings[s.ending].mode && !G.modeOk(s.mode, G.endings[s.ending])) errs.push(L('結局無效', 'invalid ending'));
       if (!errs.length && G.rooms[s.room] && !G.rooms[s.room].accessible(s)) errs.push(L('所在房間尚未解鎖', 'current room is not unlocked yet'));
       return errs;
     }
@@ -271,7 +290,7 @@
       if (!s || typeof s !== 'object') return s;
       const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
       if (s.mode === undefined) s.mode = 'novice'; // 加入難度之前的存檔都是新手模式
-      const grid = s.mode === 'veteran' ? G.MIRROR_GRID_V : G.MIRROR_GRID;
+      const grid = G.isAdv(s.mode) ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       s.hints = obj(s.hints);
       s.visited = obj(s.visited);
       s.visited[s.room] = true;
@@ -296,13 +315,15 @@
       const st = obj(s.stats);
       s.stats = {};
       for (const k of ['actions', 'wrong', 'hints', 'playMs']) s.stats[k] = Number.isFinite(+st[k]) && +st[k] >= 0 ? +st[k] : 0;
+      const hand = Array.isArray(s.hand) ? s.hand : [];
+      s.hand = hand.filter((id, i) => typeof id === 'string' && G.holdable(id) && hand.indexOf(id) === i).slice(-HAND_MAX);
       return s;
     }
 
     return {
       G, newState, interact, useItem, combine, move, submit,
       hintList, revealHint, hintsLocked, stage, progress, visibleHotspots, canEnter, roomShown, itemName, pageCount,
-      validate, normalize, findRecipe,
+      validate, normalize, findRecipe, toggleHand, HAND_MAX,
       hotspot: id => hotspotById[id],
       clone: s => JSON.parse(JSON.stringify(s)),
     };

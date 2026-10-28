@@ -408,6 +408,10 @@ textarea.code {
 .mode-card .btn { justify-self: start; }
 .btn.vet { border-color: #8a4a3a; color: #f6c0a8; background: #3a1a14; }
 .btn.vet:hover { border-color: #f0a080; color: #fff0e8; }
+.mode-chip.master { color: #cdb6ff; border-color: #4e3d78; }
+.mode-card.mode-master h3 { color: #cdb6ff; }
+.btn.master { border-color: #5e4a8e; color: #ddd0ff; background: #221a3e; }
+.btn.master:hover { border-color: #cdb6ff; color: #fff; }
 .check { display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: .92rem; cursor: pointer; }
 .check input { width: 18px; height: 18px; accent-color: var(--brass); }
 
@@ -475,6 +479,8 @@ textarea.code {
 .pots.eight .pot q { font-size: 1rem; }
 .bottles.six { grid-template-columns: repeat(6, minmax(52px, 84px)); gap: 8px; }
 .badge-vet { margin-left: auto; font-size: .75rem; color: #f0a080; border: 1px solid #6a3a2a; border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
+.badge-vet.badge-master { color: #cdb6ff; border-color: #4e3d78; }
+.badge-vet + .badge-vet { margin-left: 6px; }
 
 /* ---------- 語言切換 ---------- */
 .lang-switch { display: inline-flex; }
@@ -518,4 +524,36 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- 拿在手上：最多三份文件並排在遊戲畫面下方，解謎視窗底部也有一份 ---------- */
+.hand-panel { margin-top: 16px; background: var(--night-2); border: 1px solid var(--brass); border-radius: var(--radius); padding: 12px; }
+.hand-panel h2 { font-size: .95rem; letter-spacing: .2em; color: var(--brass-hi); margin: 0 0 10px; font-weight: 600; }
+.hand-panel.empty { border: 1px dashed var(--rule); padding-block: 10px; }
+.hand-panel.empty h2 { color: var(--dim); margin-bottom: 4px; }
+.hand-empty { margin: 0; color: var(--dim); font-size: .9rem; }
+.hand-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.hand-card { min-width: 0; display: grid; gap: 6px; }
+.hand-card header { display: flex; align-items: center; gap: 8px; }
+.hand-card h3 { margin: 0; flex: 1; min-width: 0; font-size: .92rem; color: var(--star); letter-spacing: .06em; }
+.hand-body { max-height: 360px; overflow: auto; border-radius: 4px; overscroll-behavior: contain; }
+.hand-body:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+.hand-card .paper { padding: 12px 14px; font-size: .9rem; max-width: none; box-shadow: none; }
+.hand-card .paper.hand { font-size: 1rem; line-height: 1.7; }
+.hand-card .art-box { max-width: none; }
+.hand-strip { border: 1px solid var(--brass); border-radius: var(--radius); padding: 8px 12px; background: rgba(201, 162, 79, .06); }
+.hand-strip summary { cursor: pointer; color: var(--brass-hi); font-weight: 600; letter-spacing: .08em; }
+.hand-strip[open] summary { margin-bottom: 10px; }
+.hand-strip .hand-body { max-height: 260px; }
+.tag-hand { margin-left: auto; margin-right: 8px; font-size: .75rem; color: var(--brass-hi); border: 1px solid var(--brass); border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
+.btn.hold { border-color: var(--brass); color: var(--brass-hi); }
+.btn.hold[aria-pressed="true"] { background: var(--brass); color: var(--brass-ink); border-color: var(--brass-hi); }
+html:lang(en) .hand-card .paper.hand { font-size: 1.2rem; line-height: 1.4; }
+html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }
+@media (max-width: 960px) {
+  .hand-cards { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
+@media (max-width: 520px) {
+  .hand-cards { grid-template-columns: minmax(0, 1fr); }
+  .hand-body { max-height: 300px; }
 }

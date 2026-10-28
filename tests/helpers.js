@@ -178,8 +178,25 @@ function vetDarkroomPath(P, { dryingLine = true } = {}) {
   P.solve('develop', G.DEVELOP_ANSWER_V);
 }
 
+// 大師模式主線：和資深相同，只是音樂盒要用星盤的解答（每個撥兩下再回到最高的那個）
+function masterMainPath(P) {
+  const real = G.MUSIC_ANSWER;
+  const orig = P.solve;
+  P.solve = (pz, ans) => orig(pz, pz === 'musicbox' && ans === real ? G.MUSIC_ANSWER_M : ans);
+  try { vetMainPath(P); } finally { P.solve = orig; }
+}
+
+// 大師模式：嵌好三枚徽章、找到並打開水道（要讀過剪報，並有日記三或底片）
+function masterTunnel(P) {
+  const goTo = room => { if (P.s.room !== room) P.go(room); };
+  if (!G.allInserted(P.s)) { goTo('foyer'); insertAll(P); }
+  goTo('study'); P.look('s_clipping');
+  goTo('storeroom'); P.look('t_shelf'); P.look('t_tunnel');
+  P.solve('tunnel', G.TUNNEL_CODE);
+}
+
 function insertAll(P) {
   for (const e of G.EMBLEMS) P.use(e, 'f_door');
 }
 
-module.exports = { G, create, makeGame, mainPath, darkroomPath, vetMainPath, vetDarkroomPath, insertAll, MIRROR_SOLUTION, VALVE_SOLUTION, txt, zh };
+module.exports = { G, create, makeGame, mainPath, darkroomPath, vetMainPath, vetDarkroomPath, masterMainPath, masterTunnel, insertAll, MIRROR_SOLUTION, VALVE_SOLUTION, txt, zh };

@@ -312,7 +312,7 @@
     <polygon points="560,300 640,300 610,246 590,246" fill="url(#st-cone)"/>
     ${H(v, 's_desk', `<rect x="356" y="300" width="288" height="18" fill="url(#st-wood)"/><rect x="356" y="300" width="288" height="2" fill="#8a6a32" opacity=".6"/>
       <rect x="380" y="292" width="200" height="8" fill="#2f4a3a" opacity=".85"/>
-      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>${v.s.mode === 'veteran' ? `<path d="M462 300 q0 -12 10 -12 q10 0 10 12 z" fill="url(#fy-brass)"/><circle cx="472" cy="286" r="2.5" fill="#c9a24f"/>` : ''}`}
+      ${f.gridTaken ? '' : `<rect x="430" y="286" width="48" height="16" fill="#e8e1cc" transform="skewX(-25)"/>${G.isAdv(v.s.mode) ? `<path d="M462 300 q0 -12 10 -12 q10 0 10 12 z" fill="url(#fy-brass)"/><circle cx="472" cy="286" r="2.5" fill="#c9a24f"/>` : ''}`}
       <rect x="500" y="288" width="40" height="12" fill="#c9bfa4" transform="skewX(-20)"/>
       <rect x="392" y="280" width="34" height="8" fill="#5b3a2a"/><rect x="394" y="272" width="30" height="8" fill="#3e4a5e"/>
       <path d="M548 300 l-4 -12 h14 l-4 12 z" fill="#1d1d22"/><path d="M552 290 l18 -30" stroke="#e8e1cc" stroke-width="2"/><path d="M566 262 q10 -6 8 4 q-6 6 -8 -4" fill="#e8e1cc"/>
@@ -332,7 +332,7 @@
   /* ---------------- 溫室 ---------------- */
   function greenhouse(v) {
     const f = v.s.flags;
-    const vet = v.s.mode === 'veteran';
+    const vet = G.isAdv(v.s.mode);
     const bloom = f.moonTaken || (f.waterOk && f.lightOk);
     const r = rng(73);
     let drops = '';
@@ -501,7 +501,7 @@
   function darkroom(v) {
     const f = v.s.flags;
     const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K') };
-    const vet = v.s.mode === 'veteran';
+    const vet = G.isAdv(v.s.mode), master = v.s.mode === 'master';
     if (!f.darkroomLit) {
       const r = rng(5);
       let dust = '';
@@ -533,11 +533,12 @@
     ${H(v, 'd_vent', `<rect x="820" y="40" width="90" height="50" fill="#050101"/><path d="M820 40 L910 40 L910 72 L882 90 L820 90 Z" fill="#140404"/>${[50, 60, 70].map(y => `<line x1="826" y1="${y}" x2="${y < 72 ? 904 : 896}" y2="${y}" stroke="#2a0806" stroke-width="2"/>`).join('')}<path d="M882 90 L910 72 L910 90 Z" fill="#050101"/>${headlights ? `<circle cx="901" cy="85" r="7" fill="#ffe9a8" opacity=".25"/><circle cx="897" cy="86" r="2" fill="#ffe9a8"/><circle cx="905" cy="86" r="2" fill="#ffe9a8"/>` : ''}<path d="M882 90 L910 72" stroke="#3a0d0a" stroke-width="2"/>${hit(814, 34, 102, 62)}`)}
     ${H(v, 'd_shelf', vet
       ? `<rect x="700" y="250" width="240" height="10" fill="#3a0d0a"/><rect x="700" y="250" width="240" height="2" fill="#6a2018"/>
-        ${G.BOTTLES_V.map((b, i) => `<rect x="${708 + i * 38}" y="198" width="26" height="52" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${711 + i * 38}" y="202" width="5" height="42" fill="#ff6a50" opacity=".15"/><rect x="${710 + i * 38}" y="188" width="22" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${721 + i * 38}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
+        ${G.BOTTLES_V.map((b, i) => `<rect x="${708 + i * 38}" y="198" width="26" height="52" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${711 + i * 38}" y="202" width="5" height="42" fill="#ff6a50" opacity=".15"/><rect x="${710 + i * 38}" y="188" width="22" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${721 + i * 38}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>${master && b.id === 'black' ? crustPath(708 + i * 38, 198, 26) : ''}`).join('')}
         <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(696, 180, 248, 126)}`
       : `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/><rect x="740" y="250" width="190" height="2" fill="#6a2018"/>
       ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${759 + i * 44}" y="200" width="5" height="44" fill="#ff6a50" opacity=".15"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
       <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(736, 180, 198, 126)}`)}
+    ${H(v, 'd_card2', `<g transform="rotate(-5 750 136)"><rect x="722" y="110" width="58" height="50" fill="#efe2c4" opacity=".9"/><rect x="722" y="110" width="58" height="9" fill="#b0453a" opacity=".85"/><text x="770" y="155" text-anchor="end" font-size="13" fill="#9a3a2a" opacity=".55" class="t-mono">17</text>${[126, 134, 142].map(y => `<line x1="728" y1="${y}" x2="764" y2="${y}" stroke="#7a3a2a" stroke-width="1.4" opacity=".6"/>`).join('')}</g><circle cx="750" cy="112" r="2.5" fill="#8a929b"/>${hit(714, 102, 74, 66)}`)}
     ${H(v, 'd_chart', `<rect x="610" y="34" width="84" height="74" fill="#e8c8b8" opacity=".78" transform="rotate(2 652 71)"/><g transform="rotate(2 652 71)"><rect x="618" y="42" width="52" height="6" fill="#7a3a2a" opacity=".7"/>${[56, 66, 76, 86, 96].map(y => `<line x1="618" y1="${y}" x2="686" y2="${y}" stroke="#7a3a2a" stroke-width="1.5" opacity=".6"/>`).join('')}</g><circle cx="652" cy="36" r="2.5" fill="#8a929b"/>${hit(604, 28, 96, 86)}`)}
     ${H(v, 'd_tray', `<rect x="230" y="320" width="460" height="16" fill="#3a0d0a"/><rect x="230" y="320" width="460" height="2" fill="#6a2018"/><rect x="250" y="336" width="12" height="104" fill="#2a0806"/><rect x="658" y="336" width="12" height="104" fill="#2a0806"/>
       <rect x="236" y="250" width="10" height="70" fill="#2a0806"/><path d="M226 250 h40 v24 h-40 z" fill="#3a0d0a"/><rect x="238" y="274" width="16" height="10" fill="#1a0404"/><rect x="226" y="314" width="34" height="6" fill="#2a0806"/>
@@ -552,6 +553,8 @@
     const r = rng(91);
     let dust = '';
     for (let i = 0; i < 22; i++) dust += `<circle cx="${(400 + r() * 260).toFixed(1)}" cy="${(220 + r() * 220).toFixed(1)}" r="${(0.6 + r()).toFixed(1)}" fill="#e8dcc0" opacity="${(0.08 + r() * 0.2).toFixed(2)}"/>`;
+    // 大師：雜物架被插進地板的鐵栓卡住；三枚徽章歸位、架子推開後，露出老水道的鐵門
+    const master = v.s.mode === 'master', moved = master && !!f.tunnelFound, bolt = master && !moved && !G.allInserted(v.s);
     const tin = (x, y, body, lid, label) => `<rect x="${x}" y="${y}" width="26" height="30" rx="3" fill="${body}"/><rect x="${x - 1}" y="${y - 4}" width="28" height="6" rx="2" fill="${lid}"/><rect x="${x + 4}" y="${y + 10}" width="18" height="10" fill="#e8dcc0" opacity=".8"/><text x="${x + 13}" y="${y + 18.5}" text-anchor="middle" font-size="7" fill="#3b2a10">${label}</text>`;
     const drawers = [];
     for (let rr = 0; rr < 6; rr++) for (let c = 0; c < 4; c++) {
@@ -578,8 +581,15 @@
     <rect y="436" width="960" height="6" fill="#2a1d12"/>
     <!-- 月光 -->
     <polygon points="444,222 540,222 660,540 380,540" fill="url(#sr-moon)"/>${dust}
+    <!-- 大師：老水道的鐵門（雜物架推開之後才看得到） -->
+    ${moved ? `<rect x="92" y="250" width="100" height="186" fill="#0d0907"/><path d="M92 250 q50 -34 100 0" fill="#0d0907"/>` : ''}
+    ${H(v, 't_tunnel', `<path d="M100 436 L100 262 q42 -28 84 0 L184 436 Z" fill="#050403" stroke="#4a4f55" stroke-width="4"/>
+      ${f.tunnelOpen
+        ? `<path d="M100 262 L72 274 L72 432 L100 436 Z" fill="#2a2d31" stroke="#4a4f55" stroke-width="3"/>${[80, 88].map(x => `<line x1="${x}" y1="272" x2="${x}" y2="432" stroke="#4a4f55" stroke-width="3"/>`).join('')}<path d="M110 436 q32 -40 64 0" fill="#1a2a3a" opacity=".55"/><path d="M118 430 q24 -14 48 0" fill="none" stroke="#9ab6d8" stroke-width="1.5" opacity=".5"/>`
+        : `${[114, 128, 142, 156, 170].map(x => `<line x1="${x}" y1="${x === 142 ? 250 : 258}" x2="${x}" y2="436" stroke="#5a5f66" stroke-width="4"/>`).join('')}<line x1="100" y1="320" x2="184" y2="320" stroke="#5a5f66" stroke-width="4"/><rect x="132" y="330" width="22" height="26" rx="3" fill="#8a929b" stroke="#c7ccd4"/>${[0, 1, 2, 3, 4].map(i => `<rect x="${134 + i * 4}" y="340" width="3" height="9" fill="#1a1a1a"/>`).join('')}`}
+      ${hit(92, 236, 100, 204)}`)}
     <!-- 雜物架 -->
-    ${H(v, 't_shelf', `<rect x="30" y="110" width="140" height="322" fill="#2a1c12"/>${[150, 230, 310, 390].map(y => `<rect x="26" y="${y}" width="148" height="8" fill="#5a3d22"/>`).join('')}
+    ${H(v, 't_shelf', `<g ${moved ? 'transform="translate(-96 0)"' : ''}><rect x="30" y="110" width="140" height="322" fill="#2a1c12"/>${[150, 230, 310, 390].map(y => `<rect x="26" y="${y}" width="148" height="8" fill="#5a3d22"/>`).join('')}
       ${[44, 70, 96, 124].map((x, i) => `<rect x="${x}" y="${126 + (i % 2) * 4}" width="18" height="${24 - (i % 2) * 4}" rx="3" fill="${['#6b5a3a', '#4f6a5a', '#7a5a3a', '#5a5a6a'][i]}"/>`).join('')}
       <circle cx="70" cy="214" r="13" fill="none" stroke="#b59a5e" stroke-width="5"/><circle cx="70" cy="214" r="6" fill="none" stroke="#b59a5e" stroke-width="3"/>
       <rect x="104" y="196" width="50" height="34" fill="#4a3a22"/><path d="M104 196 l25 -10 l25 10" fill="#5a4630"/>
@@ -587,7 +597,8 @@
       <rect x="100" y="270" width="56" height="40" fill="#3a2a1a"/><rect x="104" y="274" width="48" height="10" fill="#6b5a3a"/>
       <path d="M40 390 h120 l-8 -40 h-104 z" fill="#4a3220"/>${[50, 76, 102, 128].map(x => `<ellipse cx="${x + 10}" cy="350" rx="11" ry="5" fill="#6b4a2c"/>`).join('')}
       <line x1="160" y1="120" x2="176" y2="420" stroke="#6b5a3a" stroke-width="5"/><path d="M168 118 l18 -10 l4 8 z" fill="#8a929b"/>
-      ${hit(26, 104, 160, 330)}`)}
+      ${bolt ? `<rect x="92" y="424" width="12" height="18" rx="2" fill="#8a929b" stroke="#c7ccd4"/><rect x="88" y="420" width="20" height="5" rx="2" fill="#5a5f66"/>` : ''}</g>
+      ${moved ? hit(0, 104, 92, 330) : hit(26, 104, 160, 330)}`)}
     <!-- 小窗：山谷對面的燈 -->
     ${H(v, 't_window', `<rect x="436" y="124" width="112" height="104" fill="#3a2818" stroke="#5a3d22" stroke-width="5"/>
       <rect x="444" y="132" width="96" height="88" fill="#0b1226"/>${starfield(17, 14, 446, 134, 92, 46)}
@@ -1064,9 +1075,16 @@
       <path d="M150 1 l-10 -16 h20 z" fill="#7a1c14" stroke="#f3d68f" stroke-width="1"/></svg>`;
   }
 
-  function bottleSvg(b) {
-    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6', green: '#4f9a5b', black: '#1c1c1c', orange: '#e8873a', purple: '#8a5ac0' }[b.id];
-    return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="16" y="30" width="6" height="56" fill="#ff7a60" opacity=".15"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/></svg>`;
+  // crust：瓶口結了一圈褐色結晶（大師模式的黑蓋瓶——放久氧化的顯影液）
+  function bottleSvg(b, { crust = false } = {}) {
+    const cap = { red: '#d94a3a', blue: '#4f6fc0', yellow: '#e6b93a', white: '#f2ece6', green: '#4f9a5b', black: '#1c1c1c' }[b.id];
+    return `<svg viewBox="0 0 60 100" class="bottle" aria-hidden="true"><rect x="12" y="24" width="36" height="70" rx="8" fill="#3a1a14" stroke="#6a2a20" stroke-width="2"/><rect x="16" y="30" width="6" height="56" fill="#ff7a60" opacity=".15"/><rect x="18" y="8" width="24" height="18" rx="3" fill="${cap}" stroke="#2a0a08"/>${crust ? crustPath(12, 24, 36) : ''}</svg>`;
+  }
+  // 一圈不規則的褐色結晶，貼在瓶肩上（x、y 是瓶身左上角，w 是瓶身寬）
+  function crustPath(x, y, w) {
+    const k = w / 36;
+    return `<path d="M${x + 2 * k} ${y + 2 * k} q${4 * k} ${-4 * k} ${8 * k} 0 q${4 * k} ${-5 * k} ${8 * k} ${-1 * k} q${4 * k} ${-4 * k} ${8 * k} 0 q${4 * k} ${-4 * k} ${8 * k} ${1 * k} l0 ${5 * k} q${-4 * k} ${3 * k} ${-8 * k} 0 q${-4 * k} ${4 * k} ${-8 * k} 0 q${-4 * k} ${3 * k} ${-8 * k} 0 q${-4 * k} ${3 * k} ${-8 * k} 0 z" fill="#8a5a2a"/>` +
+      [[8, 7, 1.6], [21, 8, 1.3], [30, 6, 1.5]].map(([dx, dy, r]) => `<circle cx="${x + dx * k}" cy="${y + dy * k}" r="${r * k}" fill="#c08a46"/>`).join('');
   }
 
   /* ------------------------------------------------------------

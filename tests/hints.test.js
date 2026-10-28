@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { G, create, makeGame, VALVE_SOLUTION } = require('./helpers');
 const { textProblem } = require('./solver');
 
-const forMode = (h, mode) => !h.mode || h.mode === mode;
+const forMode = (h, mode) => G.modeOk(mode, h);
 
 function recorder(mode) {
   const P = makeGame(mode);
@@ -158,8 +158,8 @@ test('［資深］提示依階段分組：目前階段的提示排在最前面',
 
 test('每一則提示都標明「第幾段會公布答案」，而且答案不會提早出現在前面的段落', () => {
   // 各謎題答案的關鍵字：只能出現在 answerAt 那一段（含）之後
-  const ANSWERS = [G.DRAWER_CODE, G.SAFE_CODE, G.SEED_CODE, G.TRAPDOOR_CODE, '3:15', '3 點 15', '5、8、10', '鼠尾草盆', '答案是玫瑰盆', 'V2、V4、V5', '黃 → 白', '紫 → 黑', '外環＝鑰', 'H→J→K', 'A→B→C'];
-  for (const mode of ['novice', 'veteran']) {
+  const ANSWERS = [G.DRAWER_CODE, G.SAFE_CODE, G.SEED_CODE, G.TRAPDOOR_CODE, G.TUNNEL_CODE, '3:15', '3 點 15', '5、8、10', '6、6、5', '鼠尾草盆', '答案是玫瑰盆', 'V2、V4、V5', '黃 → 白', '黑 → 紅', '外環＝鑰', 'H→J→K', 'A→B→C', '查看「雜物架」', '是韓嶽偽造的'];
+  for (const mode of G.MODES) {
     const E = create(G);
     const s = E.newState(mode);
     for (const h of G.hints) {
@@ -177,4 +177,66 @@ test('每一則提示都標明「第幾段會公布答案」，而且答案不�
   const drawer = P.E.hintList(P.s).find(h => h.id === 'drawer');
   assert.equal(drawer.answerAt, 3);
   assert.equal(G.hints.find(h => h.id === 'diary').answer, 1);
+});
+
+/* ================= 大師模式 ================= */
+
+test('［大師］完整玩一遍時，每一個大師適用的提示都會在某個時刻出現；資深專用的版本不會出現', () => {
+  const { P, seen } = recorder('master');
+  P.look('f_coat');
+  P.go('study'); P.look('s_shelf'); P.look('s_clipping'); P.look('s_drawer');
+  P.solve('drawer', G.DRAWER_CODE);
+  P.combine('flashlight_dead', 'battery');
+  P.look('s_desk'); P.look('s_painting'); P.look('s_waste');
+  P.go('foyer'); P.look('f_clock'); P.look('f_hatch');
+  P.use('greenhouse_key', 'f_gh_door');
+  P.go('greenhouse'); P.look('g_valves'); P.look('g_pots'); P.look('g_tools'); P.look('g_storedoor');
+  P.go('study'); P.use('flashlight', 's_fireplace');
+  P.go('greenhouse'); P.use('storeroom_key', 'g_storedoor');
+  P.go('storeroom'); P.look('t_balance'); P.look('t_cabinet'); P.look('t_calendar'); P.look('t_shelf');
+  P.solve('seedlock', G.SEED_CODE);
+  P.go('foyer'); P.use('hook_pole', 'f_hatch');
+  P.go('attic'); P.look('a_chest'); P.look('a_photobox'); P.look('a_marks'); P.look('a_window');
+  P.solve('photos', G.PHOTO_ORDER);
+  P.use('crank', 'a_musicbox');
+  P.go('storeroom'); P.solve('signal', ['.-.']); P.solve('signal', ['---', '...']);
+  P.go('greenhouse'); P.solve('pots', G.POT_ANSWER_V);
+  P.use('flashlight', 'g_bench');
+  P.go('foyer'); P.use('brass_key', 'f_gate');
+  P.go('observatory'); P.look('o_telescope'); P.look('o_dial'); P.look('o_poster');
+  P.use('flashlight', 'o_under'); P.use('eyepiece', 'o_telescope');
+  P.solve('dome', 'SE'); P.solve('dial', G.DIAL_ANSWER);
+  P.look('o_cabinet'); P.look('o_log'); P.look('o_almanac'); P.look('o_lamp');
+  P.go('attic'); P.solve('musicbox', G.MUSIC_ANSWER_M);
+  P.combine('grid_paper', 'transparency'); P.combine('note_left', 'note_right');
+  P.go('foyer'); P.solve('clock', G.CLOCK_ANSWER);
+  P.go('study'); P.solve('safe', G.SAFE_CODE);
+  P.go('greenhouse'); P.solve('skylight', G.MIRROR_SOLUTION_V);
+  P.use('valve_wheel', 'g_valves'); P.solve('valves', VALVE_SOLUTION);
+  P.look('g_moonflower');
+  P.solve('trapdoor', G.TRAPDOOR_CODE); P.go('darkroom');
+  P.use('red_bulb', 'd_socket'); P.look('d_shelf'); P.look('d_card2'); P.look('d_chart'); P.look('d_line');
+  P.solve('develop', G.DEVELOP_ANSWER_V);
+  P.go('foyer'); P.solve('phone', 'refuse');
+  for (const e of G.EMBLEMS) P.use(e, 'f_door');
+  P.go('storeroom'); P.look('t_shelf'); P.look('t_tunnel');
+  P.solve('tunnel', G.TUNNEL_CODE);
+  const want = G.hints.filter(h => forMode(h, 'master')).map(h => h.id);
+  assert.deepEqual(want.filter(id => !seen.has(id)), []);
+  const vetOnly = G.hints.filter(h => h.upTo === 'veteran').map(h => h.id);
+  assert.ok(vetOnly.length >= 4);
+  assert.deepEqual(vetOnly.filter(id => seen.has(id)), [], '被大師版本取代的資深提示不應出現');
+  assert.equal(P.solve('escape', 'publish').ending, 'B');
+});
+
+test('［大師］「還沒仔細看過的地方」也會列出資深的物件；嵌好徽章之前，提示不會預告老水道', () => {
+  const { P } = recorder('master');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.look('s_clipping'); P.look('s_drawer');
+  P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('s_desk'); P.look('s_painting'); P.look('s_waste');
+  // 書房裡只剩資深才有意義的煙囪（藏著儲物間鑰匙）
+  const explore = P.E.hintList(P.s).find(h => h.id === 'explore');
+  assert.ok(explore && /煙囪|壁爐/.test(explore.texts.map(t => t.zh).join() + G.hotspots.find(h => h.id === 's_fireplace').name.zh));
+  const all = () => P.E.hintList(P.s).map(h => h.title.zh + h.title.en + h.texts.map(t => t.zh + t.en).join()).join(' ');
+  assert.ok(!/水道|channel/i.test(all()), '還沒嵌好徽章時，提示不會提到老水道');
 });

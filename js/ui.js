@@ -34,6 +34,11 @@
   // 變數本身是 HTML（例如 <strong>）時用這個：只跳脫範本
   const TH = (key, html) => I.fmt(esc(I.tr(I.UI[key], LANG)), html);
   const cap = s => (LANG === 'en' && s ? s[0].toUpperCase() + s.slice(1) : s);
+  // 難度名稱（雙語原文，可以直接當作 T 的變數）
+  const MODE_KEY = { novice: 'modeNovice', veteran: 'modeVeteran', master: 'modeMaster' };
+  const MODE_DESC = { novice: 'modeNoviceDesc', veteran: 'modeVeteranDesc', master: 'modeMasterDesc' };
+  const modeL = m => I.UI[MODE_KEY[m] || 'modeNovice'];
+  const modeName = m => tr(modeL(m));
   const joinL = arr => {
     const out = {};
     for (const l of I.LANGS) out[l] = arr.map(x => I.tr(x, l)).join(I.tr(I.UI.listSep, l));
@@ -107,9 +112,11 @@
     tutPending: false,    // 開場的信關上之後才開始教學
     hintPulse: false,     // 完成一個階段後，提示按鈕會亮起來，直到玩家打開它
     modeTut: null,
+    handKey: null,        // 「拿在手上」上次畫的內容（沒變就不重畫，保留捲動位置）
+    handStripOpen: true,  // 謎題視窗裡「手上的文件」是否展開
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null, hintAsk: null };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null, hintAsk: null, devConfirm: false };
   }
 
   /* ================= 畫面切換 ================= */
@@ -288,7 +295,7 @@
     if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'nearest' });
     el.hidden = false;
     $('tut-count').textContent = T('tutStep', { i: app.tut + 1, n: TUT.length });
-    $('tut-text').textContent = T(step.key) + (step.key === 'tut5' && app.s.mode === 'veteran' ? (LANG === 'en' ? ' ' : '') + T('tut5v') : '');
+    $('tut-text').textContent = T(step.key) + (step.key === 'tut5' && G.isAdv(app.s.mode) ? (LANG === 'en' ? ' ' : '') + T('tut5v', { mode: modeL(app.s.mode) }) : '');
     $('tut-next').hidden = !!step.until;
     $('tut-next').textContent = T(app.tut === TUT.length - 1 ? 'tutDone' : 'tutNext');
     $('tut-skip').textContent = T('tutSkip');
@@ -409,7 +416,7 @@
   }
 
   function submit(pid, answer, { closeOnSolve = true } = {}) {
-    if (pid === 'exit' || (pid === 'phone' && answer === 'accept')) checkpoint();
+    if (pid === 'exit' || pid === 'escape' || (pid === 'phone' && answer === 'accept')) checkpoint();
     const r = act(() => E.submit(app.s, pid, answer), { noOpen: true });
     if (!r || r.ending) return r;
     app.ui.confirm = null;
@@ -440,9 +447,10 @@
     $('chip-plate').hidden = !p.plate;
     $('chip-plate').classList.toggle('on', p.plate);
     $('chip-time').textContent = fmtTime(s.stats.playMs);
-    $('chip-mode').textContent = T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice');
-    $('chip-mode').title = T('modeChip', { mode: T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice') });
+    $('chip-mode').textContent = modeName(s.mode);
+    $('chip-mode').title = T('modeChip', { mode: modeL(s.mode) });
     $('chip-mode').classList.toggle('vet', s.mode === 'veteran');
+    $('chip-mode').classList.toggle('master', s.mode === 'master');
     const st = E.stage(s), locked = E.hintsLocked(s);
     $('hint-label').textContent = locked ? T('hintsBtnLocked') : T('hintsBtn', { n: st.index + 1, total: st.total });
     $('btn-hints').classList.toggle('locked', locked);
@@ -453,13 +461,14 @@
     renderNav();
     renderInventory();
     renderLog();
+    renderHand();
     $('narration').innerHTML = app.latest.map(m => msgHtml(m)).join('');
     renderTutorial();
   }
 
   function visible(id) {
     const h = E.hotspot(id);
-    return !!h && h.room === app.s.room && (!h.visible || !!h.visible(app.s));
+    return !!h && h.room === app.s.room && G.modeOk(app.s.mode, h) && (!h.visible || !!h.visible(app.s));
   }
   function renderScene() {
     const wrap = $('scene').parentElement;
@@ -574,7 +583,11 @@
     const V = VIEWS[view.view];
     const out = V ? V(view) : { title: '?', html: `<p>${tx('missingView')}</p>` };
     $('modal-title').textContent = out.title;
-    $('modal-body').innerHTML = out.html;
+    keepScroll($('modal-body'), () => { $('modal-body').innerHTML = out.html + handStrip(view.view); });
+    const strip = $('modal-body').querySelector('.hand-strip');
+    if (strip) strip.addEventListener('toggle', () => { app.handStripOpen = strip.open; Store.setSetting('handStrip', strip.open ? '1' : '0'); });
+    $('modal-body').querySelectorAll('[data-hold]').forEach(b => { b.onclick = () => toggleHand(b.dataset.hold); });
+    $('modal-body').querySelectorAll('[data-unhold]').forEach(b => { b.onclick = () => toggleHand(b.dataset.unhold); });
     $('modal').dataset.view = view.view;
     $('modal-back-btn').hidden = app.stack.length < 2;
     back.hidden = false;
@@ -587,7 +600,57 @@
   function docView(id) {
     const d = G.docs[id];
     if (d.view) return VIEWS[d.view]({});
-    return { title: tr(d.title), html: paper(d) };
+    return { title: tr(d.title), html: paper(d) + holdButton(id) };
+  }
+
+  /* ================= 拿在手上 ================= */
+  // 最多三份文件攤在畫面最下方；解謎的視窗裡也看得到（不必在筆記和謎題之間來回切換）
+  function noteTranscript(head = '') {
+    const all = G.noteLines(app.s.mode), lines = (all[LANG] || all.zh).map(l => l[0] + l[1]).filter(Boolean);
+    return `<div class="paper hand">${head}<p>${lines.map(esc).join('<br>')}</p></div>`;
+  }
+  const handTitle = id => tr(id === 'note_full' ? E.itemName(app.s, id) : G.docs[id].title);
+  const handBody = id => {
+    const d = G.docs[id];
+    if (!d) return noteTranscript();
+    return d.view ? `<div class="art-box">${Art[d.view]()}</div>` : paper(d);
+  };
+  const handCard = id => `<article class="hand-card"><header><h3>${esc(handTitle(id))}</h3><button class="btn small ghost" type="button" data-unhold="${id}" aria-label="${tx('handDropAria', { doc: handTitle(id) })}">${tx('handDropShort')}</button></header>
+    <div class="hand-body" data-hand-id="${id}" tabindex="0" role="region" aria-label="${esc(handTitle(id))}">${handBody(id)}</div></article>`;
+  function holdButton(id) {
+    if (!app.s || app.screen !== 'game' || !G.holdable(id)) return '';
+    const held = app.s.hand.includes(id), full = !held && app.s.hand.length >= E.HAND_MAX;
+    const label = held ? T('handDrop') : full ? T('handHoldSwap', { doc: handTitle(app.s.hand[0]) }) : T('handHold');
+    return center(`<button class="btn small hold" type="button" data-hold="${id}" aria-pressed="${held}">${esc(label)}</button>`);
+  }
+  function toggleHand(id) {
+    E.toggleHand(app.s, id);
+    autosave();
+    renderHand();
+    if (app.stack.length) renderModal();
+  }
+  // 重畫時保留每份文件捲動到的位置（長的日誌常常要捲到中間才看得到重點）
+  function keepScroll(root, draw) {
+    const pos = {};
+    root.querySelectorAll('[data-hand-id]').forEach(el => { pos[el.dataset.handId] = el.scrollTop; });
+    draw();
+    root.querySelectorAll('[data-hand-id]').forEach(el => { if (pos[el.dataset.handId]) el.scrollTop = pos[el.dataset.handId]; });
+  }
+  function renderHand() {
+    if (!app.s) return;
+    const hand = app.s.hand, key = [LANG, app.s.mode, ...hand].join('|');
+    if (app.handKey === key) return;
+    app.handKey = key;
+    $('hand').classList.toggle('empty', !hand.length);
+    keepScroll($('hand'), () => {
+      $('hand-cards').innerHTML = hand.length ? hand.map(handCard).join('') : `<p class="hand-empty">${tx('handEmpty')}</p>`;
+    });
+  }
+  // 謎題視窗底部的「手上的文件」（讀文件、看物品、選單之類的視窗不需要）
+  const NO_HAND_STRIP = new Set(['doc', 'item', 'notes', 'hints', 'menu', 'save', 'load', 'help', 'gallery', 'mode', 'exit', 'phone']);
+  function handStrip(view) {
+    if (!app.s || app.screen !== 'game' || NO_HAND_STRIP.has(view) || !app.s.hand.length) return '';
+    return `<details class="hand-strip" ${app.handStripOpen ? 'open' : ''}><summary>${tx('handStrip', { n: app.s.hand.length })}</summary><div class="hand-cards">${app.s.hand.map(handCard).join('')}</div></details>`;
   }
 
   function itemContent(id) {
@@ -599,13 +662,10 @@
       case 'overlay': return `<div class="art-box narrow">${Art.gridSvg({ digits: true, stars: true })}</div><p class="lead">${tx('overlayLead')}</p>`;
       case 'note_left': return `<div class="art-box narrow">${Art.note('left', app.s.mode)}</div><p class="lead">${tx('noteLeftLead')}</p>`;
       case 'note_right': return `<div class="art-box narrow">${Art.note('right', app.s.mode)}</div><p class="lead">${tx('noteRightLead')}</p>`;
-      case 'note_full': {
-        const all = G.noteLines(app.s.mode), lines = (all[LANG] || all.zh).map(l => l[0] + l[1]).filter(Boolean);
-        return `<div class="art-box">${Art.note('full', app.s.mode)}</div><div class="paper hand"><h3>${tx('transcript')}</h3><p>${lines.map(esc).join('<br>')}</p></div>`;
-      }
+      case 'note_full': return `<div class="art-box">${Art.note('full', app.s.mode)}</div>${noteTranscript(`<h3>${tx('transcript')}</h3>`)}`;
       case 'diary': {
         const pages = app.s.flags.diaryPages || [];
-        return pages.map(p => paper(G.docs[p], `<h3>${esc(tr(G.docs[p].title))}</h3>`)).join('') +
+        return pages.map(p => paper(G.docs[p], `<h3>${esc(tr(G.docs[p].title))}</h3>`) + holdButton(p)).join('') +
           `<p class="lead">${pages.length < 4 ? tx('diaryMissing', { n: 4 - pages.length }) : tx('diaryComplete')}</p>`;
       }
       case 'plate': return `<div class="art-box narrow" style="max-width:440px">${Art.plate()}</div><p class="lead">${tx('plateLead')}</p>`;
@@ -626,7 +686,7 @@
       const held = app.s && app.s.inv.includes(id);
       return {
         title: tr(E.itemName(app.s, id)),
-        html: `<p class="lead">${esc(tr(it.desc))}</p>${itemContent(id)}
+        html: `<p class="lead">${esc(tr(it.desc))}</p>${itemContent(id)}${holdButton(it.doc || id)}
           ${held ? center(`<button class="btn" type="button" data-act="hold">${tx('holdIt')}</button><button class="btn" type="button" data-act="combine">${tx('combineWith')}</button>`) : ''}`,
         bind(root) {
           const hold = root.querySelector('[data-act=hold]');
@@ -639,12 +699,12 @@
 
     bookshelf: () => ({
       title: T('shelfTitle'),
-      html: `<p class="lead">${tx('shelfLead')}</p><div class="art-box">${Art.bookshelf()}</div>`,
+      html: `<p class="lead">${tx('shelfLead')}</p><div class="art-box">${Art.bookshelf()}</div>${holdButton('bookshelf')}`,
     }),
 
     poster: () => ({
       title: tr(G.docs.poster.title),
-      html: `<p class="lead">${tx('posterLead')}</p><div class="art-box">${Art.poster()}</div>`,
+      html: `<p class="lead">${tx('posterLead')}</p><div class="art-box">${Art.poster()}</div>${holdButton('poster')}`,
     }),
 
     eyepiece: () => {
@@ -718,7 +778,8 @@
         },
         keys(e) {
           if (/^[0-9]$/.test(e.key)) { cur.shift(); cur.push(+e.key); app.ui.feedback = []; renderModal(); return true; }
-          if (e.key === 'Enter' && !(e.target && e.target.tagName === 'BUTTON')) { submit(id, cur.join('')); return true; }
+          // 焦點在按鈕或「手上的文件」上時，Enter 照常按下它們
+          if (e.key === 'Enter' && !(e.target && /^(BUTTON|SUMMARY)$/.test(e.target.tagName))) { submit(id, cur.join('')); return true; }
           return false;
         },
       };
@@ -726,7 +787,7 @@
 
     pots: () => {
       const trowel = app.s.inv.includes('trowel');
-      const vet = app.s.mode === 'veteran';
+      const vet = G.isAdv(app.s.mode);
       const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'];
       const head = vet ? 3 : 2; // 資深模式多一行：挖錯三盆就失敗
       // 資深模式：剩下幾次機會；最後一次要再確認一次，避免手滑
@@ -781,7 +842,7 @@
     },
 
     mirrors: () => {
-      const vet = app.s.mode === 'veteran';
+      const vet = G.isAdv(app.s.mode);
       const grid = vet ? G.MIRROR_GRID_V : G.MIRROR_GRID;
       const cfg = Object.assign({}, grid.initial, app.s.puz.mirrors);
       const hit = G.traceBeam(cfg, grid).hit;
@@ -839,23 +900,34 @@
       const V = G.variant(app.s), steps = V.developAnswer.length;
       const name = id => tr(V.bottles.find(b => b.id === id).name);
       const hasNote = app.s.inv.includes('note_full');
+      const adv = G.isAdv(app.s.mode), master = app.s.mode === 'master';
+      // 大師：避光盒裡只有三張廢片；倒數顯示在畫面上，最後一張要再確認一次
+      const left = G.DEV_MISS_LIMIT - (app.s.flags.devMisses || 0);
+      const confirm = master && app.ui.devConfirm && seq.length >= steps;
       return {
         title: T('devTitle'),
         html: `<p class="lead">${tx(V.bottles.length > steps ? 'devLeadV' : 'devLead')}</p>
-          <div class="bottles ${V.bottles.length > 4 ? 'six' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
+          ${master ? `<p class="notice ${left === 1 ? 'warn' : ''}" role="status">${tx(left === 1 ? 'devFilmsLast' : 'devFilms', { n: left, total: G.DEV_MISS_LIMIT })}</p>` : ''}
+          <div class="bottles ${V.bottles.length > 4 ? 'six' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b, { crust: master && b.id === 'black' })}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
           <div class="slots">${[...Array(steps).keys()].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
-          ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
-          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}${app.s.mode === 'veteran' ? `<button class="btn small" type="button" data-chart="1">${tx('readChart')}</button>` : ''}`)}`,
+          ${confirm
+            ? `<div class="confirm"><p style="margin:0"><strong>${tx('devConfirm')}</strong></p>
+                <div class="row"><button class="btn danger" type="button" data-act="dev-yes">${tx('devConfirmYes')}</button><button class="btn" type="button" data-act="dev-no" data-autofocus>${tx('thinkAgain')}</button></div></div>`
+            : center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
+          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${master ? `<button class="btn small" type="button" data-card2="1">${tx('readCard2')}</button>` : ''}${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}${adv ? `<button class="btn small" type="button" data-chart="1">${tx('readChart')}</button>` : ''}`)}`,
         bind(root) {
+          const go = () => { app.ui.devConfirm = false; const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r && !r.ending) renderModal(); };
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
-          root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
-          root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
+          const on = (sel, f) => { const b = root.querySelector(sel); if (b) b.onclick = f; };
+          on('[data-act=clear]', () => { seq.length = 0; app.ui.feedback = []; renderModal(); });
+          on('[data-act=go]', () => { if (master && left === 1) { app.ui.devConfirm = true; app.ui.feedback = []; renderModal(true); } else go(); });
+          on('[data-act=dev-yes]', go);
+          on('[data-act=dev-no]', () => { app.ui.devConfirm = false; renderModal(true); });
           // 透過「查看藥瓶架」讀卡片，遊戲才會記得你讀過（沖洗台要讀過卡片才能作答）
-          root.querySelector('[data-doc]').onclick = () => act(() => E.interact(app.s, 'd_shelf'));
-          const chart = root.querySelector('[data-chart]');
-          if (chart) chart.onclick = () => act(() => E.interact(app.s, 'd_chart'));
-          const n = root.querySelector('[data-note]');
-          if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
+          on('[data-doc]', () => act(() => E.interact(app.s, 'd_shelf')));
+          on('[data-card2]', () => act(() => E.interact(app.s, 'd_card2')));
+          on('[data-chart]', () => act(() => E.interact(app.s, 'd_chart')));
+          on('[data-note]', () => openView({ view: 'item', id: 'note_full' }));
         },
       };
     },
@@ -886,14 +958,18 @@
       };
     },
 
-    exit: () => {
+    // 大門；大師模式的老水道也用這個畫面（via: 'tunnel'），送出的謎題是 escape
+    exit: ({ via }) => {
       const s = app.s, plate = s.inv.includes('plate'), pages = E.pageCount(s);
-      const opts = plate ? [['publish', 'exitPublish'], ['leave_plate', 'exitLeavePlate']] : [['leave', 'exitLeave']];
+      const tunnel = via === 'tunnel';
+      const opts = plate ? [['publish', 'exitPublish'], ['leave_plate', 'exitLeavePlate']] : [['leave', tunnel ? 'tunnelLeave' : 'exitLeave']];
       const c = app.ui.confirm;
       const label = c && opts.find(o => o[0] === c);
+      // 大師：韓嶽的車一直停在門外（沖出底片或接過電話之後，從大門縫看得見）
+      const lead = tunnel ? 'tunnelLead' : s.mode === 'master' && (plate || s.flags.phoneDone) ? 'exitLeadM' : 'exitLead';
       return {
-        title: T('exitTitle'),
-        html: `<p class="lead">${tx('exitLead')}</p>
+        title: T(tunnel ? 'tunnelTitle' : 'exitTitle'),
+        html: `<p class="lead">${tx(lead)}</p>
           <p class="lead">${tx('exitCarrying', { n: pages, plate: plate ? T('exitCarryingPlate') : '' })}</p>
           ${label
             ? `<div class="confirm"><p style="margin:0">${tx('exitConfirm', { choice: T(label[1]) })}</p>
@@ -903,7 +979,7 @@
         bind(root) {
           root.querySelectorAll('[data-choice]').forEach(b => { b.onclick = () => { app.ui.confirm = b.dataset.choice; renderModal(true); }; });
           const yes = root.querySelector('[data-yes]');
-          if (yes) yes.onclick = () => submit('exit', yes.dataset.yes);
+          if (yes) yes.onclick = () => submit(tunnel ? 'escape' : 'exit', yes.dataset.yes);
           const no = root.querySelector('[data-act=no]');
           if (no) no.onclick = () => { app.ui.confirm = null; renderModal(true); };
           const stay = root.querySelector('[data-act=stay]');
@@ -917,7 +993,7 @@
       return {
         title: T('notesTitle'),
         html: `<p class="lead">${tx('notesLead')}</p>
-          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(tr(G.docs[id].title))}</span><span aria-hidden="true">›</span></button>`).join('')}</div>`,
+          <div class="list">${notes.map(id => `<button class="btn" type="button" data-note="${id}"><span>${esc(tr(G.docs[id].title))}</span>${app.s.hand.includes(id) ? `<span class="tag-hand">${tx('handHeld')}</span>` : ''}<span aria-hidden="true">›</span></button>`).join('')}</div>`,
         bind(root) {
           root.querySelectorAll('[data-note]').forEach(b => { b.onclick = () => openView(b.dataset.note === 'letter' ? { view: 'item', id: 'letter' } : { view: 'doc', id: b.dataset.note }); });
         },
@@ -929,7 +1005,7 @@
       const head = `<div class="stage-head"><p class="stage-n">${tx('hintsStage', { n: st.index + 1, total: st.total, title: st.stage.title })}</p>
         <p class="stage-goal">${tx('hintsGoal', { goal: st.stage.goal })}</p>
         <div class="stage-bar" aria-hidden="true">${st.ids.map((id, i) => `<span class="${i < st.index ? 'done' : i === st.index ? 'cur' : ''}"></span>`).join('')}</div></div>`;
-      if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked')}</p>` };
+      if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked', { mode: modeL(app.s.mode) })}</p>` };
       const list = E.hintList(app.s);
       // 每一段提示都要先確認；下一段會公布答案時，確認框是閃動的紅色
       const ask = app.ui.hintAsk && list.find(h => h.id === app.ui.hintAsk && h.level < h.max);
@@ -969,11 +1045,11 @@
       const auto = Store.read('auto');
       const live = auto && auto.state && !auto.state.ending;
       const tut = app.modeTut != null ? app.modeTut : Store.getSetting('tutorialSeen') !== '1';
-      const card = m => `<div class="mode-card mode-${m}"><h3>${tx(m === 'veteran' ? 'modeVeteran' : 'modeNovice')}</h3><p>${tx(m === 'veteran' ? 'modeVeteranDesc' : 'modeNoviceDesc')}</p>
-        <button class="btn ${m === 'novice' ? 'primary' : 'vet'}" type="button" data-mode="${m}" ${m === 'novice' ? 'data-autofocus' : ''}>${tx('modeStart', { mode: T(m === 'veteran' ? 'modeVeteran' : 'modeNovice') })}</button></div>`;
+      const card = m => `<div class="mode-card mode-${m}"><h3>${esc(modeName(m))}</h3><p>${tx(MODE_DESC[m])}</p>
+        <button class="btn ${m === 'novice' ? 'primary' : m === 'master' ? 'master' : 'vet'}" type="button" data-mode="${m}" ${m === 'novice' ? 'data-autofocus' : ''}>${tx('modeStart', { mode: modeL(m) })}</button></div>`;
       return {
         title: T('modeTitle'),
-        html: `<div class="modes">${card('novice')}${card('veteran')}</div>
+        html: `<div class="modes">${G.MODES.map(card).join('')}</div>
           <label class="check"><input type="checkbox" id="tut-toggle" ${tut ? 'checked' : ''}> ${tx('tutorialToggle')}</label>
           ${live ? `<p class="notice warn">${tx('confirmNew')}</p>` : ''}`,
         bind(root) {
@@ -1144,7 +1220,7 @@
 
     gallery: () => {
       const got = Store.getEndings();
-      const vet = Store.getEndings('veteran');
+      const vet = Store.getEndings('veteran'), mas = Store.getEndings('master');
       const excerpt = s => {
         if (LANG !== 'en') return s.slice(0, 26) + '……';
         if (s.length <= 90) return s;
@@ -1156,7 +1232,11 @@
         html: `<p class="lead">${tx('galleryCount', { n: got.length, total: G.ENDING_ORDER.length })}</p>
           <div class="gallery">${G.ENDING_ORDER.map(id => {
             const e = G.endings[id], ok = got.includes(id);
-            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(e.text)[0]))}` : tx('galleryLocked')}</span>${vet.includes(id) ? `<span class="badge-vet" title="${tx('galleryVeteranTip')}">${tx('galleryVeteran')}</span>` : ''}</div>`;
+            // 只在大師模式出現的結局：未解鎖時就先標明，免得玩家在別的難度裡白找
+            const only = e.mode === 'master';
+            const badges = (vet.includes(id) && !only ? `<span class="badge-vet" title="${tx('galleryVeteranTip')}">${tx('galleryVeteran')}</span>` : '') +
+              (mas.includes(id) ? `<span class="badge-vet badge-master" title="${tx('galleryMasterTip')}">${tx('galleryMaster')}</span>` : '');
+            return `<div class="gal ${ok ? '' : 'locked'}"><span class="rk">${ok ? esc(tr(e.rank)) : tx('galleryUnknown')}</span><span>${ok ? `<strong>${esc(tr(e.title))}</strong> — ${esc(excerpt(tr(G.endingText(e, only ? 'master' : 'novice'))[0]))}` : tx(only ? 'galleryMasterOnly' : 'galleryLocked')}</span>${badges}</div>`;
           }).join('')}</div>`,
       };
     },
@@ -1298,7 +1378,7 @@
     const got = Store.getEndings();
     const stats = [
       [fmtTime(s.stats.playMs), 'statTime'], [s.stats.actions, 'statActions'], [s.stats.wrong, 'statWrong'],
-      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [T(s.mode === 'veteran' ? 'modeVeteran' : 'modeNovice'), 'statMode'],
+      [s.stats.hints, 'statHints'], [E.pageCount(s) + ' / 4', 'statPages'], [esc(modeName(s.mode)), 'statMode'],
     ];
     $('ending-card').classList.toggle('fail', !!e.fail);
     $('ending-card').innerHTML = `
@@ -1373,6 +1453,7 @@
       if (b && !b.disabled) { app.selected = null; app.combining = false; act(() => E.move(app.s, b.dataset.room)); }
     });
     $('inventory').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (b) onItem(b.dataset.item); });
+    $('hand').addEventListener('click', e => { const b = e.target.closest('[data-unhold]'); if (b && app.s) toggleHand(b.dataset.unhold); });
     $('item-detail').addEventListener('click', e => {
       const b = e.target.closest('[data-detail]');
       if (!b || !app.selected) return;
@@ -1415,6 +1496,7 @@
   /* ================= 啟動 ================= */
   function start(data) {
     bindStatic();
+    app.handStripOpen = Store.getSetting('handStrip') !== '0';
     setLang(initialLang(), { persist: false });
     show('title');
     if (data && data.state) loadState(data.state, I.UI.beforeUpdate);

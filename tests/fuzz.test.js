@@ -18,7 +18,7 @@ function rng(seed) {
 const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
 
 function allActions(s) {
-  const vet = s.mode === 'veteran';
+  const vet = G.isAdv(s.mode), master = s.mode === 'master';
   const acts = [];
   for (const h of E.visibleHotspots(s)) {
     acts.push(() => E.interact(s, h.id));
@@ -35,12 +35,16 @@ function allActions(s) {
     mirrors: vet ? [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial] : [G.MIRROR_SOLUTIONS[0], G.MIRROR_GRID.initial, { A: '\\' }],
     skylight: [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial, null],
     dome: G.DIRECTIONS.map(d => d.id), dial: [G.DIAL_ANSWER, G.DIAL_ANSWER.slice().reverse()],
-    develop: vet ? [G.DEVELOP_ANSWER_V, G.DEVELOP_ANSWER] : [G.DEVELOP_ANSWER, ['red', 'blue', 'yellow', 'white']],
+    // 大師模式第三張廢片試壞就失敗（另有測試）；用掉兩張之後只會倒對的順序。假卡片的順序也在亂走範圍內
+    develop: master && (s.flags.devMisses || 0) >= G.DEV_MISS_LIMIT - 1 ? [G.DEVELOP_ANSWER_V]
+      : vet ? [G.DEVELOP_ANSWER_V, G.DEVELOP_ANSWER, ['blue', 'yellow', 'red', 'white'], ['black', 'red']] : [G.DEVELOP_ANSWER, ['red', 'blue', 'yellow', 'white']],
     seedlock: [G.SEED_CODE, '473'], balance_set: [{ tin_moon: 'L', w2: 'L', w5: 'R' }, {}],
     signal: [['.-.'], ['---', '...'], ['-.-', '...'], ['.-'], ['...']],
-    photos: [G.PHOTO_ORDER, G.PHOTO_ORDER.slice().reverse()], musicbox: [G.MUSIC_ANSWER, [1, 2, 3]],
+    photos: [G.PHOTO_ORDER, G.PHOTO_ORDER.slice().reverse()], musicbox: [G.MUSIC_ANSWER, G.MUSIC_ANSWER_M, [1, 2, 3]],
+    tunnel: [G.TUNNEL_CODE, G.TUNNEL_TRAP, '00000'],
     phone: ['refuse'], // 接受交易會直接結束遊戲，不在亂走範圍內
     exit: [],          // 離開也會結束遊戲
+    escape: [],
   };
   for (const pid of Object.keys(G.puzzles)) for (const a of answers[pid]) acts.push(() => E.submit(s, pid, a));
   return acts;
@@ -74,7 +78,9 @@ const VETERAN_MIDDLE = [
   [s => F(s, 'zhouCalled') && !F(s, 'zhouReplied') && has(s, 'flashlight'), 'storeroom', s => E.submit(s, 'signal', ['---', '...'])],
   [s => F(s, 'zhouReplied') && !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.POT_ANSWER_V)],
   [s => !F(s, 'lightOk'), 'greenhouse', s => E.submit(s, 'skylight', G.MIRROR_SOLUTION_V)],
-  [s => F(s, 'crankInserted') && !F(s, 'musicSolved') && F(s, 'posterRead'), 'attic', s => E.submit(s, 'musicbox', G.MUSIC_ANSWER)],
+  // 大師：旋律藏在星盤的答案裡，要先解開星盤
+  [s => F(s, 'crankInserted') && !F(s, 'musicSolved') && F(s, 'posterRead') && (s.mode !== 'master' || F(s, 'starDialSolved')), 'attic',
+    s => E.submit(s, 'musicbox', s.mode === 'master' ? G.MUSIC_ANSWER_M : G.MUSIC_ANSWER)],
 ];
 const NOVICE_MIDDLE = [
   [s => !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.POT_ANSWER)],
@@ -102,15 +108,25 @@ const COMMON_TAIL = [
   [s => has(s, 'red_bulb') && F(s, 'trapdoorOpen'), 'darkroom', s => E.useItem(s, 'red_bulb', 'd_socket')],
   [s => F(s, 'darkroomLit') && !F(s, 'p4Taken'), 'darkroom', s => E.interact(s, 'd_line')],
   [s => F(s, 'darkroomLit') && !F(s, 'bottleCardRead'), 'darkroom', s => E.interact(s, 'd_shelf')],
-  [s => F(s, 'darkroomLit') && s.mode === 'veteran' && !F(s, 'chartRead'), 'darkroom', s => E.interact(s, 'd_chart')],
-  [s => F(s, 'darkroomLit') && !F(s, 'plateDeveloped'), 'darkroom', s => E.submit(s, 'develop', s.mode === 'veteran' ? G.DEVELOP_ANSWER_V : G.DEVELOP_ANSWER)],
+  [s => F(s, 'darkroomLit') && G.isAdv(s.mode) && !F(s, 'chartRead'), 'darkroom', s => E.interact(s, 'd_chart')],
+  [s => F(s, 'darkroomLit') && !F(s, 'plateDeveloped'), 'darkroom', s => E.submit(s, 'develop', G.isAdv(s.mode) ? G.DEVELOP_ANSWER_V : G.DEVELOP_ANSWER)],
   ...G.EMBLEMS.map(e => [s => has(s, e), 'foyer', s => E.useItem(s, e, 'f_door')]),
   [s => F(s, 'phoneRinging'), 'foyer', s => E.submit(s, 'phone', 'refuse')],
+];
+const LEAVE_BY_DOOR = [
   [s => G.allInserted(s) && has(s, 'plate') && G.countPages(s) === 4, 'foyer', s => E.submit(s, 'exit', 'publish')],
 ];
+// 大師：大門外有人守著，要從儲物間的老水道離開
+const MASTER_ESCAPE = [
+  [s => !F(s, 'clippingRead'), 'study', s => E.interact(s, 's_clipping')],
+  [s => G.allInserted(s) && !F(s, 'tunnelFound'), 'storeroom', s => E.interact(s, 't_shelf')],
+  [s => F(s, 'tunnelFound') && !F(s, 'tunnelOpen'), 'storeroom', s => E.submit(s, 'tunnel', G.TUNNEL_CODE)],
+  [s => F(s, 'tunnelOpen') && has(s, 'plate') && G.countPages(s) === 4, 'storeroom', s => E.submit(s, 'escape', 'publish')],
+];
 const STEPS = {
-  novice: [...COMMON_HEAD, ...NOVICE_MIDDLE, ...COMMON_TAIL],
-  veteran: [...COMMON_HEAD, ...VETERAN_MIDDLE, ...COMMON_TAIL],
+  novice: [...COMMON_HEAD, ...NOVICE_MIDDLE, ...COMMON_TAIL, ...LEAVE_BY_DOOR],
+  veteran: [...COMMON_HEAD, ...VETERAN_MIDDLE, ...COMMON_TAIL, ...LEAVE_BY_DOOR],
+  master: [...COMMON_HEAD, ...VETERAN_MIDDLE, ...COMMON_TAIL, ...MASTER_ESCAPE],
 };
 
 function finish(s) {
@@ -129,8 +145,9 @@ function finish(s) {
   return { ok: s.ending === 'B', why: '結局：' + s.ending, s };
 }
 
-for (const mode of ['novice', 'veteran']) {
-  const tag = mode === 'veteran' ? '［資深］' : '［新手］';
+const TAG = { novice: '［新手］', veteran: '［資深］', master: '［大師］' };
+for (const mode of G.MODES) {
+  const tag = TAG[mode];
   test(`${tag}從新遊戲直接交給通關者，會走到真結局 B`, () => {
     const r = finish(E.newState(mode));
     assert.ok(r.ok, r.why);
@@ -139,7 +156,7 @@ for (const mode of ['novice', 'veteran']) {
   test(`${tag}隨機亂走 400 次（每次最多 300 步）後，通關者都能打到真結局 B，且過程沒有任何例外`, () => {
     let totalSteps = 0;
     for (let seed = 1; seed <= 400; seed++) {
-      const r = rng(seed * 7919 + (mode === 'veteran' ? 13 : 0));
+      const r = rng(seed * 7919 + G.RANK[mode] * 13);
       const s = E.newState(mode);
       const len = 1 + Math.floor(r() * 300);
       for (let i = 0; i < len; i++) {

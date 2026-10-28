@@ -27,8 +27,9 @@ function fastClone(s) {
 
 function canonical(s) {
   // 邏輯狀態＝物品（不計順序）＋為真的旗標＋結局；房間、機關角度、統計都不算。
-  // 挖錯過哪幾盆（potsDug）只有花盆謎題會讀；挖到鑰匙之後花盆就關閉了，這項紀錄不再影響任何事，所以不計入
-  const keys = Object.keys(s.flags).filter(k => s.flags[k] && !(k === 'potsDug' && s.flags.keyDug)).sort();
+  // 挖錯過哪幾盆（potsDug）只有花盆謎題會讀；挖到鑰匙之後花盆就關閉了，這項紀錄不再影響任何事，所以不計入。
+  // 大師模式用掉幾張廢片（devMisses）也一樣：底片沖好之後就不再有意義
+  const keys = Object.keys(s.flags).filter(k => s.flags[k] && !(k === 'potsDug' && s.flags.keyDug) && !(k === 'devMisses' && s.flags.plateDeveloped)).sort();
   let f = '';
   for (const k of keys) { const v = s.flags[k]; f += k + (v === true ? '' : '=' + (Array.isArray(v) ? v.join('+') : v)) + ','; }
   return s.inv.slice().sort().join(',') + '|' + f + '|' + (s.ending || '');
@@ -36,11 +37,11 @@ function canonical(s) {
 
 // 純顯示用的機關：只改變畫面上的角度或擺放，不影響遊戲邏輯
 const COSMETIC_PUZZLES = new Set(['dome', 'valves_set', 'balance_set']);
-const isCosmetic = (pid, mode) => COSMETIC_PUZZLES.has(pid) || (pid === 'mirrors' && mode === 'veteran'); // 資深模式的鏡子要拉開天窗才判定
+const isCosmetic = (pid, mode) => COSMETIC_PUZZLES.has(pid) || (pid === 'mirrors' && G.isAdv(mode)); // 資深以上的鏡子要拉開天窗才判定
 const isPagey = id => G.PAGES.includes(id) || id === 'diary';
 
 function correctAnswers(pid, mode = 'novice') {
-  const vet = mode === 'veteran';
+  const vet = G.isAdv(mode);
   switch (pid) {
     case 'drawer': return [G.DRAWER_CODE];
     case 'safe': return [G.SAFE_CODE];
@@ -55,24 +56,26 @@ function correctAnswers(pid, mode = 'novice') {
     case 'seedlock': return [G.SEED_CODE];
     case 'signal': return [['.-.'], ['---', '...']]; // 先呼叫，再問花盆
     case 'photos': return [G.PHOTO_ORDER];
-    case 'musicbox': return [G.MUSIC_ANSWER];
+    case 'musicbox': return [mode === 'master' ? G.MUSIC_ANSWER_M : G.MUSIC_ANSWER];
+    case 'tunnel': return [G.TUNNEL_CODE];
     case 'phone': return ['accept', 'refuse'];
-    case 'exit': return ['leave', 'publish', 'leave_plate'];
+    case 'exit': case 'escape': return ['leave', 'publish', 'leave_plate'];
     default: return [];
   }
 }
 function wrongAnswers(pid, mode = 'novice') {
+  const vet = G.isAdv(mode);
   switch (pid) {
     case 'drawer': return [G.DRAWER_TRAP, '0000', '', null, '37519'];
     case 'safe': return ['274', '000', 'abc'];
     case 'trapdoor': return ['0812', '9999'];
     // 資深模式挖錯會累積次數（第三次失敗），屬於有效果的動作，另外在 stateActions 裡窮舉；這裡只留不存在的花盆
-    case 'pots': return mode === 'veteran'
+    case 'pots': return vet
       ? ['nope', 'lotus']
       : G.POTS.map(p => p.id).filter(id => id !== G.POT_ANSWER).concat(['nope']);
     case 'clock': return [{ h: 2, m: 15 }, { h: 15, m: 15 }, { h: 3, m: 0 }, null];
     case 'valves': return [{ V1: true, V2: true, V3: true, V4: true, V5: true }, {}, null];
-    case 'mirrors': return mode === 'veteran'
+    case 'mirrors': return vet
       ? [G.MIRROR_GRID_V.initial, {}, null, G.MIRROR_SOLUTION_V, G.MIRROR_SOLUTIONS[0]] // 資深：只記錄角度，連正確角度也不會直接解開
       : [G.MIRROR_GRID.initial, {}, null];
     // 不含 null：null 代表「照目前擺好的鏡子拉開天窗」，若目前正好擺對就是正確答案
@@ -81,11 +84,17 @@ function wrongAnswers(pid, mode = 'novice') {
     case 'balance_set': return [{ tin_moon: 'L', w5: 'R' }, {}, null, { w5: 'L', tin_fern: 'R' }];
     case 'signal': return [['.-'], ['...'], ['-.-', '...'], ['.-.', '.-.'], ['......'], [], null, 'qing', ['x']];
     case 'photos': return [G.PHOTO_ORDER.slice().reverse(), G.PHOTO_ORDER.slice(0, 5), ['ph_a', 'ph_a', 'ph_b', 'ph_c', 'ph_d', 'ph_e'], null];
-    case 'musicbox': return [G.MUSIC_ANSWER.slice().reverse(), [1, 2, 3], [0, 11], [], null];
+    // 資深的旋律在大師模式是錯的（大師的旋律來自星盤），反之亦然
+    case 'musicbox': return [G.MUSIC_ANSWER.slice().reverse(), [1, 2, 3], [0, 11], [], null, mode === 'master' ? G.MUSIC_ANSWER : G.MUSIC_ANSWER_M];
     case 'dial': return [G.DIAL_ANSWER.slice().reverse(), ['lamp', 'lamp', 'lamp'], [], null];
-    case 'develop': return mode === 'veteran'
-      ? [G.DEVELOP_ANSWER_V.slice().reverse(), G.DEVELOP_ANSWER, ['green', 'red', 'white', 'yellow'], ['purple'], null]   // 新手模式的答案在資深模式是錯的；用到干擾瓶也是錯的
-      : [G.DEVELOP_ANSWER.slice().reverse(), ['red'], null, G.DEVELOP_ANSWER_V];
+    // 大師模式倒錯會用掉一張廢片（有效果的動作，另外在 stateActions 裡窮舉）；這裡只留不算一次嘗試的輸入：不完整、不存在的瓶子
+    case 'develop': return mode === 'master'
+      ? [['purple'], null, ['black', 'red'], ['purple', 'red', 'white', 'yellow']]
+      : vet
+        ? [G.DEVELOP_ANSWER_V.slice().reverse(), G.DEVELOP_ANSWER, ['green', 'red', 'white', 'yellow'], ['purple'], null]   // 新手模式的答案在資深模式是錯的；用到干擾瓶也是錯的
+        : [G.DEVELOP_ANSWER.slice().reverse(), ['red'], null, G.DEVELOP_ANSWER_V];
+    case 'tunnel': return [G.TUNNEL_TRAP, '00000', '5271', null];
+    case 'escape': return ['fly', null];
     case 'phone': return ['maybe', null];
     case 'exit': return ['fly', null];
     default: return [];
@@ -101,17 +110,22 @@ const PICKUPS_COMMON = [
   ['observatory', 'look', 'o_cabinet'],
   // 讀線索（只會設「讀過」的旗標，讓需要線索的謎題可以作答；不移除任何東西）
   ['study', 'look', 's_shelf'], ['greenhouse', 'look', 'g_rules'], ['observatory', 'look', 'o_poster'],
-  ['observatory', 'look', 'o_almanac'], ['darkroom', 'look', 'd_shelf'],
+  ['observatory', 'look', 'o_almanac'], ['darkroom', 'look', 'd_shelf'], ['study', 'look', 's_clipping'],
   // 注意：日記殘頁（煙囪、晾片繩、音樂盒）「不」在此列——收齊四頁會讓「孤證」結局消失，
   // 它們會改變結局選項，因此必須當成一般動作窮舉。
 ];
+const PICKUPS_VET = PICKUPS_COMMON.concat([
+  // 資深模式的煙囪裡是儲物間鑰匙（不是日記），只會增加物品
+  ['study', 'use', 's_fireplace', 'flashlight'],
+  ['attic', 'look', 'a_chest'], ['attic', 'look', 'a_photobox'],
+  ['foyer', 'look', 'f_hatch'], ['greenhouse', 'look', 'g_storedoor'], ['darkroom', 'look', 'd_chart'],
+]);
 const PICKUPS = {
   novice: PICKUPS_COMMON,
-  veteran: PICKUPS_COMMON.concat([
-    // 資深模式的煙囪裡是儲物間鑰匙（不是日記），只會增加物品
-    ['study', 'use', 's_fireplace', 'flashlight'],
-    ['attic', 'look', 'a_chest'], ['attic', 'look', 'a_photobox'],
-    ['foyer', 'look', 'f_hatch'], ['greenhouse', 'look', 'g_storedoor'], ['darkroom', 'look', 'd_chart'],
+  veteran: PICKUPS_VET,
+  master: PICKUPS_VET.concat([
+    // 大師：讀牆上的假卡片、查看雜物架（徽章歸位後會發現鐵門）——都只增加旗標
+    ['darkroom', 'look', 'd_card2'], ['storeroom', 'look', 't_shelf'],
   ]),
 };
 
@@ -160,12 +174,14 @@ function stateActions(s) {
     if (isCosmetic(pid, s.mode) || !G.puzzles[pid].available(s)) continue;
     for (const a of correctAnswers(pid, s.mode)) acts.push({ t: 'submit', p: pid, a });
   }
-  // 資深模式挖錯一盆：哪一盆錯的效果都一樣（挖錯的盆 +1，第三盆失敗），取還沒挖過的第一盆當代表
-  if (s.mode === 'veteran' && G.puzzles.pots.available(s) && s.inv.includes('trowel')) {
+  // 資深以上挖錯一盆：哪一盆錯的效果都一樣（挖錯的盆 +1，第三盆失敗），取還沒挖過的第一盆當代表
+  if (G.isAdv(s.mode) && G.puzzles.pots.available(s) && s.inv.includes('trowel')) {
     const dug = s.flags.potsDug || [];
     const next = G.POTS_V.find(p => p.id !== G.POT_ANSWER_V && !dug.includes(p.id));
     if (next) acts.push({ t: 'submit', p: 'pots', a: next.id, miss: true });
   }
+  // 大師模式倒錯一次：哪一種錯法效果都一樣（廢片 −1，第三張失敗），用假卡片的順序當代表
+  if (s.mode === 'master' && G.puzzles.develop.available(s)) acts.push({ t: 'submit', p: 'develop', a: ['blue', 'yellow', 'red', 'white'], miss: true });
   return acts;
 }
 
@@ -230,7 +246,7 @@ function explore(opts = {}) {
         const n = fastClone(base);
         let r;
         try { r = apply(n, a); } catch (e) { errors.push({ state: canonical(s), room, action: a, error: e.stack }); continue; }
-        const silent = a.t === 'submit' && G.puzzles[a.p].silent && !(a.p === 'mirrors' && mode === 'veteran');
+        const silent = a.t === 'submit' && G.puzzles[a.p].silent && !(a.p === 'mirrors' && G.isAdv(mode));
         const responded = r.messages.length || r.open || r.ending || r.moved || silent;
         if (!responded) errors.push({ state: canonical(s), room, action: a, error: '沒有任何回應' });
         for (const m of r.messages) {

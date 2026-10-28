@@ -109,7 +109,7 @@
     modeTut: null,
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null, hintAsk: null };
   }
 
   /* ================= 畫面切換 ================= */
@@ -929,16 +929,35 @@
         <div class="stage-bar" aria-hidden="true">${st.ids.map((id, i) => `<span class="${i < st.index ? 'done' : i === st.index ? 'cur' : ''}"></span>`).join('')}</div></div>`;
       if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked')}</p>` };
       const list = E.hintList(app.s);
+      // 每一段提示都要先確認；下一段會公布答案時，確認框是閃動的紅色
+      const ask = app.ui.hintAsk && list.find(h => h.id === app.ui.hintAsk && h.level < h.max);
+      const confirmBox = h => {
+        const spoil = h.level + 1 >= h.answerAt;
+        return `<div class="confirm hint-ask ${spoil ? 'spoiler' : ''}" role="alertdialog" aria-label="${esc(T(spoil ? 'hintAskAnswer' : 'hintAsk', { n: h.level + 1, max: h.max }))}">
+          <p>${tx(spoil ? 'hintAskAnswer' : 'hintAsk', { n: h.level + 1, max: h.max })}</p>
+          <div class="row"><button class="btn ${spoil ? 'danger' : 'primary'}" type="button" data-hint-yes="${h.id}">${tx(spoil ? 'hintAskAnswerYes' : 'hintAskYes')}</button><button class="btn" type="button" data-hint-no="${h.id}">${tx('hintAskNo')}</button></div></div>`;
+      };
+      const button = h => `<div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div>`;
       const card = h => `<div class="hint ${h.group}"><h4>${esc(tr(h.title))}</h4>
         ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(tr(t))}</li>`).join('')}</ol>` : ''}
-        <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div></div>`;
+        ${ask && ask.id === h.id ? confirmBox(h) : button(h)}</div>`;
       const groups = [['current', 'hintGroupCurrent'], ['earlier', 'hintGroupEarlier'], ['explore', 'hintGroupExplore'], ['side', 'hintGroupSide'], ['other', 'hintGroupOther']];
       const body = groups.map(([g, key]) => { const hs = list.filter(h => h.group === g); return hs.length ? `<h3 class="hint-group">${tx(key)}</h3>${hs.map(card).join('')}` : ''; }).join('');
       return {
         title: T('hintsTitle'),
         html: `${head}<p class="lead">${tx('hintsLead')}</p>${body || `<p>${tx('hintNone')}</p>`}`,
         bind(root) {
-          root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { if (E.revealHint(app.s, b.dataset.hint)) autosave(); renderModal(); }; });
+          root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { app.ui.hintAsk = b.dataset.hint; renderModal(); }; });
+          const yes = root.querySelector('[data-hint-yes]'), no = root.querySelector('[data-hint-no]');
+          const back = id => { app.ui.hintAsk = null; renderModal(); const b = $('modal-body').querySelector(`[data-hint="${CSS.escape(id)}"]`); if (b && !b.disabled) b.focus(); };
+          if (yes) yes.onclick = () => { const id = yes.dataset.hintYes; if (E.revealHint(app.s, id)) autosave(); back(id); };
+          if (no) no.onclick = () => back(no.dataset.hintNo);
+          // 確認框出現時把焦點放上去：一般提示放在「給我提示」，會公布答案時放在「先不用」，避免連按 Enter 就看到答案
+          if (ask) (ask.level + 1 >= ask.answerAt ? no : yes).focus();
+          else {
+            const first = root.querySelector('.hint.current [data-hint]:not([disabled])');
+            if (first && !root.contains(document.activeElement)) first.setAttribute('data-autofocus', '');
+          }
         },
       };
     },
@@ -1313,7 +1332,7 @@
     $('btn-intro-next').onclick = nextIntro;
     $('btn-intro-skip').onclick = () => { app.introStep = tr(G.intro).length; beginGame(); };
 
-    $('btn-hints').onclick = () => { app.hintPulse = false; render(); openView({ view: 'hints' }); };
+    $('btn-hints').onclick = () => { app.hintPulse = false; app.ui.hintAsk = null; render(); openView({ view: 'hints' }); };
     $('tut-next').onclick = () => { if (app.tut == null) return; app.tut++; if (app.tut >= TUT.length) endTutorial(); else renderTutorial(true); };
     $('tut-skip').onclick = () => endTutorial();
     window.addEventListener('resize', () => renderTutorial());

@@ -2,7 +2,7 @@
 // 提示系統：不劇透尚未發現的東西；每個提示都會在正常遊玩中出現；每一段文字都有內容。
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { G, makeGame, VALVE_SOLUTION } = require('./helpers');
+const { G, create, makeGame, VALVE_SOLUTION } = require('./helpers');
 const { textProblem } = require('./solver');
 
 const forMode = (h, mode) => !h.mode || h.mode === mode;
@@ -154,4 +154,27 @@ test('［資深］提示依階段分組：目前階段的提示排在最前面',
   assert.equal(safe.group, 'other');
   assert.equal(gh.group, 'current');
   assert.ok(list.indexOf(gh) < list.indexOf(safe));
+});
+
+test('每一則提示都標明「第幾段會公布答案」，而且答案不會提早出現在前面的段落', () => {
+  // 各謎題答案的關鍵字：只能出現在 answerAt 那一段（含）之後
+  const ANSWERS = [G.DRAWER_CODE, G.SAFE_CODE, G.SEED_CODE, G.TRAPDOOR_CODE, '3:15', '3 點 15', '5、8、10', '鼠尾草盆', '答案是玫瑰盆', 'V2、V4、V5', '黃 → 白', '紫 → 黑', '外環＝鑰', 'H→J→K', 'A→B→C'];
+  for (const mode of ['novice', 'veteran']) {
+    const E = create(G);
+    const s = E.newState(mode);
+    for (const h of G.hints) {
+      const at = (h.answer === undefined ? h.texts.length - 1 : h.answer) + 1;
+      assert.ok(at >= 2 && at <= h.texts.length, `${h.id}：公布答案的段落要在第 2 段之後`);
+      h.texts.slice(0, at - 1).forEach((t, i) => {
+        const text = (typeof t === 'function' ? t(s) : t).zh;
+        for (const a of ANSWERS) assert.ok(!text.includes(a), `${h.id} 第 ${i + 1} 段提早說出答案「${a}」`);
+      });
+    }
+  }
+  // 引擎把 answerAt 交給介面：抽屜是第 3 段、日記是第 2 段
+  const P = makeGame('novice');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.look('s_drawer');
+  const drawer = P.E.hintList(P.s).find(h => h.id === 'drawer');
+  assert.equal(drawer.answerAt, 3);
+  assert.equal(G.hints.find(h => h.id === 'diary').answer, 1);
 });

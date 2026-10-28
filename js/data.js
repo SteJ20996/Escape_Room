@@ -2406,6 +2406,7 @@
     {
       id: 'diary', stage: 'truth', title: L('陸觀的日記（選擇性）', 'Lu Guan\'s Diary (Optional)'),
       avail: s => countPages(s) > 0, done: s => countPages(s) >= 4,
+      answer: 1, // 第二段就列出四頁的位置
       texts: [
         s => L(`日記一共四頁，你找到了 ${countPages(s)} 頁。殘頁散落在屋子各處，有的藏在很暗的地方。`, `The diary has four pages; you have found ${countPages(s)}. They are scattered around the house, some in very dark places.`),
         s => VET(s)

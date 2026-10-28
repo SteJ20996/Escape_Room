@@ -380,6 +380,16 @@ textarea.code {
 .hint-btn { border-color: var(--brass); color: var(--brass-hi); gap: .35em; }
 .hint-btn .bulb { font-size: .9em; }
 .hint-btn.locked { opacity: .6; border-color: var(--rule); color: var(--dim); }
+/* 提示的確認框：會公布答案時閃紅色（「減少動態效果」時只保留紅色、不閃） */
+.hint-ask { margin-top: 8px; border-color: var(--brass); }
+.hint-ask p { margin: 0; }
+.hint-ask.spoiler { border: 2px solid var(--bad); background: rgba(200, 60, 45, .22); color: #ffe0d8; animation: spoilerPulse 1.1s ease-in-out infinite; }
+.hint-ask.spoiler p { font-weight: 700; }
+.hint-ask.spoiler p::before { content: "⚠ "; }
+@keyframes spoilerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 90, 70, .6); border-color: var(--bad); background: rgba(200, 60, 45, .18); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 90, 70, 0); border-color: #ff5a46; background: rgba(220, 60, 45, .38); }
+}
 .hint-btn.pulse { background: var(--brass); color: var(--brass-ink); animation: hintPulse 1.4s ease-in-out infinite; }
 @keyframes hintPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 201, 127, .55); } 50% { box-shadow: 0 0 0 7px rgba(232, 201, 127, 0); } }
 .m-stage { color: var(--brass-hi); font-weight: 600; }
@@ -3025,6 +3035,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     {
       id: 'diary', stage: 'truth', title: L('陸觀的日記（選擇性）', 'Lu Guan\'s Diary (Optional)'),
       avail: s => countPages(s) > 0, done: s => countPages(s) >= 4,
+      answer: 1, // 第二段就列出四頁的位置
       texts: [
         s => L(`日記一共四頁，你找到了 ${countPages(s)} 頁。殘頁散落在屋子各處，有的藏在很暗的地方。`, `The diary has four pages; you have found ${countPages(s)}. They are scattered around the house, some in very dark places.`),
         s => VET(s)
@@ -3295,8 +3306,10 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         const level = s.hints[h.id] || 0;
         const at = h.stage == null ? -1 : st.ids.indexOf(h.stage);
         const group = h.stage == null ? 'explore' : h.stage === 'truth' ? 'side' : at === st.index ? 'current' : at < st.index ? 'earlier' : 'other';
+        // answerAt：第幾段會直接公布答案（預設是最後一段：方向 → 線索在哪 → 答案）
+        const answerAt = (h.answer === undefined ? h.texts.length - 1 : h.answer) + 1;
         return {
-          id: h.id, title: h.title, level, max: h.texts.length, stage: h.stage, group,
+          id: h.id, title: h.title, level, max: h.texts.length, stage: h.stage, group, answerAt,
           texts: h.texts.slice(0, level).map(t => typeof t === 'function' ? t(s) : t),
         };
       }).sort((a, b) => rank[a.group] - rank[b.group]);
@@ -3773,6 +3786,11 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     notesLead: L('你讀過、看過的線索都會自動記在這裡，隨時可以重讀。（物品本身請在物品欄「查看」。）', 'Every clue you read or look at is recorded here automatically, so you can reread it any time. (To look at an item itself, use "Examine" in your inventory.)'),
     hintsTitle: L('提示', 'Hints'),
     hintsLead: L('每個目標的提示分三段：先給方向，再指出線索在哪，最後才是答案。用過的提示次數會出現在結算畫面上。', 'Each goal has three hints: first a direction, then where the clues are, and finally the answer. The number of hints you use is shown at the end.'),
+    hintAsk: L('要看第 {n} 段提示嗎？（共 {max} 段；用過的提示會記在結算畫面）', 'Show hint {n} of {max}? (Hints you use are shown on the ending screen.)'),
+    hintAskYes: L('給我提示', 'Show the hint'),
+    hintAskNo: L('先不用', 'Not yet'),
+    hintAskAnswer: L('注意：第 {n} 段提示會直接公布答案。確定要看嗎？', 'Careful: hint {n} gives away the answer. Are you sure?'),
+    hintAskAnswerYes: L('公布答案', 'Reveal the answer'),
     hintFirst: L('給我一點提示', 'Give me a hint'),
     hintMore: L('再多一點（{n}/{max}）', 'A bit more ({n}/{max})'),
     hintDone: L('已經是答案了', 'That\'s the answer'),
@@ -3816,7 +3834,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ['組合線索', '點選物品後按「組合…」，再點另一個物品。撕開的紙、疊在一起的圖、裝電池……很多線索要合在一起才看得懂。'],
       ['線索筆記', '讀過的文件會自動記下，隨時能重讀。'],
       ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗，整局作廢（手動存檔不受影響）。'],
-      ['提示', '右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來。每個目標分三段，從方向到答案。'],
+      ['提示', '右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來。每個目標分三段，從方向到答案；每一段都要先確認，會公布答案的那一段，確認框會閃紅色。'],
       ['存檔', '每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。'],
       ['公平原則', '所有謎題的答案都在屋子裡，不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死。'],
       ['語言', '在標題畫面或「選單」裡可以隨時切換中文與英文，進度不受影響。'],
@@ -3828,7 +3846,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       ['Combine clues', 'Select an item, press "Combine…", then click another item. Torn paper, overlapping charts, batteries… many clues only make sense together.'],
       ['Notebook', 'Every document you read is recorded automatically so you can reread it.'],
       ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game (your manual saves are kept).'],
-      ['Hints', 'Hints, at the top right, shows your current stage goal and lights up whenever you finish a stage. Each goal has three steps, from a nudge to the answer.'],
+      ['Hints', 'Hints, at the top right, shows your current stage goal and lights up whenever you finish a stage. Each goal has three steps, from a nudge to the answer. You confirm each step first, and the confirmation flashes red when the next step gives away the answer.'],
       ['Saving', 'The game autosaves after every action. You can also save to three slots, or copy a save code to carry your progress elsewhere.'],
       ['Fair play', 'Every answer is inside the house — no outside knowledge needed. Wrong answers are never punished and can never leave you stuck.'],
       ['Language', 'Switch between Chinese and English any time from the title screen or the Menu. Your progress is kept.'],
@@ -5218,7 +5236,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     modeTut: null,
   };
   function freshUi() {
-    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null };
+    return { locks: {}, dev: [], confirm: null, feedback: [], code: '', importText: '', saveNote: null, photoOrder: null, photoBacks: false, music: [], musicLit: 0, sig: [''], sigReply: null, mirrorReveal: false, musicDone: false, potConfirm: null, hintAsk: null };
   }
 
   /* ================= 畫面切換 ================= */
@@ -6038,16 +6056,35 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         <div class="stage-bar" aria-hidden="true">${st.ids.map((id, i) => `<span class="${i < st.index ? 'done' : i === st.index ? 'cur' : ''}"></span>`).join('')}</div></div>`;
       if (E.hintsLocked(app.s)) return { title: T('hintsTitle'), html: head + `<p class="notice warn">${tx('hintsLocked')}</p>` };
       const list = E.hintList(app.s);
+      // 每一段提示都要先確認；下一段會公布答案時，確認框是閃動的紅色
+      const ask = app.ui.hintAsk && list.find(h => h.id === app.ui.hintAsk && h.level < h.max);
+      const confirmBox = h => {
+        const spoil = h.level + 1 >= h.answerAt;
+        return `<div class="confirm hint-ask ${spoil ? 'spoiler' : ''}" role="alertdialog" aria-label="${esc(T(spoil ? 'hintAskAnswer' : 'hintAsk', { n: h.level + 1, max: h.max }))}">
+          <p>${tx(spoil ? 'hintAskAnswer' : 'hintAsk', { n: h.level + 1, max: h.max })}</p>
+          <div class="row"><button class="btn ${spoil ? 'danger' : 'primary'}" type="button" data-hint-yes="${h.id}">${tx(spoil ? 'hintAskAnswerYes' : 'hintAskYes')}</button><button class="btn" type="button" data-hint-no="${h.id}">${tx('hintAskNo')}</button></div></div>`;
+      };
+      const button = h => `<div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div>`;
       const card = h => `<div class="hint ${h.group}"><h4>${esc(tr(h.title))}</h4>
         ${h.texts.length ? `<ol>${h.texts.map(t => `<li>${esc(tr(t))}</li>`).join('')}</ol>` : ''}
-        <div class="row"><button class="btn small" type="button" data-hint="${h.id}" ${h.level >= h.max ? 'disabled' : ''}>${h.level === 0 ? tx('hintFirst') : h.level >= h.max ? tx('hintDone') : tx('hintMore', { n: h.level + 1, max: h.max })}</button></div></div>`;
+        ${ask && ask.id === h.id ? confirmBox(h) : button(h)}</div>`;
       const groups = [['current', 'hintGroupCurrent'], ['earlier', 'hintGroupEarlier'], ['explore', 'hintGroupExplore'], ['side', 'hintGroupSide'], ['other', 'hintGroupOther']];
       const body = groups.map(([g, key]) => { const hs = list.filter(h => h.group === g); return hs.length ? `<h3 class="hint-group">${tx(key)}</h3>${hs.map(card).join('')}` : ''; }).join('');
       return {
         title: T('hintsTitle'),
         html: `${head}<p class="lead">${tx('hintsLead')}</p>${body || `<p>${tx('hintNone')}</p>`}`,
         bind(root) {
-          root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { if (E.revealHint(app.s, b.dataset.hint)) autosave(); renderModal(); }; });
+          root.querySelectorAll('[data-hint]').forEach(b => { b.onclick = () => { app.ui.hintAsk = b.dataset.hint; renderModal(); }; });
+          const yes = root.querySelector('[data-hint-yes]'), no = root.querySelector('[data-hint-no]');
+          const back = id => { app.ui.hintAsk = null; renderModal(); const b = $('modal-body').querySelector(`[data-hint="${CSS.escape(id)}"]`); if (b && !b.disabled) b.focus(); };
+          if (yes) yes.onclick = () => { const id = yes.dataset.hintYes; if (E.revealHint(app.s, id)) autosave(); back(id); };
+          if (no) no.onclick = () => back(no.dataset.hintNo);
+          // 確認框出現時把焦點放上去：一般提示放在「給我提示」，會公布答案時放在「先不用」，避免連按 Enter 就看到答案
+          if (ask) (ask.level + 1 >= ask.answerAt ? no : yes).focus();
+          else {
+            const first = root.querySelector('.hint.current [data-hint]:not([disabled])');
+            if (first && !root.contains(document.activeElement)) first.setAttribute('data-autofocus', '');
+          }
         },
       };
     },
@@ -6422,7 +6459,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     $('btn-intro-next').onclick = nextIntro;
     $('btn-intro-skip').onclick = () => { app.introStep = tr(G.intro).length; beginGame(); };
 
-    $('btn-hints').onclick = () => { app.hintPulse = false; render(); openView({ view: 'hints' }); };
+    $('btn-hints').onclick = () => { app.hintPulse = false; app.ui.hintAsk = null; render(); openView({ view: 'hints' }); };
     $('tut-next').onclick = () => { if (app.tut == null) return; app.tut++; if (app.tut >= TUT.length) endTutorial(); else renderTutorial(true); };
     $('tut-skip').onclick = () => endTutorial();
     window.addEventListener('resize', () => renderTutorial());

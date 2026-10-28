@@ -398,6 +398,29 @@ async function darkroom(P) {
   ok(await P.has('plate'), '底片');
 }
 
+// 一段一段展開某一則提示：每一段都要確認；最後一段（答案）的確認框是閃動的紅色，焦點停在「先不用」
+async function hintAll(P, id) {
+  const { page } = P;
+  const ask = () => page.locator('#modal-body .hint-ask');
+  for (let n = 1; n <= 3; n++) {
+    await page.click(`#modal-body [data-hint="${id}"]`);
+    ok(await ask().count() === 1, `第 ${n} 段要先確認`);
+    const spoiler = await ask().evaluate(e => e.classList.contains('spoiler'));
+    ok(spoiler === (n === 3), `第 ${n} 段${n === 3 ? '會公布答案，確認框應該是紅色' : '不是答案，確認框不該是紅色'}`);
+    const text = (await ask().locator('p').innerText()).trim();
+    ok(text.includes(ui(n === 3 ? 'hintAskAnswer' : 'hintAsk', P.lang, { n, max: 3 })), `第 ${n} 段的確認文字：${text}`);
+    if (n === 3) {
+      ok(await ask().evaluate(e => getComputedStyle(e).animationName) === 'spoilerPulse', '公布答案的確認框會閃動');
+      ok(await page.evaluate(() => document.activeElement.hasAttribute('data-hint-no')), '公布答案前焦點停在「先不用」');
+      await P.shot('hint-spoiler');
+    }
+    await page.click(`#modal-body [data-hint-yes="${id}"]`);
+    ok(await page.locator(`#modal-body .hint:has([data-hint="${id}"]) li`).count() === n, `確認後顯示到第 ${n} 段`);
+  }
+  ok(await page.locator(`#modal-body [data-hint="${id}"]`).isDisabled(), '三段都看完後按鈕停用');
+  await P.shot('hints');
+}
+
 /* ---------- 資深模式各段（全部用介面操作） ---------- */
 const NOT_RIGHT = X(/^不對。$/, /^That's not right\.$/);
 
@@ -462,8 +485,17 @@ async function vetStudy(P, { tutorialDone = true } = {}) {
   ok((await page.locator('#hint-label').innerText()).trim() === ui('hintsBtn', P.lang, { n: 2, total: 8 }), '提示按鈕顯示第 2/8 階段');
   await page.click('#btn-hints');
   await P.modalHas(X(/2\/8/, /2\/8/), '提示顯示目前階段');
-  await page.locator('#modal-body .hint.current [data-hint]').first().click();
-  ok(await page.locator('#modal-body .hint.current li').count() === 1, '目前階段的提示可以展開');
+  const hid = await page.locator('#modal-body .hint.current [data-hint]').first().getAttribute('data-hint');
+  await page.click(`#modal-body [data-hint="${hid}"]`);
+  ok(await page.locator('#modal-body .hint-ask').count() === 1 && await page.locator('#modal-body .hint.current li').count() === 0, '要先確認才會顯示提示');
+  await page.click(`#modal-body [data-hint-no="${hid}"]`);                  // 先不用
+  ok(await page.locator('#modal-body .hint-ask').count() === 0 && await page.locator('#modal-body .hint.current li').count() === 0, '取消就不顯示');
+  const used = () => page.evaluate(() => window.__stargazer.state.stats.hints);
+  ok(await used() === 0, '取消不計入使用提示的次數');
+  await page.click(`#modal-body [data-hint="${hid}"]`);
+  await page.click(`#modal-body [data-hint-yes="${hid}"]`);
+  ok(await page.locator('#modal-body .hint.current li').count() === 1, '確認後顯示第一段');
+  ok(await used() === 1, '確認後才計入一次');
   await P.shot('hints-stage2');
   await P.close();
   ok(!(await page.locator('#btn-hints').evaluate(b => b.classList.contains('pulse'))), '打開提示後按鈕不再閃');
@@ -789,9 +821,8 @@ async function fullRun(browser, lang) {
     await P.said(X(/捲起來的紙/, /rolled-up sheet/));
     // 提示與筆記
     await page.click('#btn-hints');
-    await page.locator('#modal-body [data-hint]').first().click();
-    ok(await page.locator('#modal-body .hint li').count() >= 1, '提示應顯示');
-    await P.shot('hints'); await P.close();
+    await hintAll(P, await page.locator('#modal-body .hint.current [data-hint]').first().getAttribute('data-hint'));
+    await P.close();
     await page.click('#btn-notes');
     await page.click('#modal-body [data-note="clipping"]');
     await P.modalHas(X(/東南/, /southeast/), '剪報可從筆記重讀');

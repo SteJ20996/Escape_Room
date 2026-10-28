@@ -210,8 +210,10 @@
         const level = s.hints[h.id] || 0;
         const at = h.stage == null ? -1 : st.ids.indexOf(h.stage);
         const group = h.stage == null ? 'explore' : h.stage === 'truth' ? 'side' : at === st.index ? 'current' : at < st.index ? 'earlier' : 'other';
+        // answerAt：第幾段會直接公布答案（預設是最後一段：方向 → 線索在哪 → 答案）
+        const answerAt = (h.answer === undefined ? h.texts.length - 1 : h.answer) + 1;
         return {
-          id: h.id, title: h.title, level, max: h.texts.length, stage: h.stage, group,
+          id: h.id, title: h.title, level, max: h.texts.length, stage: h.stage, group, answerAt,
           texts: h.texts.slice(0, level).map(t => typeof t === 'function' ? t(s) : t),
         };
       }).sort((a, b) => rank[a.group] - rank[b.group]);

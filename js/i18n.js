@@ -317,7 +317,7 @@
       ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗，整局作廢（手動存檔不受影響）。'],
       ['提示', '右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來。每個目標分三段，從方向到答案；每一段都要先確認，會公布答案的那一段，確認框會閃紅色。'],
       ['存檔', '每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。'],
-      ['公平原則', '所有謎題的答案都在屋子裡，不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死。'],
+      ['公平原則', '所有謎題的答案都能在遊戲裡找到（資深模式有一件事要問周伯），不需要任何外部知識。答錯不會有懲罰，也不會讓遊戲卡死——唯一的例外是資深模式的八個花盆：挖錯三盆就失敗，木牌上事先寫明。'],
       ['語言', '在標題畫面或「選單」裡可以隨時切換中文與英文，進度不受影響。'],
       ['鍵盤', 'Tab 移動、Enter 選擇、Esc 關閉視窗或放下手上的物品；數字鎖可以直接打數字。'],
     ], [
@@ -329,7 +329,7 @@
       ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game (your manual saves are kept).'],
       ['Hints', 'Hints, at the top right, shows your current stage goal and lights up whenever you finish a stage. Each goal has three steps, from a nudge to the answer. You confirm each step first, and the confirmation flashes red when the next step gives away the answer.'],
       ['Saving', 'The game autosaves after every action. You can also save to three slots, or copy a save code to carry your progress elsewhere.'],
-      ['Fair play', 'Every answer is inside the house — no outside knowledge needed. Wrong answers are never punished and can never leave you stuck.'],
+      ['Fair play', 'Every answer can be found in the game (in Veteran mode, one thing has to be asked of Old Zhou) — no outside knowledge needed. Wrong answers are never punished and can never leave you stuck, with one exception: in Veteran mode, digging up three wrong pots of the eight loses the game, as the sign on the shelf warns.'],
       ['Language', 'Switch between Chinese and English any time from the title screen or the Menu. Your progress is kept.'],
       ['Keyboard', 'Tab to move, Enter to choose, Esc to close a window or put an item away. You can type digits straight into locks.'],
     ]),

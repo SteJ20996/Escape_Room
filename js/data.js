@@ -411,21 +411,22 @@
         'One more thing. The truth about that winter night twenty years ago is hidden "where the light cannot reach". Whether you carry it out through that door is up to you.',
         '— Lu Guan',
       ]),
-      // 資深模式的信多一段，介紹周伯與晴
+      // 資深模式的信多一段，介紹周伯與晴。八個花盆非問周伯不可，所以信不能說「答案全都在屋子裡」，
+      // 也不能把周伯寫成「卡住了才找」——要明說有一個答案只有他知道
       bodyV: L([
         '阿遙：',
         '抱歉，用這種方式迎接你。',
         '大門已經被我設下的機關鎖上了。屋裡藏著三枚徽章——日、月、星。把它們嵌回大門，門就會打開。',
-        '這屋子裡的每一道鎖，答案都在屋子裡。不必求助任何書本，只要仔細看、慢慢想。',
-        '如果卡住了，別忘了周伯。他就住在山谷對面；晴小時候常跟他打燈號玩，他一定還看得懂。',
+        '這屋子裡的鎖，答案幾乎都藏在屋子裡。不必求助任何書本，只要仔細看、慢慢想。',
+        '唯獨有一個答案，屋子不會告訴你，得去問周伯。他替我們家照顧溫室很多年了，就住在山谷對面。晴小時候常跟他打燈號玩，他一定還看得懂。',
         '還有一件事。二十年前那個冬夜的真相，我藏在「光照不到的地方」。要不要把它帶出這扇門，由你決定。',
         '—— 陸觀',
       ], [
         'Yao,',
         'Forgive me for welcoming you like this.',
         'The front door is locked by a mechanism I built. Three emblems are hidden in this house — the Sun, the Moon and the Star. Set them back into the door and it will open.',
-        'Every lock in this house has its answer inside this house. You won\'t need any book. Just look closely and think slowly.',
-        'If you get stuck, remember Old Zhou. He lives across the valley. When Qing was little she used to signal to him with a lamp for fun — he\'ll still understand.',
+        'Almost every lock in this house has its answer hidden inside the house. You won\'t need any book. Just look closely and think slowly.',
+        'There is one answer the house won\'t give you — for that you\'ll have to ask Old Zhou. He has looked after our greenhouse for years, and he lives across the valley. When Qing was little she used to signal to him with a lamp for fun; he\'ll still understand.',
         'One more thing. The truth about that winter night twenty years ago is hidden "where the light cannot reach". Whether you carry it out through that door is up to you.',
         '— Lu Guan',
       ]),

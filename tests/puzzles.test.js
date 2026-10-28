@@ -237,12 +237,13 @@ function permute(arr) {
   return arr.flatMap((x, i) => permute(arr.filter((_, j) => j !== i)).map(p => [x, ...p]));
 }
 
-const CHEMS_V = ['presoak', 'developer', 'stop', 'fixer', 'toner', 'hypo', 'water', 'wetting'];
+const CHEMS_V = ['developer', 'stop', 'fixer', 'water', 'toner', 'hypo'];
 function bottleRuleHolds(r, P) {
   const caps = G.BOTTLES_V.map(b => b.id);
   const pos = ch => P.indexOf(ch);
   switch (r.k) {
-    case 'half': return pos(r.a) >= 4;
+    case 'end': return pos(r.a) === 0 || pos(r.a) === P.length - 1;
+    case 'caps': return r.caps.includes(caps[pos(r.a)]);
     case 'notCaps': return !r.caps.includes(caps[pos(r.a)]);
     case 'adjacent': return Math.abs(pos(r.a) - pos(r.b)) === 1;
     case 'notAdjacent': return Math.abs(pos(r.a) - pos(r.b)) > 1;
@@ -253,39 +254,35 @@ function bottleRuleHolds(r, P) {
   throw new Error(r.k);
 }
 
-test('資深・八瓶藥劑：40320 種排列中只有一種符合卡片的八條規則，而且每一條都不可省略', () => {
+test('資深・六瓶藥劑：720 種擺法中只有一種符合卡片的五條規則；少了任何一條，該用哪四瓶、怎麼倒就不再唯一', () => {
+  assert.equal(G.BOTTLES_V.length, 6);
   const all = permute(CHEMS_V);
+  assert.equal(all.length, 720);
   const fits = rules => all.filter(P => rules.every(r => bottleRuleHolds(r, P)));
+  // 玩家真正要倒的：便條四步各用哪一瓶
+  const answerOf = P => G.DEVELOP_SEQUENCE_V.map(c => G.BOTTLES_V[P.indexOf(c)].id).join();
   const sol = fits(G.BOTTLE_RULES_V);
   assert.equal(sol.length, 1);
   assert.deepEqual(sol[0], G.BOTTLES_V.map(b => b.content));
   G.BOTTLE_RULES_V.forEach((r, i) => {
-    assert.ok(fits(G.BOTTLE_RULES_V.filter((_, j) => j !== i)).length > 1, `第 ${i + 1} 條規則是多餘的`);
+    const rest = fits(G.BOTTLE_RULES_V.filter((_, j) => j !== i));
+    assert.ok(new Set(rest.map(answerOf)).size > 1, `第 ${i + 1} 條規則是多餘的：少了它，答案仍然唯一`);
   });
+  // 用不到的兩瓶也必須拿來推理：卡片上有規則提到它們
+  for (const c of G.UNUSED_CHEMS_V) assert.ok(G.BOTTLE_RULES_V.some(r => r.a === c || r.b === c), `卡片沒有提到 ${c}`);
   assert.equal(G.docs.bottle_card_v.body.zh.length, 1 + G.BOTTLE_RULES_V.length);
 });
 
-test('資深・沖洗順序：便條的四步加上流程表的四條，八種藥劑的順序唯一；只看便條則無法確定', () => {
-  const core = ['developer', 'stop', 'fixer', 'water'];
-  const coreOk = P => core.every((c, i) => i === 0 || P.indexOf(core[i - 1]) < P.indexOf(c));
-  const ruleOk = (r, P) => {
-    const at = ch => P.indexOf(ch);
-    switch (r.k) {
-      case 'before': return at(r.a) < at(r.b);
-      case 'immAfter': return at(r.a) === at(r.b) + 1;
-      case 'between': return at(r.a) > at(r.after) && at(r.a) < at(r.before);
-      case 'last': return at(r.a) === P.length - 1;
-    }
-    throw new Error(r.k);
-  };
-  const all = permute(CHEMS_V).filter(coreOk);
-  const sol = all.filter(P => G.PROCESS_RULES_V.every(r => ruleOk(r, P)));
-  assert.equal(sol.length, 1);
-  assert.deepEqual(sol[0], G.DEVELOP_SEQUENCE_V);
-  assert.ok(all.length > 1);
-  // 便條上的基本順序，就是新手模式的那四步
-  assert.deepEqual(core, G.DEVELOP_SEQUENCE);
+test('資深・沖洗順序：只倒四步，就是便條上的順序；流程表寫明另外兩瓶用不到', () => {
+  assert.deepEqual(G.DEVELOP_SEQUENCE_V, G.DEVELOP_SEQUENCE);
+  assert.deepEqual(G.DEVELOP_SEQUENCE_V.concat(G.UNUSED_CHEMS_V).sort(), CHEMS_V.slice().sort(), '六瓶＝四種要用的＋兩種用不到的');
   assert.deepEqual(G.DEVELOP_ANSWER_V, G.DEVELOP_SEQUENCE_V.map(c => G.BOTTLES_V.find(b => b.content === c).id));
+  assert.notDeepEqual(G.DEVELOP_ANSWER_V, G.DEVELOP_ANSWER, '資深模式的答案和新手不同');
+  const chart = G.docs.process_chart.body;
+  for (const c of G.UNUSED_CHEMS_V) {
+    assert.ok(chart.zh.join('').includes(G.CHEM_NAMES[c].zh) && chart.en.join('').includes(G.CHEM_NAMES[c].en), `流程表沒有寫到 ${c}`);
+  }
+  assert.ok(/用不到/.test(chart.zh.join('')) && /won't need/.test(chart.en.join('')));
 });
 
 test('資深・天平：有了 5 兩紙鎮，三罐的重量才能唯一確定；密碼照園丁守則的順序', () => {

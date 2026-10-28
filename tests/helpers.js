@@ -159,7 +159,7 @@ function vetMainPath(P) {
   P.look('g_moonflower');
 }
 
-// 資深模式支線：暗房（八瓶藥劑）。dryingLine=false 時不拿晾片繩上的日記四（用來走「孤證」）
+// 資深模式支線：暗房（六瓶藥劑選四瓶）。dryingLine=false 時不拿晾片繩上的日記四（用來走「孤證」）
 function vetDarkroomPath(P, { dryingLine = true } = {}) {
   P.go('study');
   P.look('s_waste');

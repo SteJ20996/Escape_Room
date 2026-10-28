@@ -500,7 +500,7 @@
   /* ---------------- 暗房 ---------------- */
   function darkroom(v) {
     const f = v.s.flags;
-    const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K'), orange: L('橙', 'O'), purple: L('紫', 'P') };
+    const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K') };
     const vet = v.s.mode === 'veteran';
     if (!f.darkroomLit) {
       const r = rng(5);
@@ -533,7 +533,7 @@
     ${H(v, 'd_vent', `<rect x="820" y="40" width="90" height="50" fill="#050101"/><path d="M820 40 L910 40 L910 72 L882 90 L820 90 Z" fill="#140404"/>${[50, 60, 70].map(y => `<line x1="826" y1="${y}" x2="${y < 72 ? 904 : 896}" y2="${y}" stroke="#2a0806" stroke-width="2"/>`).join('')}<path d="M882 90 L910 72 L910 90 Z" fill="#050101"/>${headlights ? `<circle cx="901" cy="85" r="7" fill="#ffe9a8" opacity=".25"/><circle cx="897" cy="86" r="2" fill="#ffe9a8"/><circle cx="905" cy="86" r="2" fill="#ffe9a8"/>` : ''}<path d="M882 90 L910 72" stroke="#3a0d0a" stroke-width="2"/>${hit(814, 34, 102, 62)}`)}
     ${H(v, 'd_shelf', vet
       ? `<rect x="700" y="250" width="240" height="10" fill="#3a0d0a"/><rect x="700" y="250" width="240" height="2" fill="#6a2018"/>
-        ${G.BOTTLES_V.map((b, i) => `<rect x="${706 + i * 29}" y="200" width="22" height="50" rx="4" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${709 + i * 29}" y="204" width="4" height="40" fill="#ff6a50" opacity=".15"/><rect x="${708 + i * 29}" y="190" width="18" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${717 + i * 29}" y="232" text-anchor="middle" font-size="11" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
+        ${G.BOTTLES_V.map((b, i) => `<rect x="${708 + i * 38}" y="198" width="26" height="52" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${711 + i * 38}" y="202" width="5" height="42" fill="#ff6a50" opacity=".15"/><rect x="${710 + i * 38}" y="188" width="22" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${721 + i * 38}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
         <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(696, 180, 248, 126)}`
       : `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/><rect x="740" y="250" width="190" height="2" fill="#6a2018"/>
       ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${759 + i * 44}" y="200" width="5" height="44" fill="#ff6a50" opacity=".15"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
@@ -691,7 +691,7 @@
     `;
   }
 
-  const CAP_COLORS = { red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0', green: '#5fb86e', black: '#1c1c1c', orange: '#f08a3a', purple: '#a070d0' };
+  const CAP_COLORS = { red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0', green: '#5fb86e', black: '#1c1c1c' };
   const ROOM_ART = { foyer, study, greenhouse, observatory, darkroom, storeroom, attic };
   function scene(room, v) {
     // 模板裡的 <!-- 註解 --> 只是給讀程式的人看的，不放進畫面
@@ -1136,6 +1136,7 @@
     const ang = Math.max(-14, Math.min(14, diff * 3.5));
     const a = ang * Math.PI / 180, cx = 300, cy = 92, arm = 190;
     const ends = [[cx - arm * Math.cos(a), cy - arm * Math.sin(a)], [cx + arm * Math.cos(a), cy + arm * Math.sin(a)]];
+    // 橫桿畫成「旋轉的長方形」而不是漸層描邊的線：水平線的外框高度為 0，漸層畫不出來，平衡時橫桿會整條消失
     const tinColor = { tin_moon: ['#6f8fb8', '#9fb6d8'], tin_fern: ['#4f8a5b', '#7fb08a'], tin_cactus: ['#c9a46a', '#e3c99a'] };
     const drawThing = (th, x, y) => {
       if (tinColor[th.id]) {
@@ -1161,7 +1162,7 @@
       <rect x="0" y="276" width="600" height="24" fill="#3a2414"/>
       <rect x="262" y="262" width="76" height="16" rx="3" fill="#3a3f45"/><rect x="294" y="${cy}" width="12" height="172" fill="url(#bl-brass)"/>
       ${pan(ends[0], onL)}${pan(ends[1], onR)}
-      <line x1="${ends[0][0]}" y1="${ends[0][1]}" x2="${ends[1][0]}" y2="${ends[1][1]}" stroke="url(#bl-brass)" stroke-width="8" stroke-linecap="round"/>
+      <rect class="balance-beam" x="${cx - arm - 4}" y="${cy - 4}" width="${arm * 2 + 8}" height="8" rx="4" fill="url(#bl-brass)" transform="rotate(${ang} ${cx} ${cy})"/>
       <circle cx="${cx}" cy="${cy}" r="9" fill="#c9a24f" stroke="#f3d68f" stroke-width="2"/>
       <path d="M${cx} ${cy} L${cx + Math.sin(a) * 56} ${cy - Math.cos(a) * 56}" stroke="${level ? '#8cc49a' : '#e39a8a'}" stroke-width="4" stroke-linecap="round"/>
       <path d="M${cx - 30} ${cy - 50} A58 58 0 0 1 ${cx + 30} ${cy - 50}" fill="none" stroke="#6b4a1e" stroke-width="2"/><line x1="${cx}" y1="${cy - 62}" x2="${cx}" y2="${cy - 52}" stroke="#e8dcc0" stroke-width="2"/>

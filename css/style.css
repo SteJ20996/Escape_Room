@@ -473,8 +473,7 @@ textarea.code {
 .pot-row b.dug { background: #4a3a2c; color: #9d8e7a; }
 .pot-row span { margin: 0 4px; white-space: nowrap; }
 .pots.eight .pot q { font-size: 1rem; }
-.bottles.eight { grid-template-columns: repeat(8, minmax(44px, 72px)); gap: 6px; }
-.bottles.eight .bottle-btn span { font-size: .78rem; }
+.bottles.six { grid-template-columns: repeat(6, minmax(52px, 84px)); gap: 8px; }
 .badge-vet { margin-left: auto; font-size: .75rem; color: #f0a080; border: 1px solid #6a3a2a; border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
 
 /* ---------- 語言切換 ---------- */
@@ -510,8 +509,8 @@ html:lang(en) .inv-tile { font-size: .82rem; line-height: 1.2; }
 html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
 @media (max-width: 520px) {
-  /* 資深模式的八瓶藥劑、六個相框：手機上換行，照片才看得清楚 */
-  .bottles.eight { grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+  /* 資深模式的六瓶藥劑、六個相框：手機上換行，照片才看得清楚 */
+  .bottles.six { grid-template-columns: repeat(3, minmax(56px, 1fr)); }
   .frames { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   html:lang(en) .picker-row { grid-template-columns: 5.6em 40px minmax(4.5em, auto) 40px; }
   .title-card { margin-bottom: 18vh; }

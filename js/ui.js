@@ -841,17 +841,19 @@
       const hasNote = app.s.inv.includes('note_full');
       return {
         title: T('devTitle'),
-        html: `<p class="lead">${tx(steps > 4 ? 'devLeadV' : 'devLead')}</p>
-          <div class="bottles ${steps > 4 ? 'eight' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
+        html: `<p class="lead">${tx(V.bottles.length > steps ? 'devLeadV' : 'devLead')}</p>
+          <div class="bottles ${V.bottles.length > 4 ? 'six' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
           <div class="slots">${[...Array(steps).keys()].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
           ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
-          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}`)}`,
+          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}${app.s.mode === 'veteran' ? `<button class="btn small" type="button" data-chart="1">${tx('readChart')}</button>` : ''}`)}`,
         bind(root) {
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
           root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
           // 透過「查看藥瓶架」讀卡片，遊戲才會記得你讀過（沖洗台要讀過卡片才能作答）
           root.querySelector('[data-doc]').onclick = () => act(() => E.interact(app.s, 'd_shelf'));
+          const chart = root.querySelector('[data-chart]');
+          if (chart) chart.onclick = () => act(() => E.interact(app.s, 'd_chart'));
           const n = root.querySelector('[data-note]');
           if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
         },

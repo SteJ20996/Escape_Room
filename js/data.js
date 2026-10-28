@@ -29,7 +29,7 @@
   ];
   const COLOR_NAMES = {
     red: L('紅', 'red'), yellow: L('黃', 'yellow'), blue: L('藍', 'blue'), green: L('綠', 'green'), brown: L('棕', 'brown'),
-    white: L('白', 'white'), black: L('黑', 'black'), orange: L('橙', 'orange'), purple: L('紫', 'purple'),
+    white: L('白', 'white'), black: L('黑', 'black'),
   };
   const DRAWER_ORDER = ['red', 'yellow', 'blue', 'green'];
   const DRAWER_CODE = DRAWER_ORDER.map(c => BOOKS.find(b => b.color === c).vol).join('');
@@ -217,8 +217,8 @@
   ];
   const CHEM_NAMES = {
     developer: L('顯影液', 'developer'), stop: L('停影液', 'stop bath'), fixer: L('定影液', 'fixer'), water: L('清水', 'water'),
-    // 以下四種只出現在資深模式
-    presoak: L('預浸液', 'pre-soak'), toner: L('調色液', 'toner'), hypo: L('洗淨液', 'hypo clearing agent'), wetting: L('潤濕液', 'wetting agent'),
+    // 以下兩種只出現在資深模式：沖相紙用的，沖玻璃底片用不到
+    toner: L('調色液', 'toner'), hypo: L('洗淨液', 'hypo clearing agent'),
   };
   const DEVELOP_SEQUENCE = ['developer', 'stop', 'fixer', 'water'];
   const DEVELOP_ANSWER = DEVELOP_SEQUENCE.map(ch => BOTTLES.find(b => b.content === ch).id);
@@ -295,7 +295,8 @@
   const MIRROR_PATH_V = beamPaths(MIRROR_GRID_V)[0];
   const MIRROR_SOLUTION_V = Object.assign({}, MIRROR_GRID_V.initial, MIRROR_PATH_V);
 
-  // 資深・顯影：八瓶藥劑（瓶蓋顏色由左到右固定）。內容物由藥瓶卡片的八條規則唯一決定。
+  // 資深・顯影：架上六瓶藥劑（瓶蓋顏色由左到右固定），沖玻璃底片只用其中四瓶（照便條的四步）。
+  // 另外兩瓶（調色液、洗淨液）是沖相紙用的；卡片的五條規則要連這兩瓶一起推，才分得出該用哪四瓶。
   const BOTTLES_V = [
     { id: 'red', name: L('紅蓋', 'Red cap'), content: 'stop' },
     { id: 'blue', name: L('藍蓋', 'Blue cap'), content: 'toner' },
@@ -303,28 +304,20 @@
     { id: 'white', name: L('白蓋', 'White cap'), content: 'fixer' },
     { id: 'green', name: L('綠蓋', 'Green cap'), content: 'hypo' },
     { id: 'black', name: L('黑蓋', 'Black cap'), content: 'developer' },
-    { id: 'orange', name: L('橙蓋', 'Orange cap'), content: 'wetting' },
-    { id: 'purple', name: L('紫蓋', 'Purple cap'), content: 'presoak' },
   ];
-  // 卡片上的規則（同時供文件顯示與測試驗證唯一解）
+  const UNUSED_CHEMS_V = ['toner', 'hypo'];
+  // 卡片上的規則（同時供文件顯示與測試驗證唯一解）。推理順序：
+  // 顯影液在一端、洗淨液在它左邊 → 顯影液在最右（黑）；隔一瓶 → 定影液（白）；清水只剩黃；
+  // 停影液緊挨在調色液左邊，剩下紅、藍、綠三瓶只有紅藍相鄰 → 停影液紅、調色液藍、洗淨液綠。
   const BOTTLE_RULES_V = [
-    { k: 'half', a: 'wetting', half: 'right' },
-    { k: 'notCaps', a: 'toner', caps: ['yellow', 'orange'] },
-    { k: 'notCaps', a: 'developer', caps: ['red', 'orange'] },
-    { k: 'adjacent', a: 'wetting', b: 'developer' },
-    { k: 'notAdjacent', a: 'stop', b: 'hypo' },
-    { k: 'immLeft', a: 'hypo', b: 'developer' },
-    { k: 'leftOf', a: 'fixer', b: 'presoak' },
-    { k: 'gap', a: 'fixer', b: 'stop', between: 2 },
+    { k: 'end', a: 'developer' },
+    { k: 'immLeft', a: 'stop', b: 'toner' },
+    { k: 'leftOf', a: 'hypo', b: 'developer' },
+    { k: 'gap', a: 'developer', b: 'fixer', between: 1 },
+    { k: 'caps', a: 'water', caps: ['yellow', 'white'] },
   ];
-  // 沖洗順序：便條給了「顯影→停影→定影→清水」，暗房牆上的流程表補上另外四種藥劑的位置
-  const PROCESS_RULES_V = [
-    { k: 'before', a: 'presoak', b: 'developer' },
-    { k: 'immAfter', a: 'toner', b: 'fixer' },
-    { k: 'between', a: 'hypo', after: 'toner', before: 'water' },
-    { k: 'last', a: 'wetting' },
-  ];
-  const DEVELOP_SEQUENCE_V = ['presoak', 'developer', 'stop', 'fixer', 'toner', 'hypo', 'water', 'wetting'];
+  // 沖洗順序：就是便條上的四步
+  const DEVELOP_SEQUENCE_V = DEVELOP_SEQUENCE;
   const DEVELOP_ANSWER_V = DEVELOP_SEQUENCE_V.map(ch => BOTTLES_V.find(b => b.content === ch).id);
 
   // 資深・天平：三個種子罐的重量（兩）只能用天平量出來；砝碼只有 2 兩一個，另一個 5 兩被借去當紙鎮。
@@ -389,25 +382,16 @@
     const c = id => CHEM_NAMES[id];
     const A = c(r.a), B = r.b && c(r.b);
     switch (r.k) {
-      case 'half': return L(`${A.zh}放在架子的右半邊（右邊四瓶之中）。`, `The ${A.en} is in the right half of the shelf (one of the four on the right).`);
+      case 'end': return L(`${A.zh}放在架子的最左邊或最右邊。`, `The ${A.en} is at one end of the shelf — far left or far right.`);
+      case 'caps': return L(`${A.zh}的瓶蓋是${COLOR_NAMES[r.caps[0]].zh}色或${COLOR_NAMES[r.caps[1]].zh}色。`, `The ${A.en}'s cap is ${COLOR_NAMES[r.caps[0]].en} or ${COLOR_NAMES[r.caps[1]].en}.`);
       case 'notCaps': return L(`${A.zh}的瓶蓋既不是${COLOR_NAMES[r.caps[0]].zh}色，也不是${COLOR_NAMES[r.caps[1]].zh}色。`, `The ${A.en}'s cap is neither ${COLOR_NAMES[r.caps[0]].en} nor ${COLOR_NAMES[r.caps[1]].en}.`);
       case 'adjacent': return L(`${A.zh}和${B.zh}緊挨在一起。`, `The ${A.en} and the ${B.en} stand side by side.`);
       case 'notAdjacent': return L(`${A.zh}和${B.zh}沒有挨在一起。`, `The ${A.en} and the ${B.en} are not next to each other.`);
       case 'immLeft': return L(`${A.zh}就在${B.zh}的緊左邊。`, `The ${A.en} stands immediately to the left of the ${B.en}.`);
       case 'leftOf': return L(`${A.zh}在${B.zh}左邊的某處。`, `The ${A.en} is somewhere to the left of the ${B.en}.`);
-      case 'gap': return L(`${A.zh}和${B.zh}之間，正好隔著兩瓶。`, `There are exactly two bottles between the ${A.en} and the ${B.en}.`);
+      case 'gap': return L(`${A.zh}和${B.zh}之間，正好隔著${'零一兩三'[r.between]}瓶。`, `There ${r.between === 1 ? 'is exactly one bottle' : `are exactly ${['no', 'one', 'two', 'three'][r.between]} bottles`} between the ${A.en} and the ${B.en}.`);
     }
     throw new Error('未知的藥瓶規則：' + r.k);
-  }
-  function processRuleText(r) {
-    const c = id => CHEM_NAMES[id];
-    switch (r.k) {
-      case 'before': return L(`${c(r.a).zh}要在${c(r.b).zh}之前。`, `The ${c(r.a).en} comes before the ${c(r.b).en}.`);
-      case 'immAfter': return L(`${c(r.a).zh}緊接在${c(r.b).zh}之後。`, `The ${c(r.a).en} comes immediately after the ${c(r.b).en}.`);
-      case 'between': return L(`${c(r.a).zh}在${c(r.after).zh}之後、${c(r.before).zh}之前。`, `The ${c(r.a).en} comes after the ${c(r.after).en} and before the ${c(r.before).en}.`);
-      case 'last': return L(`${c(r.a).zh}永遠是最後一步。`, `The ${c(r.a).en} is always the very last step.`);
-    }
-    throw new Error('未知的流程規則：' + r.k);
   }
   const docs = {
     letter: {
@@ -748,19 +732,19 @@
       title: L('牆上的沖洗流程表', 'Developing Chart on the Wall'), style: 'hand',
       body: L([
         '玻璃底片沖洗流程（陸觀手寫）',
-        '基本的四步，寫在給阿遙的便條上。其餘四種藥劑：',
-        ...PROCESS_RULES_V.map((r, i) => `${'一二三四'[i]}、${processRuleText(r).zh}`),
+        '玻璃底片只用四種藥劑：顯影液、停影液、定影液、清水。順序寫在給阿遙的便條上。',
+        '架上另外兩瓶——調色液和洗淨液——是沖相紙用的，這次用不到。',
       ], [
         'Developing a glass plate (in Lu Guan\'s hand)',
-        'The four basic steps are on my note to Yao. The other four chemicals:',
-        ...PROCESS_RULES_V.map((r, i) => `${i + 1}. ${processRuleText(r).en}`),
+        'A glass plate needs only four chemicals: developer, stop bath, fixer and water. The order is on my note to Yao.',
+        'The other two bottles on the shelf — toner and hypo clearing agent — are for printing paper. You won\'t need them.',
       ]),
     },
     bottle_card_v: {
       title: L('藥瓶架上的卡片', 'Card on the Bottle Shelf'), style: 'hand',
       body: L([
         `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
-        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六七八'[i]}、${bottleRuleText(r).zh}`),
+        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六'[i]}、${bottleRuleText(r).zh}`),
       ], [
         `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
         ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
@@ -1770,7 +1754,7 @@
         if (pick.join() === answer.join()) {
           ctx.set('plateDeveloped');
           ctx.say(L('你先用一張廢片試了一次——影像清清楚楚地浮現出來。順序對了。', 'First you try a scrap of film — the image comes up crisp and clear. The order is right.'), 'good');
-          ctx.say(L(`你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過${VET(ctx.s) ? '八' : '四'}個藥盤。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。`, `You open the light-tight box, take out the glass plate sealed away for twenty years, and pass it through the ${VET(ctx.s) ? 'eight' : 'four'} trays in turn. Under the red light the stars appear one by one — and among them, a comet with a short tail.`), 'event');
+          ctx.say(L(`你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過三個藥盤和清洗槽。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。`, `You open the light-tight box, take out the glass plate sealed away for twenty years, and pass it through the three trays and the rinse bath in turn. Under the red light the stars appear one by one — and among them, a comet with a short tail.`), 'event');
           ctx.give('plate');
           return true;
         }
@@ -2398,9 +2382,9 @@
       id: 'develop_v', mode: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
-        L('要推兩件事：八種藥劑的先後順序，和八個瓶子各裝什麼。拼好的便條給了基本的四步，牆上的流程表補上另外四種；藥瓶架上的卡片有八條規則。', 'You need two things: the order of the eight chemicals, and what is in each of the eight bottles. The mended note gives the four basic steps, the chart on the wall places the other four, and the card on the bottle shelf has eight rules.'),
-        L(`順序是：${DEVELOP_SEQUENCE_V.map(c => CHEM_NAMES[c].zh).join('→')}。排瓶子時，先把「洗淨液—顯影液—潤濕液」當成連在一起的一組，再用「潤濕液在右半邊」「顯影液不是紅、橙蓋」和「定影液與停影液隔兩瓶」排除不可能的位置。`, `The order is: ${DEVELOP_SEQUENCE_V.map(c => CHEM_NAMES[c].en).join(' → ')}. For the bottles, treat "hypo clearing agent – developer – wetting agent" as one block, then use "wetting agent in the right half", "developer's cap not red or orange" and "two bottles between the fixer and the stop bath" to rule positions out.`),
-        L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+        L('架上有六瓶，但只倒四步：拼好的便條給了順序，牆上的流程表說明哪兩種藥劑用不到，藥瓶架上的卡片有五條規則，能推出每一瓶是什麼。', 'There are six bottles but only four steps: the mended note gives the order, the chart on the wall says which two chemicals you won\'t need, and the card on the bottle shelf has five rules that tell you what each bottle holds.'),
+        L('從卡片第一條和第三條開始：顯影液在一端，而洗淨液在它左邊，所以顯影液在最右邊。接著用第四條找定影液、第五條找清水，最後用第二條排出停影液和調色液。', 'Start with rules 1 and 3: the developer is at one end and the hypo clearing agent is to its left, so the developer is on the far right. Then rule 4 finds the fixer, rule 5 the water, and rule 2 places the stop bath and the toner.'),
+        L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。用不到調色液和洗淨液。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. The toner and the hypo clearing agent aren\'t used. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
       ],
     },
     {
@@ -2458,7 +2442,7 @@
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
     POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
-    BOTTLES_V, BOTTLE_RULES_V, PROCESS_RULES_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
+    BOTTLES_V, BOTTLE_RULES_V, UNUSED_CHEMS_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
   };

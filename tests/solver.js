@@ -84,7 +84,7 @@ function wrongAnswers(pid, mode = 'novice') {
     case 'musicbox': return [G.MUSIC_ANSWER.slice().reverse(), [1, 2, 3], [0, 11], [], null];
     case 'dial': return [G.DIAL_ANSWER.slice().reverse(), ['lamp', 'lamp', 'lamp'], [], null];
     case 'develop': return mode === 'veteran'
-      ? [G.DEVELOP_ANSWER_V.slice().reverse(), G.DEVELOP_ANSWER, ['purple'], null]   // 新手模式的答案在資深模式是錯的
+      ? [G.DEVELOP_ANSWER_V.slice().reverse(), G.DEVELOP_ANSWER, ['green', 'red', 'white', 'yellow'], ['purple'], null]   // 新手模式的答案在資深模式是錯的；用到干擾瓶也是錯的
       : [G.DEVELOP_ANSWER.slice().reverse(), ['red'], null, G.DEVELOP_ANSWER_V];
     case 'phone': return ['maybe', null];
     case 'exit': return ['fly', null];

@@ -537,6 +537,8 @@ async function vetStoreroom(P) {
   await pan('tin_fern', ''); await pan('tin_moon', '');
   await pan('tin_moon', 'L'); await pan('w2', 'L'); await pan('w5', 'R');
   ok((await read()) === ui('balanceReadEven', P.lang), '月光花＋2 兩＝5 兩：平衡');
+  const beam = await page.locator('#modal-body .balance-beam').boundingBox();
+  ok(beam && beam.width > 100 && beam.height >= 4, '平衡時橫桿也要看得見');
   await P.shot('balance');
   await page.click('#modal-body [data-act=clear]');
   ok(await page.locator('#modal-body [data-pan$=":L"].cur').count() === 0, '清空天平');
@@ -695,15 +697,19 @@ async function vetDarkroom(P, { dryingLine = true } = {}) {
   await P.obj('d_chart'); await P.shot('process-chart'); await P.close();
   await P.obj('d_shelf'); await P.shot('bottle-card-v'); await P.close();
   await P.obj('d_tray');
-  ok(await page.locator('#modal-body [data-bottle]').count() === 8, '資深模式有八瓶藥劑');
+  ok(await page.locator('#modal-body [data-bottle]').count() === 6 && await page.locator('#modal-body .slot').count() === 4, '資深模式：六瓶藥劑、四個步驟');
   await page.click('#modal-body [data-doc]');
-  await P.modalHas(X(/潤濕液/, /wetting agent/), '沖洗台的「看卡片」打開資深的藥瓶卡片');
+  await P.modalHas(X(/洗淨液/, /hypo clearing agent/), '沖洗台的「看卡片」打開資深的藥瓶卡片');
   await page.click('#modal-back-btn');
-  for (const b of ['red', 'blue', 'yellow', 'white', 'green', 'black', 'orange', 'purple']) await page.click(`#modal-body [data-bottle="${b}"]`);
+  await page.click('#modal-body [data-chart]');
+  await P.modalHas(X(/用不到/, /won't need/), '沖洗台的「看流程表」寫明哪兩瓶用不到');
+  await page.click('#modal-back-btn');
+  // 選錯一瓶（用了沖相紙的洗淨液，而不是顯影液）也只得到「不對」
+  for (const b of ['green', 'red', 'white', 'yellow']) await page.click(`#modal-body [data-bottle="${b}"]`);
   await page.click('#modal-body [data-act=go]');
   await P.feedback(X(/一片模糊。不對。/, /just a blur\. Not right\./));
   for (const b of G.DEVELOP_ANSWER_V) await page.click(`#modal-body [data-bottle="${b}"]`);
-  await P.shot('develop8');
+  await P.shot('develop6');
   await page.click('#modal-body [data-act=go]');
   await P.said(X(/彗星/, /comet/));
   ok(await P.has('plate'), '底片');
@@ -1014,7 +1020,7 @@ async function mobileRun(browser, lang) {
   await page.fill('#code-in', VET_DARKROOM_CODE);
   await page.click('#modal-body [data-act=import]');
   ok((await page.locator('#room-name').innerText()).trim() === G.rooms.darkroom.name[lang], '存檔碼的進度停在暗房');
-  await view('develop8', () => P.obj('d_tray'));
+  await view('develop6', () => P.obj('d_tray'));
   await page.context().close();
 }
 

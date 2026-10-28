@@ -480,8 +480,7 @@ textarea.code {
 .pot-row b.dug { background: #4a3a2c; color: #9d8e7a; }
 .pot-row span { margin: 0 4px; white-space: nowrap; }
 .pots.eight .pot q { font-size: 1rem; }
-.bottles.eight { grid-template-columns: repeat(8, minmax(44px, 72px)); gap: 6px; }
-.bottles.eight .bottle-btn span { font-size: .78rem; }
+.bottles.six { grid-template-columns: repeat(6, minmax(52px, 84px)); gap: 8px; }
 .badge-vet { margin-left: auto; font-size: .75rem; color: #f0a080; border: 1px solid #6a3a2a; border-radius: 999px; padding: 0 .6em; white-space: nowrap; }
 
 /* ---------- 語言切換 ---------- */
@@ -517,8 +516,8 @@ html:lang(en) .inv-tile { font-size: .82rem; line-height: 1.2; }
 html:lang(en) .scene-svg text { letter-spacing: .02em; }
 
 @media (max-width: 520px) {
-  /* 資深模式的八瓶藥劑、六個相框：手機上換行，照片才看得清楚 */
-  .bottles.eight { grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+  /* 資深模式的六瓶藥劑、六個相框：手機上換行，照片才看得清楚 */
+  .bottles.six { grid-template-columns: repeat(3, minmax(56px, 1fr)); }
   .frames { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   html:lang(en) .picker-row { grid-template-columns: 5.6em 40px minmax(4.5em, auto) 40px; }
   .title-card { margin-bottom: 18vh; }
@@ -658,7 +657,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   ];
   const COLOR_NAMES = {
     red: L('紅', 'red'), yellow: L('黃', 'yellow'), blue: L('藍', 'blue'), green: L('綠', 'green'), brown: L('棕', 'brown'),
-    white: L('白', 'white'), black: L('黑', 'black'), orange: L('橙', 'orange'), purple: L('紫', 'purple'),
+    white: L('白', 'white'), black: L('黑', 'black'),
   };
   const DRAWER_ORDER = ['red', 'yellow', 'blue', 'green'];
   const DRAWER_CODE = DRAWER_ORDER.map(c => BOOKS.find(b => b.color === c).vol).join('');
@@ -846,8 +845,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   ];
   const CHEM_NAMES = {
     developer: L('顯影液', 'developer'), stop: L('停影液', 'stop bath'), fixer: L('定影液', 'fixer'), water: L('清水', 'water'),
-    // 以下四種只出現在資深模式
-    presoak: L('預浸液', 'pre-soak'), toner: L('調色液', 'toner'), hypo: L('洗淨液', 'hypo clearing agent'), wetting: L('潤濕液', 'wetting agent'),
+    // 以下兩種只出現在資深模式：沖相紙用的，沖玻璃底片用不到
+    toner: L('調色液', 'toner'), hypo: L('洗淨液', 'hypo clearing agent'),
   };
   const DEVELOP_SEQUENCE = ['developer', 'stop', 'fixer', 'water'];
   const DEVELOP_ANSWER = DEVELOP_SEQUENCE.map(ch => BOTTLES.find(b => b.content === ch).id);
@@ -924,7 +923,8 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   const MIRROR_PATH_V = beamPaths(MIRROR_GRID_V)[0];
   const MIRROR_SOLUTION_V = Object.assign({}, MIRROR_GRID_V.initial, MIRROR_PATH_V);
 
-  // 資深・顯影：八瓶藥劑（瓶蓋顏色由左到右固定）。內容物由藥瓶卡片的八條規則唯一決定。
+  // 資深・顯影：架上六瓶藥劑（瓶蓋顏色由左到右固定），沖玻璃底片只用其中四瓶（照便條的四步）。
+  // 另外兩瓶（調色液、洗淨液）是沖相紙用的；卡片的五條規則要連這兩瓶一起推，才分得出該用哪四瓶。
   const BOTTLES_V = [
     { id: 'red', name: L('紅蓋', 'Red cap'), content: 'stop' },
     { id: 'blue', name: L('藍蓋', 'Blue cap'), content: 'toner' },
@@ -932,28 +932,20 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     { id: 'white', name: L('白蓋', 'White cap'), content: 'fixer' },
     { id: 'green', name: L('綠蓋', 'Green cap'), content: 'hypo' },
     { id: 'black', name: L('黑蓋', 'Black cap'), content: 'developer' },
-    { id: 'orange', name: L('橙蓋', 'Orange cap'), content: 'wetting' },
-    { id: 'purple', name: L('紫蓋', 'Purple cap'), content: 'presoak' },
   ];
-  // 卡片上的規則（同時供文件顯示與測試驗證唯一解）
+  const UNUSED_CHEMS_V = ['toner', 'hypo'];
+  // 卡片上的規則（同時供文件顯示與測試驗證唯一解）。推理順序：
+  // 顯影液在一端、洗淨液在它左邊 → 顯影液在最右（黑）；隔一瓶 → 定影液（白）；清水只剩黃；
+  // 停影液緊挨在調色液左邊，剩下紅、藍、綠三瓶只有紅藍相鄰 → 停影液紅、調色液藍、洗淨液綠。
   const BOTTLE_RULES_V = [
-    { k: 'half', a: 'wetting', half: 'right' },
-    { k: 'notCaps', a: 'toner', caps: ['yellow', 'orange'] },
-    { k: 'notCaps', a: 'developer', caps: ['red', 'orange'] },
-    { k: 'adjacent', a: 'wetting', b: 'developer' },
-    { k: 'notAdjacent', a: 'stop', b: 'hypo' },
-    { k: 'immLeft', a: 'hypo', b: 'developer' },
-    { k: 'leftOf', a: 'fixer', b: 'presoak' },
-    { k: 'gap', a: 'fixer', b: 'stop', between: 2 },
+    { k: 'end', a: 'developer' },
+    { k: 'immLeft', a: 'stop', b: 'toner' },
+    { k: 'leftOf', a: 'hypo', b: 'developer' },
+    { k: 'gap', a: 'developer', b: 'fixer', between: 1 },
+    { k: 'caps', a: 'water', caps: ['yellow', 'white'] },
   ];
-  // 沖洗順序：便條給了「顯影→停影→定影→清水」，暗房牆上的流程表補上另外四種藥劑的位置
-  const PROCESS_RULES_V = [
-    { k: 'before', a: 'presoak', b: 'developer' },
-    { k: 'immAfter', a: 'toner', b: 'fixer' },
-    { k: 'between', a: 'hypo', after: 'toner', before: 'water' },
-    { k: 'last', a: 'wetting' },
-  ];
-  const DEVELOP_SEQUENCE_V = ['presoak', 'developer', 'stop', 'fixer', 'toner', 'hypo', 'water', 'wetting'];
+  // 沖洗順序：就是便條上的四步
+  const DEVELOP_SEQUENCE_V = DEVELOP_SEQUENCE;
   const DEVELOP_ANSWER_V = DEVELOP_SEQUENCE_V.map(ch => BOTTLES_V.find(b => b.content === ch).id);
 
   // 資深・天平：三個種子罐的重量（兩）只能用天平量出來；砝碼只有 2 兩一個，另一個 5 兩被借去當紙鎮。
@@ -1018,25 +1010,16 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     const c = id => CHEM_NAMES[id];
     const A = c(r.a), B = r.b && c(r.b);
     switch (r.k) {
-      case 'half': return L(`${A.zh}放在架子的右半邊（右邊四瓶之中）。`, `The ${A.en} is in the right half of the shelf (one of the four on the right).`);
+      case 'end': return L(`${A.zh}放在架子的最左邊或最右邊。`, `The ${A.en} is at one end of the shelf — far left or far right.`);
+      case 'caps': return L(`${A.zh}的瓶蓋是${COLOR_NAMES[r.caps[0]].zh}色或${COLOR_NAMES[r.caps[1]].zh}色。`, `The ${A.en}'s cap is ${COLOR_NAMES[r.caps[0]].en} or ${COLOR_NAMES[r.caps[1]].en}.`);
       case 'notCaps': return L(`${A.zh}的瓶蓋既不是${COLOR_NAMES[r.caps[0]].zh}色，也不是${COLOR_NAMES[r.caps[1]].zh}色。`, `The ${A.en}'s cap is neither ${COLOR_NAMES[r.caps[0]].en} nor ${COLOR_NAMES[r.caps[1]].en}.`);
       case 'adjacent': return L(`${A.zh}和${B.zh}緊挨在一起。`, `The ${A.en} and the ${B.en} stand side by side.`);
       case 'notAdjacent': return L(`${A.zh}和${B.zh}沒有挨在一起。`, `The ${A.en} and the ${B.en} are not next to each other.`);
       case 'immLeft': return L(`${A.zh}就在${B.zh}的緊左邊。`, `The ${A.en} stands immediately to the left of the ${B.en}.`);
       case 'leftOf': return L(`${A.zh}在${B.zh}左邊的某處。`, `The ${A.en} is somewhere to the left of the ${B.en}.`);
-      case 'gap': return L(`${A.zh}和${B.zh}之間，正好隔著兩瓶。`, `There are exactly two bottles between the ${A.en} and the ${B.en}.`);
+      case 'gap': return L(`${A.zh}和${B.zh}之間，正好隔著${'零一兩三'[r.between]}瓶。`, `There ${r.between === 1 ? 'is exactly one bottle' : `are exactly ${['no', 'one', 'two', 'three'][r.between]} bottles`} between the ${A.en} and the ${B.en}.`);
     }
     throw new Error('未知的藥瓶規則：' + r.k);
-  }
-  function processRuleText(r) {
-    const c = id => CHEM_NAMES[id];
-    switch (r.k) {
-      case 'before': return L(`${c(r.a).zh}要在${c(r.b).zh}之前。`, `The ${c(r.a).en} comes before the ${c(r.b).en}.`);
-      case 'immAfter': return L(`${c(r.a).zh}緊接在${c(r.b).zh}之後。`, `The ${c(r.a).en} comes immediately after the ${c(r.b).en}.`);
-      case 'between': return L(`${c(r.a).zh}在${c(r.after).zh}之後、${c(r.before).zh}之前。`, `The ${c(r.a).en} comes after the ${c(r.after).en} and before the ${c(r.before).en}.`);
-      case 'last': return L(`${c(r.a).zh}永遠是最後一步。`, `The ${c(r.a).en} is always the very last step.`);
-    }
-    throw new Error('未知的流程規則：' + r.k);
   }
   const docs = {
     letter: {
@@ -1377,19 +1360,19 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       title: L('牆上的沖洗流程表', 'Developing Chart on the Wall'), style: 'hand',
       body: L([
         '玻璃底片沖洗流程（陸觀手寫）',
-        '基本的四步，寫在給阿遙的便條上。其餘四種藥劑：',
-        ...PROCESS_RULES_V.map((r, i) => `${'一二三四'[i]}、${processRuleText(r).zh}`),
+        '玻璃底片只用四種藥劑：顯影液、停影液、定影液、清水。順序寫在給阿遙的便條上。',
+        '架上另外兩瓶——調色液和洗淨液——是沖相紙用的，這次用不到。',
       ], [
         'Developing a glass plate (in Lu Guan\'s hand)',
-        'The four basic steps are on my note to Yao. The other four chemicals:',
-        ...PROCESS_RULES_V.map((r, i) => `${i + 1}. ${processRuleText(r).en}`),
+        'A glass plate needs only four chemicals: developer, stop bath, fixer and water. The order is on my note to Yao.',
+        'The other two bottles on the shelf — toner and hypo clearing agent — are for printing paper. You won\'t need them.',
       ]),
     },
     bottle_card_v: {
       title: L('藥瓶架上的卡片', 'Card on the Bottle Shelf'), style: 'hand',
       body: L([
         `藥瓶的標籤都被我撕掉了，只剩瓶蓋顏色。架上由左到右：${BOTTLES_V.map(b => COLOR_NAMES[b.id].zh).join('、')}。`,
-        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六七八'[i]}、${bottleRuleText(r).zh}`),
+        ...BOTTLE_RULES_V.map((r, i) => `${'一二三四五六'[i]}、${bottleRuleText(r).zh}`),
       ], [
         `I tore the labels off the bottles; only the cap colors are left. On the shelf, left to right: ${BOTTLES_V.map(b => COLOR_NAMES[b.id].en).join(', ')}.`,
         ...BOTTLE_RULES_V.map((r, i) => `${i + 1}. ${bottleRuleText(r).en}`),
@@ -2399,7 +2382,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
         if (pick.join() === answer.join()) {
           ctx.set('plateDeveloped');
           ctx.say(L('你先用一張廢片試了一次——影像清清楚楚地浮現出來。順序對了。', 'First you try a scrap of film — the image comes up crisp and clear. The order is right.'), 'good');
-          ctx.say(L(`你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過${VET(ctx.s) ? '八' : '四'}個藥盤。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。`, `You open the light-tight box, take out the glass plate sealed away for twenty years, and pass it through the ${VET(ctx.s) ? 'eight' : 'four'} trays in turn. Under the red light the stars appear one by one — and among them, a comet with a short tail.`), 'event');
+          ctx.say(L(`你打開避光盒，取出那張封存了二十年的玻璃底片，依序浸過三個藥盤和清洗槽。紅光下，群星一顆顆浮現，星群之間，是一顆拖著短尾的彗星。`, `You open the light-tight box, take out the glass plate sealed away for twenty years, and pass it through the three trays and the rinse bath in turn. Under the red light the stars appear one by one — and among them, a comet with a short tail.`), 'event');
           ctx.give('plate');
           return true;
         }
@@ -3027,9 +3010,9 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       id: 'develop_v', mode: 'veteran', stage: 'truth', title: L('沖洗底片（選擇性）', 'Developing the Plate (Optional)'),
       avail: s => F(s, 'darkroomLit'), done: s => F(s, 'plateDeveloped'),
       texts: [
-        L('要推兩件事：八種藥劑的先後順序，和八個瓶子各裝什麼。拼好的便條給了基本的四步，牆上的流程表補上另外四種；藥瓶架上的卡片有八條規則。', 'You need two things: the order of the eight chemicals, and what is in each of the eight bottles. The mended note gives the four basic steps, the chart on the wall places the other four, and the card on the bottle shelf has eight rules.'),
-        L(`順序是：${DEVELOP_SEQUENCE_V.map(c => CHEM_NAMES[c].zh).join('→')}。排瓶子時，先把「洗淨液—顯影液—潤濕液」當成連在一起的一組，再用「潤濕液在右半邊」「顯影液不是紅、橙蓋」和「定影液與停影液隔兩瓶」排除不可能的位置。`, `The order is: ${DEVELOP_SEQUENCE_V.map(c => CHEM_NAMES[c].en).join(' → ')}. For the bottles, treat "hypo clearing agent – developer – wetting agent" as one block, then use "wetting agent in the right half", "developer's cap not red or orange" and "two bottles between the fixer and the stop bath" to rule positions out.`),
-        L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
+        L('架上有六瓶，但只倒四步：拼好的便條給了順序，牆上的流程表說明哪兩種藥劑用不到，藥瓶架上的卡片有五條規則，能推出每一瓶是什麼。', 'There are six bottles but only four steps: the mended note gives the order, the chart on the wall says which two chemicals you won\'t need, and the card on the bottle shelf has five rules that tell you what each bottle holds.'),
+        L('從卡片第一條和第三條開始：顯影液在一端，而洗淨液在它左邊，所以顯影液在最右邊。接著用第四條找定影液、第五條找清水，最後用第二條排出停影液和調色液。', 'Start with rules 1 and 3: the developer is at one end and the hypo clearing agent is to its left, so the developer is on the far right. Then rule 4 finds the fixer, rule 5 the water, and rule 2 places the stop bath and the toner.'),
+        L(`${BOTTLES_V.map(b => `${COLOR_NAMES[b.id].zh}＝${CHEM_NAMES[b.content].zh}`).join('、')}。用不到調色液和洗淨液。依序倒：${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].zh).join(' → ')}。`, `${BOTTLES_V.map(b => `${cap(COLOR_NAMES[b.id].en)} = ${CHEM_NAMES[b.content].en}`).join(', ')}. The toner and the hypo clearing agent aren\'t used. Pour in this order: ${DEVELOP_ANSWER_V.map(id => COLOR_NAMES[id].en).join(' → ')}.`),
       ],
     },
     {
@@ -3087,7 +3070,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
     POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady, MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
-    BOTTLES_V, BOTTLE_RULES_V, PROCESS_RULES_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
+    BOTTLES_V, BOTTLE_RULES_V, UNUSED_CHEMS_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,
     PHOTOS, PHOTO_ORDER, PHOTOS_IN_BOX, MUSIC_TINES, MUSIC_SCORE, MUSIC_ANSWER,
   };
@@ -3555,7 +3538,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     modeNovice: L('新手', 'Novice'),
     modeVeteran: L('資深', 'Veteran'),
     modeNoviceDesc: L('五個房間、十一道謎題。答錯時會告訴你哪裡不對，提示隨時可用。第一次來建議選這個。', 'Five rooms and eleven puzzles. Wrong answers tell you what went wrong, and hints are always there. Recommended for a first visit.'),
-    modeVeteranDesc: L('七個房間、十五道謎題：多了閣樓、儲物間和兩位新角色；花盆與藥瓶各八個，反光鏡十六面。答錯只會說「不對」，看不到光路，提示從第二階段起才開放。八個花盆挖錯三盆就失敗，整局作廢。', 'Seven rooms and fifteen puzzles: an attic, a storeroom and two more characters; eight pots, eight bottles and sixteen mirrors. Wrong answers only say "not right", you can\'t watch the light, and hints only open from the second stage. Dig up three wrong pots and the game is lost.'),
+    modeVeteranDesc: L('七個房間、十五道謎題：多了閣樓、儲物間和兩位新角色；八個花盆、六瓶藥劑，反光鏡十六面。答錯只會說「不對」，看不到光路，提示從第二階段起才開放。八個花盆挖錯三盆就失敗，整局作廢。', 'Seven rooms and fifteen puzzles: an attic, a storeroom and two more characters; eight pots, six bottles and sixteen mirrors. Wrong answers only say "not right", you can\'t watch the light, and hints only open from the second stage. Dig up three wrong pots and the game is lost.'),
     modeStart: L('以「{mode}」開始', 'Start as {mode}'),
     tutorialToggle: L('顯示操作教學（隨時可以跳過）', 'Show the tutorial (you can skip it any time)'),
     modeChip: L('難度：{mode}', 'Difficulty: {mode}'),
@@ -3740,13 +3723,14 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     minVal: L('{m} 分', '{m} min'),
     thisMoment: L('就是這一刻', 'This is the moment'),
     devTitle: L('顯影台', 'Developing Bench'),
-    devLeadV: L('一排托盤和一個清洗槽，旁邊是封存底片的避光盒。依序選出每一步要倒的藥瓶（八步），再開始沖洗。陸觀留了幾張廢片，可以先試。', 'A row of trays and a rinse bath stand beside the light-tight box that holds the plate. Choose which bottle to pour at each of the eight steps, then develop. Lu Guan left some scrap film, so you can test first.'),
+    devLeadV: L('三個藥盤和一個清洗槽排成一列，旁邊是封存底片的避光盒。架上有六瓶藥劑，只用得到其中四瓶：依序選出四步要倒的藥瓶，再開始沖洗。陸觀留了幾張廢片，可以先試。', 'Three trays and a rinse bath stand in a row beside the light-tight box that holds the plate. There are six bottles on the shelf, but only four are needed: choose the bottle for each of the four steps, then develop. Lu Guan left some scrap film, so you can test first.'),
     sigNone: L('（還沒打）', '(nothing yet)'),
     devLead: L('三個藥盤和一個清洗槽排成一列，旁邊是封存底片的避光盒。依序選出要倒的藥瓶（四步），再開始沖洗。陸觀留了幾張廢片，可以先試。', 'Three trays and a rinse bath stand in a row beside the light-tight box that holds the plate. Choose which bottle to pour at each of the four steps, then develop. Lu Guan left some scrap film, so you can test first.'),
     stepN: L('第 {i} 步', 'Step {i}'),
     clear: L('清除', 'Clear'),
     develop: L('開始沖洗', 'Develop'),
     readCard: L('看藥瓶卡片', 'Read the bottle card'),
+    readChart: L('看流程表', 'Read the chart'),
     readNote: L('看拼好的便條', 'Read the mended note'),
 
     // 電話
@@ -4416,7 +4400,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
   /* ---------------- 暗房 ---------------- */
   function darkroom(v) {
     const f = v.s.flags;
-    const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K'), orange: L('橙', 'O'), purple: L('紫', 'P') };
+    const capLetter = { red: L('紅', 'R'), blue: L('藍', 'B'), yellow: L('黃', 'Y'), white: L('白', 'W'), green: L('綠', 'G'), black: L('黑', 'K') };
     const vet = v.s.mode === 'veteran';
     if (!f.darkroomLit) {
       const r = rng(5);
@@ -4449,7 +4433,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     ${H(v, 'd_vent', `<rect x="820" y="40" width="90" height="50" fill="#050101"/><path d="M820 40 L910 40 L910 72 L882 90 L820 90 Z" fill="#140404"/>${[50, 60, 70].map(y => `<line x1="826" y1="${y}" x2="${y < 72 ? 904 : 896}" y2="${y}" stroke="#2a0806" stroke-width="2"/>`).join('')}<path d="M882 90 L910 72 L910 90 Z" fill="#050101"/>${headlights ? `<circle cx="901" cy="85" r="7" fill="#ffe9a8" opacity=".25"/><circle cx="897" cy="86" r="2" fill="#ffe9a8"/><circle cx="905" cy="86" r="2" fill="#ffe9a8"/>` : ''}<path d="M882 90 L910 72" stroke="#3a0d0a" stroke-width="2"/>${hit(814, 34, 102, 62)}`)}
     ${H(v, 'd_shelf', vet
       ? `<rect x="700" y="250" width="240" height="10" fill="#3a0d0a"/><rect x="700" y="250" width="240" height="2" fill="#6a2018"/>
-        ${G.BOTTLES_V.map((b, i) => `<rect x="${706 + i * 29}" y="200" width="22" height="50" rx="4" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${709 + i * 29}" y="204" width="4" height="40" fill="#ff6a50" opacity=".15"/><rect x="${708 + i * 29}" y="190" width="18" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${717 + i * 29}" y="232" text-anchor="middle" font-size="11" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
+        ${G.BOTTLES_V.map((b, i) => `<rect x="${708 + i * 38}" y="198" width="26" height="52" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${711 + i * 38}" y="202" width="5" height="42" fill="#ff6a50" opacity=".15"/><rect x="${710 + i * 38}" y="188" width="22" height="11" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${721 + i * 38}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
         <rect x="760" y="262" width="60" height="38" fill="#e8c8b8" opacity=".8" transform="rotate(-4 790 281)"/>${hit(696, 180, 248, 126)}`
       : `<rect x="740" y="250" width="190" height="10" fill="#3a0d0a"/><rect x="740" y="250" width="190" height="2" fill="#6a2018"/>
       ${G.BOTTLES.map((b, i) => `<rect x="${756 + i * 44}" y="196" width="28" height="54" rx="5" fill="#2a0a08" stroke="#5a1a14" stroke-width="2"/><rect x="${759 + i * 44}" y="200" width="5" height="44" fill="#ff6a50" opacity=".15"/><rect x="${760 + i * 44}" y="186" width="20" height="12" rx="2" fill="${CAP_COLORS[b.id]}"/><text x="${770 + i * 44}" y="232" text-anchor="middle" font-size="12" fill="#e8b8a8">${esc(t(capLetter[b.id]))}</text>`).join('')}
@@ -4607,7 +4591,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     `;
   }
 
-  const CAP_COLORS = { red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0', green: '#5fb86e', black: '#1c1c1c', orange: '#f08a3a', purple: '#a070d0' };
+  const CAP_COLORS = { red: '#ff5a48', blue: '#7a8fc9', yellow: '#f0c95a', white: '#f4e6e0', green: '#5fb86e', black: '#1c1c1c' };
   const ROOM_ART = { foyer, study, greenhouse, observatory, darkroom, storeroom, attic };
   function scene(room, v) {
     // 模板裡的 <!-- 註解 --> 只是給讀程式的人看的，不放進畫面
@@ -5052,6 +5036,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
     const ang = Math.max(-14, Math.min(14, diff * 3.5));
     const a = ang * Math.PI / 180, cx = 300, cy = 92, arm = 190;
     const ends = [[cx - arm * Math.cos(a), cy - arm * Math.sin(a)], [cx + arm * Math.cos(a), cy + arm * Math.sin(a)]];
+    // 橫桿畫成「旋轉的長方形」而不是漸層描邊的線：水平線的外框高度為 0，漸層畫不出來，平衡時橫桿會整條消失
     const tinColor = { tin_moon: ['#6f8fb8', '#9fb6d8'], tin_fern: ['#4f8a5b', '#7fb08a'], tin_cactus: ['#c9a46a', '#e3c99a'] };
     const drawThing = (th, x, y) => {
       if (tinColor[th.id]) {
@@ -5077,7 +5062,7 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       <rect x="0" y="276" width="600" height="24" fill="#3a2414"/>
       <rect x="262" y="262" width="76" height="16" rx="3" fill="#3a3f45"/><rect x="294" y="${cy}" width="12" height="172" fill="url(#bl-brass)"/>
       ${pan(ends[0], onL)}${pan(ends[1], onR)}
-      <line x1="${ends[0][0]}" y1="${ends[0][1]}" x2="${ends[1][0]}" y2="${ends[1][1]}" stroke="url(#bl-brass)" stroke-width="8" stroke-linecap="round"/>
+      <rect class="balance-beam" x="${cx - arm - 4}" y="${cy - 4}" width="${arm * 2 + 8}" height="8" rx="4" fill="url(#bl-brass)" transform="rotate(${ang} ${cx} ${cy})"/>
       <circle cx="${cx}" cy="${cy}" r="9" fill="#c9a24f" stroke="#f3d68f" stroke-width="2"/>
       <path d="M${cx} ${cy} L${cx + Math.sin(a) * 56} ${cy - Math.cos(a) * 56}" stroke="${level ? '#8cc49a' : '#e39a8a'}" stroke-width="4" stroke-linecap="round"/>
       <path d="M${cx - 30} ${cy - 50} A58 58 0 0 1 ${cx + 30} ${cy - 50}" fill="none" stroke="#6b4a1e" stroke-width="2"/><line x1="${cx}" y1="${cy - 62}" x2="${cx}" y2="${cy - 52}" stroke="#e8dcc0" stroke-width="2"/>
@@ -5968,17 +5953,19 @@ html:lang(en) .scene-svg text { letter-spacing: .02em; }
       const hasNote = app.s.inv.includes('note_full');
       return {
         title: T('devTitle'),
-        html: `<p class="lead">${tx(steps > 4 ? 'devLeadV' : 'devLead')}</p>
-          <div class="bottles ${steps > 4 ? 'eight' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
+        html: `<p class="lead">${tx(V.bottles.length > steps ? 'devLeadV' : 'devLead')}</p>
+          <div class="bottles ${V.bottles.length > 4 ? 'six' : ''}">${V.bottles.map(b => `<button class="bottle-btn" type="button" data-bottle="${b.id}" ${seq.length >= steps ? 'disabled' : ''}>${Art.bottleSvg(b)}<span>${esc(tr(b.name))}</span></button>`).join('')}</div>
           <div class="slots">${[...Array(steps).keys()].map(i => `<div class="slot ${seq[i] ? 'filled' : ''}">${tx('stepN', { i: i + 1 })}<br>${seq[i] ? esc(name(seq[i])) : '—'}</div>`).join('')}</div>
           ${center(`<button class="btn" type="button" data-act="clear">${tx('clear')}</button><button class="btn primary" type="button" data-act="go" ${seq.length < steps ? 'disabled' : ''}>${tx('develop')}</button>`)}${fb()}
-          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}`)}`,
+          ${center(`<button class="btn small" type="button" data-doc="bottle_card">${tx('readCard')}</button>${hasNote ? `<button class="btn small" type="button" data-note="1">${tx('readNote')}</button>` : ''}${app.s.mode === 'veteran' ? `<button class="btn small" type="button" data-chart="1">${tx('readChart')}</button>` : ''}`)}`,
         bind(root) {
           root.querySelectorAll('[data-bottle]').forEach(b => { b.onclick = () => { if (seq.length < steps) seq.push(b.dataset.bottle); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=clear]').onclick = () => { seq.length = 0; app.ui.feedback = []; renderModal(); };
           root.querySelector('[data-act=go]').onclick = () => { const r = submit('develop', seq.slice()); if (r && !r.solved) seq.length = 0; if (r) renderModal(); };
           // 透過「查看藥瓶架」讀卡片，遊戲才會記得你讀過（沖洗台要讀過卡片才能作答）
           root.querySelector('[data-doc]').onclick = () => act(() => E.interact(app.s, 'd_shelf'));
+          const chart = root.querySelector('[data-chart]');
+          if (chart) chart.onclick = () => act(() => E.interact(app.s, 'd_chart'));
           const n = root.querySelector('[data-note]');
           if (n) n.onclick = () => openView({ view: 'item', id: 'note_full' });
         },

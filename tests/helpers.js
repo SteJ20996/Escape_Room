@@ -178,11 +178,11 @@ function vetDarkroomPath(P, { dryingLine = true } = {}) {
   P.solve('develop', G.DEVELOP_ANSWER_V);
 }
 
-// 大師模式主線：和資深相同，只是音樂盒要用星盤的解答（每個撥兩下再回到最高的那個）
+// 大師模式主線：和資深相同，只是音樂盒要用星盤的解答（每個撥兩下再回到最高的那個），花盆的答案也不同
 function masterMainPath(P) {
-  const real = G.MUSIC_ANSWER;
   const orig = P.solve;
-  P.solve = (pz, ans) => orig(pz, pz === 'musicbox' && ans === real ? G.MUSIC_ANSWER_M : ans);
+  const swap = { musicbox: [G.MUSIC_ANSWER, G.MUSIC_ANSWER_M], pots: [G.POT_ANSWER_V, G.POT_ANSWER_M] };
+  P.solve = (pz, ans) => orig(pz, swap[pz] && ans === swap[pz][0] ? swap[pz][1] : ans);
   try { vetMainPath(P); } finally { P.solve = orig; }
 }
 

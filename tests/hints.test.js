@@ -158,7 +158,7 @@ test('［資深］提示依階段分組：目前階段的提示排在最前面',
 
 test('每一則提示都標明「第幾段會公布答案」，而且答案不會提早出現在前面的段落', () => {
   // 各謎題答案的關鍵字：只能出現在 answerAt 那一段（含）之後
-  const ANSWERS = [G.DRAWER_CODE, G.SAFE_CODE, G.SEED_CODE, G.TRAPDOOR_CODE, G.TUNNEL_CODE, '3:15', '3 點 15', '5、8、10', '6、6、5', '鼠尾草盆', '答案是玫瑰盆', 'V2、V4、V5', '黃 → 白', '黑 → 紅', '外環＝鑰', 'H→J→K', 'A→B→C', '查看「雜物架」', '是韓嶽偽造的'];
+  const ANSWERS = [G.DRAWER_CODE, G.SAFE_CODE, G.SEED_CODE, G.TRAPDOOR_CODE, G.TUNNEL_CODE, '3:15', '3 點 15', '5、8、10', '6、6、5', '鼠尾草盆', '羅勒盆', '答案是玫瑰盆', 'V2、V4、V5', '黃 → 白', '黑 → 紅', '外環＝鑰', 'H→J→K', 'A→B→C', '查看「雜物架」', '是韓嶽偽造的'];
   for (const mode of G.MODES) {
     const E = create(G);
     const s = E.newState(mode);
@@ -200,7 +200,7 @@ test('［大師］完整玩一遍時，每一個大師適用的提示都會在�
   P.solve('photos', G.PHOTO_ORDER);
   P.use('crank', 'a_musicbox');
   P.go('storeroom'); P.solve('signal', ['.-.']); P.solve('signal', ['---', '...']);
-  P.go('greenhouse'); P.solve('pots', G.POT_ANSWER_V);
+  P.go('greenhouse'); P.solve('pots', G.POT_ANSWER_M);
   P.use('flashlight', 'g_bench');
   P.go('foyer'); P.use('brass_key', 'f_gate');
   P.go('observatory'); P.look('o_telescope'); P.look('o_dial'); P.look('o_poster');

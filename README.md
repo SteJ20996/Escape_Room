@@ -59,7 +59,7 @@ docs/MASTER_WALKTHROUGH.md 大師模式通關筆記（逐層展開，有雷）
 需要 Node.js 18 以上。
 
 ```bash
-npm test            # 邏輯測試 166 項：三種難度各自的謎題唯一解、線索門檻、所有結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示、雙語完整性（約 3 分鐘）
+npm test            # 邏輯測試 169 項：三種難度各自的謎題唯一解、線索門檻、所有結局、狀態空間窮舉（無死局）、隨機遊走、存檔、提示、雙語完整性（約 3 分鐘）
 npm run test:e2e    # 打包後用 Playwright 只透過點擊介面，中文、英文 × 新手、資深各玩完五個結局，大師玩到截胡、老水道與失敗（開發版與單檔版各一次，約 20 分鐘）
 npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 ```

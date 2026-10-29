@@ -29,7 +29,7 @@ function allActions(s) {
   const answers = {
     drawer: [G.DRAWER_CODE, G.DRAWER_TRAP, '1234'], safe: [G.SAFE_CODE, '999'], trapdoor: [G.TRAPDOOR_CODE, '0000'],
     // 資深模式挖錯第三盆會直接失敗（另有測試）；亂走時挖錯兩盆之後只會挖對的那一盆，好讓亂走繼續下去
-    pots: vet && (s.flags.potsDug || []).length >= G.POT_MISS_LIMIT - 1 ? [G.POT_ANSWER_V] : (vet ? G.POTS_V : G.POTS).map(p => p.id),
+    pots: vet && (s.flags.potsDug || []).length >= G.POT_MISS_LIMIT - 1 ? [G.variant(s).potAnswer] : G.variant(s).pots.map(p => p.id),
     clock: [G.CLOCK_ANSWER, { h: 2, m: 15 }],
     valves: [VALVE_SOLUTION, { V1: true }], valves_set: [{ V2: true }, {}],
     mirrors: vet ? [G.MIRROR_SOLUTION_V, G.MIRROR_GRID_V.initial] : [G.MIRROR_SOLUTIONS[0], G.MIRROR_GRID.initial, { A: '\\' }],
@@ -76,7 +76,7 @@ const VETERAN_MIDDLE = [
   [s => has(s, 'crank'), 'attic', s => E.useItem(s, 'crank', 'a_musicbox')],
   [s => !F(s, 'zhouCalled') && F(s, 'storeroomOpen') && has(s, 'flashlight') && has(s, 'code_card'), 'storeroom', s => E.submit(s, 'signal', ['.-.'])],
   [s => F(s, 'zhouCalled') && !F(s, 'zhouReplied') && has(s, 'flashlight'), 'storeroom', s => E.submit(s, 'signal', ['---', '...'])],
-  [s => F(s, 'zhouReplied') && !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.POT_ANSWER_V)],
+  [s => F(s, 'zhouReplied') && !F(s, 'keyDug'), 'greenhouse', s => E.submit(s, 'pots', G.variant(s).potAnswer)],
   [s => !F(s, 'lightOk'), 'greenhouse', s => E.submit(s, 'skylight', G.MIRROR_SOLUTION_V)],
   // 大師：旋律藏在星盤的答案裡，要先解開星盤
   [s => F(s, 'crankInserted') && !F(s, 'musicSolved') && F(s, 'posterRead') && (s.mode !== 'master' || F(s, 'starDialSolved')), 'attic',

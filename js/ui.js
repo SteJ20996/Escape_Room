@@ -788,7 +788,7 @@
     pots: () => {
       const trowel = app.s.inv.includes('trowel');
       const vet = G.isAdv(app.s.mode);
-      const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'];
+      const rule = G.docs[vet ? 'pots_rule_v' : 'pots_rule'], ruleBody = G.docBody(rule, app.s.mode);
       const head = vet ? 3 : 2; // 資深模式多一行：挖錯三盆就失敗
       // 資深模式：剩下幾次機會；最後一次要再確認一次，避免手滑
       const dug = app.s.flags.potsDug || [];
@@ -797,12 +797,12 @@
       const potName = id => cap(tr(G.variant(app.s).pots.find(p => p.id === id).name));
       return {
         title: T('potsTitle'),
-        html: paper({ style: 'plain', body: { zh: rule.body.zh.slice(0, head), en: rule.body.en.slice(0, head) } }) +
+        html: paper({ style: 'plain', body: { zh: ruleBody.zh.slice(0, head), en: ruleBody.en.slice(0, head) } }) +
           (vet ? `<p class="notice ${left === 1 ? 'warn' : ''}" role="status">${tx(left === 1 ? 'potsLastChance' : 'potsChances', { n: left, total: G.POT_MISS_LIMIT })}</p>` : '') +
           (confirm ? `<div class="confirm"><p style="margin:0">${tx('potConfirm', { pot: potName(confirm) })}</p>
             <div class="row"><button class="btn danger" type="button" data-act="dig-yes">${tx('potConfirmYes')}</button><button class="btn" type="button" data-act="dig-no" data-autofocus>${tx('thinkAgain')}</button></div></div>` : '') +
           // 花架示意：八盆其實排成一排，下面的卡片只是換行排列
-          (vet ? `<div class="pot-row" role="img" aria-label="${esc(T('potsRowLabel'))}"><span>${tx('potsLeftEnd')}</span>${G.POTS_V.map(p => `<b class="${dug.includes(p.id) ? 'dug' : ''}">${p.n}</b>`).join('')}<span>${tx('potsRightEnd')}</span></div>` : '') +
+          (vet ? `<div class="pot-row" role="img" aria-label="${esc(T('potsRowLabel'))}"><span>${tx('potsLeftEnd')}</span>${G.variant(app.s).pots.map(p => `<b class="${dug.includes(p.id) ? 'dug' : ''}">${p.n}</b>`).join('')}<span>${tx('potsRightEnd')}</span></div>` : '') +
           `<div class="pots ${vet ? 'eight' : ''}">${G.variant(app.s).pots.map(p => `<div class="pot pot-${p.id}"><h3>${vet ? tx('potNum', { n: p.n, name: cap(tr(p.name)) }) : tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
             <button class="btn small" type="button" data-pot="${p.id}" ${confirm || dug.includes(p.id) ? 'disabled' : ''}>${tx(dug.includes(p.id) ? 'potDug' : 'digHere')}</button></div>`).join('')}</div>
           ${trowel ? '' : `<p class="notice">${tx('needTool')}</p>`}${fb()}`,

@@ -77,6 +77,20 @@ const MASTER_DARKROOM_CODE = (() => {
   P.use('red_bulb', 'd_socket');
   return Store.encode(P.s);
 })();
+// 大師模式「問過周伯、回到溫室、還沒挖」的存檔碼（大師的八句話與答案都和資深不同）
+const MASTER_POTS_CODE = (() => {
+  const { makeGame } = require('./helpers');
+  const Store = require('../js/storage.js');
+  const P = makeGame('master');
+  P.look('f_coat'); P.go('study'); P.look('s_shelf'); P.solve('drawer', G.DRAWER_CODE); P.combine('flashlight_dead', 'battery');
+  P.look('s_desk'); P.use('flashlight', 's_fireplace');
+  P.go('foyer'); P.use('greenhouse_key', 'f_gh_door'); P.look('f_gh_door'); P.look('g_tools'); P.look('g_rules');
+  P.use('storeroom_key', 'g_storedoor'); P.look('g_storedoor'); P.solve('seedlock', G.SEED_CODE);
+  P.go('foyer'); P.use('hook_pole', 'f_hatch'); P.look('f_hatch'); P.look('a_chest');
+  P.go('storeroom'); P.solve('signal', ['.-.']); P.solve('signal', ['---', '...']);
+  P.go('greenhouse');
+  return Store.encode(P.s);
+})();
 const MODE_KEY = { novice: 'modeNovice', veteran: 'modeVeteran', master: 'modeMaster' };
 
 async function setup(browser, lang, viewport = { width: 1280, height: 860 }) {
@@ -1276,6 +1290,27 @@ async function masterRun(browser, lang) {
   return results;
 }
 
+// 大師：八盆的話全部改寫，背資深的答案會挖錯
+async function masterPotsRun(browser, lang) {
+  const page = await setup(browser, lang);
+  const P = player(page, lang);
+  await loadCode(P, MASTER_POTS_CODE);
+  ok((await page.locator('#chip-mode').innerText()).trim() === ui('modeMaster', lang), '大師模式的存檔碼');
+  await P.obj('g_pots');
+  for (const p of G.POTS_M) {
+    const t = await page.locator(`#modal-body .pot-${p.id} q`).innerText();
+    ok(t.includes(p.says[lang]), `${p.id} 盆應顯示大師版的話：${t}`);
+    ok(!t.includes(G.POTS_V.find(v => v.id === p.id).says[lang]), `${p.id} 盆不應顯示資深版的話`);
+  }
+  await P.shot('pots-master');
+  await page.click(`#modal-body [data-pot="${G.POT_ANSWER_V}"]`);       // 背資深的答案
+  await P.feedback(X(/還剩 2 次機會/, /2 chances left/));
+  await page.click(`#modal-body [data-pot="${G.POT_ANSWER_M}"]`);
+  await P.said(X(/黃銅鑰匙/, /brass key/));
+  ok(await P.has('brass_key'), '挖到黃銅鑰匙');
+  await page.context().close();
+}
+
 // 大師：三張廢片都試壞 → 失敗（G），整局作廢
 async function masterFailRun(browser, lang) {
   const page = await setup(browser, lang);
@@ -1318,7 +1353,7 @@ async function masterFailRun(browser, lang) {
     summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}／大師：${mas.join('、')}`);
   }
   if (LANGS.length > 1) await switchRun(browser);
-  for (const lang of LANGS) { await potsFailRun(browser, lang); await masterFailRun(browser, lang); }
+  for (const lang of LANGS) { await potsFailRun(browser, lang); await masterPotsRun(browser, lang); await masterFailRun(browser, lang); }
   await noteLayoutRun(browser);
   await browser.close();
   console.log(`走完的結局 ${summary.join('；')}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);

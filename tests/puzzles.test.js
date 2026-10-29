@@ -398,3 +398,48 @@ test('大師・門外有人：周伯的日誌交代了老水道；被截胡（H�
   assert.ok(!G.endings.H.fail, '被截胡是結局，不是失敗');
   assert.ok(G.endings.G.fail, '三張廢片用完是失敗');
 });
+
+test('大師・八盆：八句全部改寫；周伯說「兩句為真」時答案唯一，而且不是資深的答案；不問周伯則無法確定', () => {
+  const K = [1, 2, 3, 4, 5, 6, 7, 8];
+  const count = k => G.POTS_M.filter(p => p.truth(k)).length;
+  const byCount = {};
+  for (const k of K) (byCount[count(k)] = byCount[count(k)] || []).push(k);
+  const answer = G.POTS_M.find(p => p.id === G.POT_ANSWER_M).n;
+  assert.deepEqual(byCount[G.POT_TRUE_COUNT_V], [answer], JSON.stringify(byCount));
+  assert.notEqual(G.POT_ANSWER_M, G.POT_ANSWER_V, '背資深的答案沒有用');
+  // 不知道句數時，其他句數至少有兩種各自指向另一盆（例如「只有一句為真」的老習慣會挖錯）
+  const otherSingles = Object.entries(byCount).filter(([c, ks]) => +c !== G.POT_TRUE_COUNT_V && ks.length === 1);
+  assert.ok(otherSingles.length >= 2, JSON.stringify(byCount));
+  // 同樣八盆、同樣編號，只換了話
+  assert.deepEqual(G.POTS_M.map(p => [p.id, p.n]), G.POTS_V.map(p => [p.id, p.n]));
+  for (const lang of ['zh', 'en']) {
+    const vet = new Set(G.POTS_V.map(p => p.says[lang]));
+    assert.ok(G.POTS_M.every(p => !vet.has(p.says[lang])), `${lang}：大師的八句都和資深不同`);
+    assert.equal(new Set(G.POTS_M.map(p => p.says[lang])).size, 8);
+  }
+});
+
+test('大師・八盆：沒有「同真同假」或「互相相反」的兩句；任兩句在八種假設下至少有兩種結果不同；每一句都省不掉', () => {
+  const K = [1, 2, 3, 4, 5, 6, 7, 8];
+  const vec = p => K.map(k => (p.truth(k) ? 1 : 0));
+  const V = G.POTS_M.map(vec);
+  for (const v of V) { const n = v.reduce((a, b) => a + b, 0); assert.ok(n >= 2 && n <= 6, '沒有幾乎永遠成立或永遠不成立的話'); }
+  for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) {
+    const d = V[i].reduce((s, x, q) => s + (x !== V[j][q] ? 1 : 0), 0);
+    assert.ok(d >= 2 && 8 - d >= 2, `${i + 1} 號和 ${j + 1} 號的話太接近（相同的假設 ${8 - d} 種）`);
+  }
+  // 對照：資深版確實有一對同真同假的話（2 號和 3 號），這正是要在大師版消除的
+  const VV = G.POTS_V.map(vec);
+  assert.deepEqual(VV[1], VV[2]);
+  // 拿掉任何一句，「恰好兩句為真」就不再唯一指向答案：玩家必須八句都算
+  const answer = G.POTS_M.find(p => p.id === G.POT_ANSWER_M).n;
+  for (let i = 0; i < 8; i++) {
+    const rest = V.filter((_, j) => j !== i);
+    const two = K.filter((k, q) => rest.reduce((s, v) => s + v[q], 0) === 2);
+    assert.ok(!(two.length === 1 && two[0] === answer), `少了 ${i + 1} 號的話，答案仍然唯一`);
+  }
+  // 木牌：前三行（排列方向、只有周伯知道、挖錯三盆）和資深相同，下面列的是大師的八句
+  const sign = G.docBody(G.docs.pots_rule_v, 'master');
+  assert.deepEqual(sign.zh.slice(0, 3), G.docs.pots_rule_v.body.zh.slice(0, 3));
+  assert.ok(G.POTS_M.every(p => sign.zh.join('').includes(p.says.zh) && sign.en.join('').includes(p.says.en)));
+});

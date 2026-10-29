@@ -46,7 +46,7 @@ function correctAnswers(pid, mode = 'novice') {
     case 'drawer': return [G.DRAWER_CODE];
     case 'safe': return [G.SAFE_CODE];
     case 'trapdoor': return [G.TRAPDOOR_CODE];
-    case 'pots': return [vet ? G.POT_ANSWER_V : G.POT_ANSWER];
+    case 'pots': return [G.variant({ mode }).potAnswer];
     case 'clock': return [G.CLOCK_ANSWER];
     case 'valves': return [{ V1: false, V2: true, V3: false, V4: true, V5: true }];
     case 'mirrors': return [G.MIRROR_SOLUTIONS[0]];
@@ -177,7 +177,8 @@ function stateActions(s) {
   // 資深以上挖錯一盆：哪一盆錯的效果都一樣（挖錯的盆 +1，第三盆失敗），取還沒挖過的第一盆當代表
   if (G.isAdv(s.mode) && G.puzzles.pots.available(s) && s.inv.includes('trowel')) {
     const dug = s.flags.potsDug || [];
-    const next = G.POTS_V.find(p => p.id !== G.POT_ANSWER_V && !dug.includes(p.id));
+    const PV = G.variant(s);
+    const next = PV.pots.find(p => p.id !== PV.potAnswer && !dug.includes(p.id));
     if (next) acts.push({ t: 'submit', p: 'pots', a: next.id, miss: true });
   }
   // 大師模式倒錯一次：哪一種錯法效果都一樣（廢片 −1，第三張失敗），用假卡片的順序當代表

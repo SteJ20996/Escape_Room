@@ -397,6 +397,7 @@ test('拿到線索才能作答：沒有線索時，正確答案也被拒絕（�
     ['veteran', 'signal', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true }, inv: ['flashlight'] }, s => { s.inv.push('code_card'); }, ['.-.'], ['---', '...']],
     ['veteran', 'musicbox', 'attic', { flags: { atticOpen: true, crankInserted: true }, inv: ['qing_letter'] }, s => { s.flags.posterRead = true; }, G.MUSIC_ANSWER, [1, 2, 3]],
     // 大師：音樂盒的旋律要先解開星盤；水道的鎖要讀過剪報；沒有線索時倒藥也不會用掉廢片（狀態不變）
+    ['master', 'pots', 'greenhouse', { flags: { greenhouseOpen: true }, inv: ['trowel'] }, s => { s.flags.zhouReplied = true; }, G.POT_ANSWER_M, G.POT_ANSWER_V],
     ['master', 'musicbox', 'attic', { flags: { atticOpen: true, crankInserted: true, posterRead: true }, inv: ['qing_letter'] }, s => { s.flags.starDialSolved = true; }, G.MUSIC_ANSWER_M, [1, 2, 3]],
     ['master', 'tunnel', 'storeroom', { flags: { greenhouseOpen: true, storeroomOpen: true, tunnelFound: true }, inv: ['page3'] }, s => { s.flags.clippingRead = true; }, G.TUNNEL_CODE, G.TUNNEL_TRAP],
     ['master', 'develop', 'darkroom', { flags: { trapdoorOpen: true, darkroomLit: true, bottleCardRead: true }, inv: ['note_full'] }, s => { s.flags.chartRead = true; }, G.DEVELOP_ANSWER_V, ['blue', 'yellow', 'red', 'white']],
@@ -558,6 +559,7 @@ test('［大師］音樂盒：資深的旋律在大師模式是錯的；要用�
   const real = P.solve;
   P.solve = (pz, ans) => {
     if (pz === 'musicbox') { tried = P.E.submit(P.s, 'musicbox', G.MUSIC_ANSWER); return real(pz, G.MUSIC_ANSWER_M); }
+    if (pz === 'pots') return real(pz, G.POT_ANSWER_M);
     return real(pz, ans);
   };
   vetMainPath(P);
@@ -586,4 +588,26 @@ test('［大師］階段依序推進，最後多一個「另一條路」；資�
   assert.ok(!V.E.visibleHotspots(V.s).some(h => h.id === 'd_card2'));
   V.go('foyer');
   assert.equal(V.solve('exit', 'publish').ending, 'B');
+});
+
+test('［大師］八盆：資深的答案（鼠尾草）在大師模式是錯的，會用掉一次機會；挖大師的答案才拿得到鑰匙', () => {
+  const P = master();
+  const real = P.solve;
+  let wrong = null;
+  // 走大師主線，但在挖花盆時先試資深的答案
+  P.solve = (pz, ans) => {
+    if (pz === 'pots' && wrong === null) wrong = real(pz, G.POT_ANSWER_V);
+    return real(pz, ans);
+  };
+  masterMainPath(P);
+  assert.equal(wrong.solved, false);
+  assert.deepEqual(P.s.flags.potsDug, [G.POT_ANSWER_V]);
+  assert.ok(P.s.flags.keyDug && P.s.flags.gateOpen, '挖到鑰匙、打開了樓梯鐵門');
+  assert.equal(P.s.ending, null);
+  // 存檔驗證跟著難度：大師的答案不可能「挖錯」，資深的答案可以
+  const E2 = P.E;
+  const bad = Object.assign(E2.newState('master'), { flags: { potsDug: [G.POT_ANSWER_M] } });
+  assert.ok(E2.validate(bad).length > 0);
+  const okSt = Object.assign(E2.newState('master'), { flags: { potsDug: [G.POT_ANSWER_V] } });
+  assert.deepEqual(E2.validate(okSt), []);
 });

@@ -254,6 +254,23 @@
   ];
   const POT_TRUE_COUNT_V = 2;
   const POT_ANSWER_V = 'sage';
+  // 大師・花盆：同樣八盆、同樣兩句為真（周伯的回答不變），八句話全部改寫，答案換成 7 號羅勒。
+  // 資深版的 2、3 號其實是同一句話（都等於「鑰匙不在 3 號」），一對同真同假的話等於少了一個變數。
+  // 大師版由程式搜尋產生並由測試證明：任兩句在八種假設下至少有兩種結果不同，也不會幾乎互為相反；
+  // 拿掉任何一句，答案就不再唯一；假設一句、四句為真會分別指向 1 號與 8 號——所以仍然一定要先問周伯。
+  const POTS_M = [
+    { id: 'rose', says: L('鑰匙那一盆的編號，比我的大 1 或大 2。', 'The number of the key\'s pot is 1 or 2 more than mine.'), truth: k => k === 2 || k === 3 },
+    { id: 'lavender', says: L('鑰匙那一盆的編號是 4 的倍數。', 'The number of the key\'s pot is a multiple of 4.'), truth: k => k % 4 === 0 },
+    { id: 'sage', says: L('鑰匙在單數盆裡，而且在左邊四盆之中。', 'The key is in an odd-numbered pot, and among the four on the left.'), truth: k => k % 2 === 1 && k <= 4 },
+    { id: 'mint', says: L('鑰匙在我右邊，但不是緊挨著我的那一盆。', 'The key is in a pot to my right, but not the one right next to me.'), truth: k => k > 5 },
+    { id: 'thyme', says: L('鑰匙在正中間的四盆之中。', 'The key is in one of the four pots in the middle.'), truth: k => k >= 3 && k <= 6 },
+    { id: 'rosemary', says: L('鑰匙就在我隔壁的盆裡。', 'The key is in a pot right next to mine.'), truth: k => k === 5 || k === 7 },
+    { id: 'basil', says: L('鑰匙那一盆的編號除以 3，餘數是 2。', 'Divide the number of the key\'s pot by 3 and the remainder is 2.'), truth: k => k % 3 === 2 },
+    { id: 'chamomile', says: L('鑰匙那一盆的編號加上我的編號，是雙數。', 'The number of the key\'s pot plus mine makes an even number.'), truth: k => (k + 8) % 2 === 0 },
+  ].map(p => Object.assign({}, POTS_V.find(v => v.id === p.id), p));
+  const POT_ANSWER_M = 'basil';
+  const potsOf = s => (MASTER(s) ? POTS_M : VET(s) ? POTS_V : POTS);
+  const potAnswerOf = s => (MASTER(s) ? POT_ANSWER_M : VET(s) ? POT_ANSWER_V : POT_ANSWER);
   // 資深模式：挖錯三盆就失敗（整局作廢）。木牌上事先寫明。
   const POT_MISS_LIMIT = 3;
 
@@ -642,6 +659,18 @@
         'Old Zhou carved the eight sayings on the pots — and only he knows how many of them are true.',
         'At the bottom of the sign, in red paint: "Dig up three wrong pots and the mechanism will sink the key into the drain, never to be recovered."',
         ...POTS_V.map(p => `No. ${p.n}, ${p.name.en} pot: "${p.says.en}"`),
+      ]),
+      // 大師：木牌前三行相同，八句話換成大師版
+      bodyM: L([
+        '八個花盆在架上排成一排，只有一個埋著東西。盆身由左到右漆著編號 1～8。',
+        '盆上的八句話是周伯刻的——其中有幾句是真的，只有他知道。',
+        '木牌最下面用紅漆寫著：「挖錯三盆，機關就會把鑰匙沉進水管，再也拿不回來。」',
+        ...POTS_M.map(p => `${p.n} 號・${p.name.zh}盆：「${p.says.zh}」`),
+      ], [
+        'The eight pots stand in a single row on the shelf, and only one has something buried in it. They are numbered 1 to 8 from left to right.',
+        'Old Zhou carved the eight sayings on the pots — and only he knows how many of them are true.',
+        'At the bottom of the sign, in red paint: "Dig up three wrong pots and the mechanism will sink the key into the drain, never to be recovered."',
+        ...POTS_M.map(p => `No. ${p.n}, ${p.name.en} pot: "${p.says.en}"`),
       ]),
     },
     weight_box: {
@@ -1719,11 +1748,10 @@
       needClue: L('八句話裡有幾句是真的，只有周伯知道。在弄清楚之前，你不敢亂挖。', 'Only Old Zhou knows how many of the eight sayings are true. Until you find out, you don\'t dare dig at random.'),
       vetKeep: true, // 「挖開了，什麼也沒有」本身就只說「不對」，不透露錯在哪
       check(ctx, potId) {
-        const list = VET(ctx.s) ? POTS_V : POTS;
-        const pot = list.find(p => p.id === potId);
+        const pot = potsOf(ctx.s).find(p => p.id === potId);
         if (!pot) return null;
         if (!ctx.has('trowel')) { ctx.say(L('花盆裡的土壓得很實，徒手挖不動。得找把工具。', 'The soil in the pots is packed hard — you can\'t dig it with your bare hands. You need a tool.'), 'bad'); return false; }
-        if (potId === (VET(ctx.s) ? POT_ANSWER_V : POT_ANSWER)) {
+        if (potId === potAnswerOf(ctx.s)) {
           ctx.set('keyDug');
           ctx.say(L(`你用小鏟子挖開${pot.name.zh}盆的土，鏟尖「叮」地碰到了金屬——一把黃銅鑰匙。`, `You dig into the ${pot.name.en} pot with the trowel, and the blade clinks against metal — a brass key.`), 'good');
           ctx.give('brass_key');
@@ -2459,12 +2487,22 @@
       ],
     },
     {
-      id: 'pots_v', mode: 'veteran', stage: 'gate', title: L('八個花盆', 'The Eight Pots'),
+      id: 'pots_v', mode: 'veteran', upTo: 'veteran', stage: 'gate', title: L('八個花盆', 'The Eight Pots'),
       avail: s => seen(s, 'pots_rule_v'), done: s => F(s, 'keyDug'),
       texts: [
         L('八句話裡有幾句是真的，周伯知道——先想辦法問他，別急著挖：挖錯三盆就失敗了。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first, and don\'t dig on a hunch: three wrong pots and it\'s over. You\'ll need a tool to dig.'),
         L('知道真話的句數之後，逐一假設鑰匙在 1～8 號盆，數數每種假設下有幾句成立。', 'Once you know how many are true, suppose the key is in pot 1, 2, … 8 in turn and count how many sayings hold each time.'),
         L('周伯說有兩句是真的。只有鑰匙在 3 號鼠尾草盆時恰好兩句成立（羅勒和洋甘菊那兩句）。挖開鼠尾草盆。', 'Zhou says two are true. Only with the key in pot 3, the sage, are exactly two true (the basil\'s and the chamomile\'s). Dig up the sage pot.'),
+      ],
+    },
+    {
+      id: 'pots_m', mode: 'master', stage: 'gate', title: L('八個花盆', 'The Eight Pots'),
+      avail: s => seen(s, 'pots_rule_v'), done: s => F(s, 'keyDug'),
+      texts: [
+        L('八句話裡有幾句是真的，周伯知道——先想辦法問他，別急著挖：挖錯三盆就失敗了。挖土需要工具。', 'Old Zhou knows how many of the eight sayings are true — find a way to ask him first, and don\'t dig on a hunch: three wrong pots and it\'s over. You\'ll need a tool to dig.'),
+        L('知道真話的句數之後，逐一假設鑰匙在 1～8 號盆，把八句都算一遍——這八句沒有兩句是同一個意思，一句也省不掉。句子裡的「我」，指的是說這句話的那一盆。', 'Once you know how many are true, suppose the key is in pot 1, 2, … 8 in turn and check all eight sayings each time — no two of them mean the same thing, so you can\'t skip any. "Me" and "mine" always mean the pot that says it.'),
+        L(`周伯說有兩句是真的。只有鑰匙在 ${POTS_M.find(p => p.id === POT_ANSWER_M).n} 號${POTS_M.find(p => p.id === POT_ANSWER_M).name.zh}盆時恰好兩句成立（${POTS_M.filter(p => p.truth(POTS_M.find(q => q.id === POT_ANSWER_M).n)).map(p => p.name.zh).join('和')}那兩句）。挖開${POTS_M.find(p => p.id === POT_ANSWER_M).name.zh}盆。`,
+          `Zhou says two are true. Only with the key in pot ${POTS_M.find(p => p.id === POT_ANSWER_M).n}, the ${POTS_M.find(p => p.id === POT_ANSWER_M).name.en}, are exactly two true (the ${POTS_M.filter(p => p.truth(POTS_M.find(q => q.id === POT_ANSWER_M).n)).map(p => p.name.en).join('\'s and the ')}\'s). Dig up the ${POTS_M.find(p => p.id === POT_ANSWER_M).name.en} pot.`),
       ],
     },
     {
@@ -2757,7 +2795,7 @@
     docBody: (d, mode) => (mode === 'master' && d.bodyM) || (isAdv(mode) && d.bodyV) || d.body,
     endingText: (e, mode) => (mode === 'master' && e.textM) || (isAdv(mode) && e.textV) || e.text,
     variant: s => (VET(s)
-      ? { pots: POTS_V, potAnswer: POT_ANSWER_V, mirrorGrid: MIRROR_GRID_V, bottles: BOTTLES_V, developAnswer: DEVELOP_ANSWER_V }
+      ? { pots: potsOf(s), potAnswer: potAnswerOf(s), mirrorGrid: MIRROR_GRID_V, bottles: BOTTLES_V, developAnswer: DEVELOP_ANSWER_V }
       : { pots: POTS, potAnswer: POT_ANSWER, mirrorGrid: MIRROR_GRID, bottles: BOTTLES, developAnswer: DEVELOP_ANSWER }),
     // 可以「拿在手上」攤在畫面下方的東西：所有線索文件（圖像類的顯示圖），加上拼好的便條（顯示抄寫的文字）
     holdable: id => !!docs[id] || id === 'note_full',
@@ -2769,7 +2807,7 @@
     NOTE_LINES, NOTE_LINES_V, noteLines, NOTE_ORDER_TEXT, TRAPDOOR_CODE, BOTTLES, CHEM_NAMES, DEVELOP_SEQUENCE, DEVELOP_ANSWER,
     EMBLEMS, EMBLEM_SHORT, PAGES, countPages, allInserted, DISCOVERIES, L,
     // 資深模式
-    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady,
+    POTS_V, POT_TRUE_COUNT_V, POT_ANSWER_V, POT_MISS_LIMIT, noteReady, POTS_M, POT_ANSWER_M,
     MIRROR_GRID_V, MIRROR_PATH_V, MIRROR_SOLUTION_V, beamPaths,
     BOTTLES_V, BOTTLE_RULES_V, UNUSED_CHEMS_V, DEVELOP_SEQUENCE_V, DEVELOP_ANSWER_V,
     TINS, WEIGHTS, BALANCE_THINGS, SEED_CODE, SIGNAL_CODE, SIGNAL_WORDS, SIGNAL_OF, ZHOU_REPLY, signalText,

@@ -1335,6 +1335,76 @@ async function masterFailRun(browser, lang) {
   await page.context().close();
 }
 
+/* ---------- 聲音 ---------- */
+// 答對、答錯、拿到東西、記下線索、完成階段各有音效；還沒讀到線索時沒有任何音效（那不算答錯）；
+// 靜音之後不發聲；環境音跟著房間切換，設定重新整理後仍在；每個聲音都不是無聲、也不會爆音
+async function soundRun(browser, lang) {
+  const page = await setup(browser, lang);
+  const P = player(page, lang);
+  const sfx = () => page.evaluate(() => window.__stargazer.sfx);
+  const last = async n => (await sfx()).slice(-n);
+  const amb = () => page.evaluate(() => window.__stargazer.ambientRoom);
+  await newGame(P);
+  ok(await amb() === null, '環境音預設關閉');
+  await P.obj('f_coat');
+  ok((await last(1))[0] === 'item', '拿到東西：撥弦聲');
+  await P.room('study');
+  await P.obj('s_drawer');
+  const before = (await sfx()).length;
+  await P.lockType(G.DRAWER_CODE);                          // 還沒看過書架：正確答案也不接受
+  const between = (await sfx()).slice(before);
+  ok(between.length && between.every(x => x === 'tick'), `還沒讀到線索時只有轉輪的輕響，沒有答對或答錯的音效：${between}`);
+  await P.close();
+  await P.obj('s_shelf');
+  ok((await last(1))[0] === 'note', '記下線索：翻紙聲');
+  await P.close();
+  await P.obj('s_drawer');
+  await P.lockType(G.DRAWER_TRAP);
+  ok((await last(1))[0] === 'wrong', '答錯：低沉的一聲');
+  await P.lockType(G.DRAWER_CODE);
+  ok((await last(1))[0] === 'good', '答對：上行的鐘聲');
+  await P.close();
+  await P.combine('flashlight_dead', 'battery');            // 修好手電筒：第一階段完成
+  const pair = await last(2);
+  ok(['good', 'item'].includes(pair[0]) && pair[1] === 'stage', `完成階段：先是動作本身的音效，再接完成階段：${pair}`);
+  // 選單：打開環境音、關掉音效
+  await page.click('#btn-menu');
+  ok(await page.locator('#modal-body [data-sound]').count() === 4, '選單裡有音效與環境音的開關');
+  await page.click('#modal-body [data-sound="ambient:1"]');
+  ok(await amb() === 'study', '環境音：書房');
+  await page.click('#modal-body [data-sound="sfx:0"]');
+  await P.check('menu-sound');
+  await P.close();
+  await P.room('foyer');
+  ok(await amb() === 'foyer', '換房間時環境音跟著換');
+  await P.obj('f_clock');
+  ok((await last(1))[0].endsWith(':muted'), '關掉音效之後不發聲');
+  await P.close();
+  // 設定記在瀏覽器裡：重新整理後仍在；回到標題畫面時環境音淡出
+  await page.reload();
+  ok(await amb() === null, '標題畫面沒有環境音');
+  await page.click('#btn-continue');
+  ok(await amb() === 'foyer', '繼續遊戲後環境音回來');
+  await page.click('#btn-menu');
+  const pressed = await page.locator('#modal-body [data-sound][aria-pressed=true]').evaluateAll(b => b.map(x => x.dataset.sound).sort());
+  ok(JSON.stringify(pressed) === JSON.stringify(['ambient:1', 'sfx:0']), `設定保留：${pressed}`);
+  await P.close();
+  // 把每個聲音在離線音訊環境裡算出來：不是無聲、不會爆音；環境音明顯比音效小
+  const m = await page.evaluate(async () => {
+    const S = window.__stargazer.sound, r = {};
+    for (const n of S.names) r[n] = await S.measure(n);
+    for (const room of S.rooms) r['amb:' + room] = await S.measure(null, room);
+    return r;
+  });
+  for (const [k, v] of Object.entries(m)) {
+    ok(v && v.peak < 0.6, `${k} 峰值過高：${v && v.peak}`);
+    if (k.startsWith('amb:')) ok(v.peak < 0.2 && v.rms > 0.003 && v.rms < m.good.rms, `${k} 環境音音量不合理：${JSON.stringify(v)}`);
+    else ok(v.peak > 0.03 && v.seconds < 3, `${k} 太小聲或太長：${JSON.stringify(v)}`);
+  }
+  ok(m.good.peak > m.wrong.peak, '答錯的聲音比答對小');
+  await page.context().close();
+}
+
 /* ---------- 主流程 ---------- */
 (async () => {
   const browser = await chromium.launch();
@@ -1353,7 +1423,7 @@ async function masterFailRun(browser, lang) {
     summary.push(`${lang} 新手：${results.join('、')}／資深：${vet.join('、')}／大師：${mas.join('、')}`);
   }
   if (LANGS.length > 1) await switchRun(browser);
-  for (const lang of LANGS) { await potsFailRun(browser, lang); await masterPotsRun(browser, lang); await masterFailRun(browser, lang); }
+  for (const lang of LANGS) { await potsFailRun(browser, lang); await masterPotsRun(browser, lang); await masterFailRun(browser, lang); await soundRun(browser, lang); }
   await noteLayoutRun(browser);
   await browser.close();
   console.log(`走完的結局 ${summary.join('；')}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);

@@ -91,6 +91,8 @@
       b.classList.toggle('cur', on);
     });
   }
+  // 選單裡的開／關切換（音效、環境音）
+  const soundRow = (key, label, on) => `<div class="lang-row"><span>${tx(label)}</span><div class="seg" role="group" aria-label="${tx(label)}">${[['1', 'soundOn'], ['0', 'soundOff']].map(([v, k]) => `<button class="btn small ${(v === '1') === on ? 'cur' : ''}" type="button" data-sound="${key}:${v}" aria-pressed="${(v === '1') === on}">${tx(k)}</button>`).join('')}</div></div>`;
   const langSwitch = () => `<div class="lang-switch" role="group" aria-label="${tx('language')}">
       <button class="btn small" type="button" data-lang="zh" lang="zh-Hant">中文</button><button class="btn small" type="button" data-lang="en" lang="en">English</button></div>`;
 
@@ -124,7 +126,7 @@
     for (const id of ['title', 'intro', 'game', 'ending']) $(id).hidden = id !== screen;
     app.screen = screen;
     if (screen === 'title') { refreshTitle(); startSky(); } else stopSky();
-    if (screen !== 'game') app.lastRoom = null;
+    if (screen !== 'game') { app.lastRoom = null; Sound.ambient(null); }
     window.scrollTo(0, 0);
   }
 
@@ -313,24 +315,171 @@
     Object.assign(bubble.style, { left: left + 'px', top: top + 'px' });
   }
 
-  /* ================= 音樂盒的聲音（沒有音效也能玩） ================= */
-  let audio = null;
-  const TINE_HZ = [523.25, 587.33, 659.25, 698.46, 783.99, 880, 987.77, 1046.5, 1174.66, 1318.51];
-  function tone(n, when = 0) {
-    try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      const t0 = audio.currentTime + when;
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type = 'triangle';
-      o.frequency.value = TINE_HZ[n - 1];
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
-      o.connect(g); g.connect(audio.destination);
-      o.start(t0); o.stop(t0 + 1.3);
-    } catch (e) { /* 瀏覽器不支援或被禁止播放聲音 */ }
+  /* ================= 聲音（全部即時合成，沒有音檔；沒有任何謎題需要聽聲音才解得開） ================= */
+  // 音效：答對、拿到東西、記下線索、答錯、完成階段、電話鈴、結局。環境音：依房間淡入淡出的雨聲、風聲、暗房的電流聲。
+  // 瀏覽器規定要有使用者操作之後才能發聲，所以第一次點擊或按鍵之前什麼都不建立。
+  const Sound = (() => {
+    let ctx = null, master = null, sfxBus = null, ambBus = null, unlocked = false, busyUntil = 0, amb = null;
+    const log = [];                               // 測試用：最近要求播放的音效
+    const sfxOn = () => Store.getSetting('sfx') !== '0';
+    const ambientOn = () => Store.getSetting('ambient') === '1';
+    function ensure() {
+      if (!unlocked) return null;
+      try {
+        if (!ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return null;
+          ctx = new AC();
+          graph();
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+      } catch (e) { return null; }
+      return ctx;
+    }
+    // 音效與環境音各走一條音量線。不用壓縮器（Chromium 的壓縮器會自動加減增益，短促的音反而忽大忽小）；
+    // 改靠音量分配：最響的「答對」峰值約 0.4，和「完成階段」疊在一起也遠低於爆音（測試會量）
+    function graph() {
+      master = ctx.createGain(); master.gain.value = 1; master.connect(ctx.destination);
+      sfxBus = ctx.createGain(); sfxBus.gain.value = 2; sfxBus.connect(master);
+      ambBus = ctx.createGain(); ambBus.gain.value = 1.3; ambBus.connect(master);
+    }
+    // 一個帶包絡的音：type 波形、f 頻率（可滑音到 f2）、t0 開始、dur 長度、g 音量
+    function voice({ f, f2, t0, dur, g = 0.12, type = 'triangle', attack = 0.008, dest }) {
+      const o = ctx.createOscillator(), e = ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f, t0);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+      e.gain.setValueAtTime(0.0001, t0);
+      e.gain.exponentialRampToValueAtTime(g, t0 + attack);
+      e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(e); e.connect(dest || sfxBus);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    }
+    let noiseBuf = null;
+    function noise() {
+      if (!noiseBuf) {
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const src = ctx.createBufferSource(); src.buffer = noiseBuf; return src;
+    }
+    // 一小段經過濾波的噪音（翻紙、門閂）
+    function burst({ t0, dur, freq, q = 1, g = 0.06, type = 'bandpass' }) {
+      const src = noise(), fl = ctx.createBiquadFilter(), e = ctx.createGain();
+      fl.type = type; fl.frequency.value = freq; fl.Q.value = q;
+      e.gain.setValueAtTime(0.0001, t0);
+      e.gain.exponentialRampToValueAtTime(g, t0 + 0.01);
+      e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(fl); fl.connect(e); e.connect(sfxBus);
+      src.start(t0); src.stop(t0 + dur + 0.05);
+    }
+    const bell = (f, t0, dur = 1.1, g = 0.1) => { voice({ f, t0, dur, g, type: 'sine', attack: 0.004 }); voice({ f: f * 2.01, t0, dur: dur * 0.5, g: g * 0.3, type: 'sine', attack: 0.004 }); };
+    const SFX = {
+      // 答對：三個上行的鐘音（C6 E6 G6），清楚、短、不刺耳——強化「我對了」的確信
+      good: t => { [1046.5, 1318.5, 1568].forEach((f, i) => bell(f, t + i * 0.09, 0.9, 0.09)); },
+      // 拿到東西：一聲輕撥
+      item: t => { voice({ f: 784, t0: t, dur: 0.25, g: 0.1 }); voice({ f: 1175, t0: t + 0.06, dur: 0.3, g: 0.06 }); },
+      // 線索記入筆記：翻紙聲
+      note: t => { burst({ t0: t, dur: 0.12, freq: 3200, q: 0.8, g: 0.08 }); burst({ t0: t + 0.08, dur: 0.1, freq: 2400, q: 0.8, g: 0.055 }); },
+      // 真正答錯：低沉的一聲「咚」（還沒讀到線索時不會出現，那不算答錯）
+      wrong: t => { voice({ f: 196, f2: 140, t0: t, dur: 0.28, g: 0.085, type: 'sine', attack: 0.004 }); burst({ t0: t, dur: 0.06, freq: 300, g: 0.04, type: 'lowpass' }); },
+      // 完成一個階段：門閂聲接一個低音鐘
+      stage: t => { burst({ t0: t, dur: 0.09, freq: 180, g: 0.09, type: 'lowpass' }); bell(523.25, t + 0.08, 1.6, 0.08); bell(784, t + 0.26, 1.4, 0.06); },
+      // 電話鈴：老式雙頻鈴，響兩下
+      phone: t => { for (const d of [0, 0.42]) for (let k = 0; k < 8; k++) { voice({ f: 440, t0: t + d + k * 0.04, dur: 0.035, g: 0.05, type: 'square', attack: 0.002 }); voice({ f: 480, t0: t + d + k * 0.04, dur: 0.035, g: 0.05, type: 'square', attack: 0.002 }); } },
+      // 轉動機關（密碼輪、星盤、指針、閥門、鏡子）：一聲輕響
+      tick: t => { burst({ t0: t, dur: 0.035, freq: 1800, q: 4, g: 0.12 }); },
+      // 結局：好結局上行琶音、其他結局一個和弦、失敗下行
+      endGood: t => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(f, t + i * 0.22, 2.2, 0.08)); },
+      endPlain: t => { [392, 493.88, 587.33].forEach(f => bell(f, t, 2.4, 0.06)); },
+      endFail: t => { [330, 262, 196].forEach((f, i) => voice({ f, t0: t + i * 0.3, dur: 0.9, g: 0.09, type: 'sine', attack: 0.01 })); },
+    };
+    function play(name) {
+      log.push(sfxOn() ? name : name + ':muted'); if (log.length > 50) log.shift();
+      if (!sfxOn() || !ensure() || !SFX[name]) return;
+      try { SFX[name](Math.max(ctx.currentTime + 0.01, busyUntil)); } catch (e) { /* 播放失敗不影響遊戲 */ }
+    }
+    // 音樂盒的音齒（第 1～10 根）
+    const TINE_HZ = [523.25, 587.33, 659.25, 698.46, 783.99, 880, 987.77, 1046.5, 1174.66, 1318.51];
+    function tine(n, when = 0) {
+      if (!sfxOn() || !ensure()) return;
+      try { voice({ f: TINE_HZ[n - 1], t0: ctx.currentTime + when, dur: 1.2, g: 0.14 }); } catch (e) { /* 同上 */ }
+    }
+    function melody(seq) {
+      seq.forEach((n, i) => tine(n, i * 0.34));
+      if (ctx) busyUntil = ctx.currentTime + seq.length * 0.34 + 0.2; // 旋律奏完才放「答對」
+    }
+
+    /* ---------- 環境音 ---------- */
+    // 每個房間由幾層聲音混成：屋頂的雨（低沉）、雨絲（高頻）、風（掃頻）、暗房的電流聲
+    const ROOM_MIX = {
+      foyer: { rumble: 0.035, hiss: 0.012 }, study: { rumble: 0.03, hiss: 0.01 }, attic: { rumble: 0.05, hiss: 0.02 },
+      storeroom: { rumble: 0.04, hiss: 0.016 }, greenhouse: { rumble: 0.02, hiss: 0.04 },
+      observatory: { rumble: 0.012, hiss: 0.006, wind: 0.13 }, darkroom: { hum: 0.02 },
+    };
+    function buildAmbient() {
+      const layer = (filterType, freq, q) => {
+        const src = noise(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+        src.loop = true; fl.type = filterType; fl.frequency.value = freq; fl.Q.value = q; g.gain.value = 0;
+        src.connect(fl); fl.connect(g); g.connect(ambBus); src.start();
+        return { g, fl };
+      };
+      const rumble = layer('lowpass', 420, 0.7), hiss = layer('highpass', 2600, 0.5), wind = layer('bandpass', 450, 3);
+      // 風：用很慢的振盪器推動濾波器的頻率
+      const lfo = ctx.createOscillator(), depth = ctx.createGain();
+      lfo.frequency.value = 0.07; depth.gain.value = 220; lfo.connect(depth); depth.connect(wind.fl.frequency); lfo.start();
+      const humG = ctx.createGain(); humG.gain.value = 0; humG.connect(ambBus);
+      for (const [f, k] of [[60, 1], [120, 0.45], [180, 0.15]]) { const o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = f; og.gain.value = k; o.connect(og); og.connect(humG); o.start(); }
+      return { rumble: rumble.g, hiss: hiss.g, wind: wind.g, hum: humG, room: null };
+    }
+    // room 為 null 時全部淡出
+    function ambient(room) {
+      const want = ambientOn() && room ? ROOM_MIX[room] || {} : {};
+      if (!amb && !Object.keys(want).length) return;
+      if (!ensure()) return;
+      try {
+        if (!amb) amb = buildAmbient();
+        const t = ctx.currentTime;
+        for (const k of ['rumble', 'hiss', 'wind', 'hum']) amb[k].gain.setTargetAtTime(want[k] || 0, t, 0.8);
+        amb.room = Object.keys(want).length ? room : null;
+      } catch (e) { /* 同上 */ }
+    }
+    function unlock() {
+      if (unlocked) return;
+      unlocked = true;
+      if (app.screen === 'game' && app.s) ambient(app.s.room);
+    }
+    // 測試用：在離線的音訊環境裡把聲音算出來，回報峰值、平均音量與長度（確認不是無聲、也不會爆音）
+    async function measure(name, room) {
+      const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OAC || (!room && !SFX[name])) return null;
+      const rate = 44100, off = new OAC(1, rate * 3, rate);
+      const saved = [ctx, master, sfxBus, ambBus, noiseBuf];
+      ctx = off; noiseBuf = null; graph();
+      try {
+        if (room) { const a = buildAmbient(), mix = ROOM_MIX[room] || {}; for (const k of ['rumble', 'hiss', 'wind', 'hum']) a[k].gain.value = mix[k] || 0; } else SFX[name](0);
+      } finally { [ctx, master, sfxBus, ambBus, noiseBuf] = saved; }
+      const d = (await off.startRendering()).getChannelData(0);
+      let peak = 0, sum = 0, last = 0;
+      for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; sum += d[i] * d[i]; if (a > 0.001) last = i; }
+      return { peak, rms: Math.sqrt(sum / d.length), seconds: last / rate };
+    }
+    return { play, tine, melody, ambient, unlock, measure, log, sfxOn, ambientOn, names: Object.keys(SFX), rooms: Object.keys(ROOM_MIX), get ambientRoom() { return amb ? amb.room : null; }, get ctx() { return ctx; } };
+  })();
+  const tone = (n, when) => Sound.tine(n, when);
+  const melody = seq => Sound.melody(seq);
+  // 從一次動作的結果決定要放哪個音效（一次只放一個主要的，完成階段另外接在後面）
+  function sfxFor(r, wrongBefore, phoneBefore) {
+    if (!r || r.ending) return;
+    const kinds = new Set(r.messages.map(m => m.kind));
+    if (!phoneBefore && app.s.flags.phoneRinging) Sound.play('phone');
+    else if (r.solved || kinds.has('good')) Sound.play('good');
+    else if (app.s.stats.wrong > wrongBefore) Sound.play('wrong');
+    else if (kinds.has('item')) Sound.play('item');
+    else if (kinds.has('note')) Sound.play('note');
+    if (kinds.has('stage')) Sound.play('stage');
   }
-  const melody = seq => seq.forEach((n, i) => tone(n, i * 0.34));
 
   // 周伯的燈號動畫：· 亮 0.3 秒、— 亮 0.9 秒，字與字之間暗 0.8 秒；尊重「減少動態效果」
   let flashTimers = [];
@@ -364,6 +513,7 @@
   function act(fn, opts = {}) {
     if (!app.s || app.s.ending) return null;
     const before = E.stage(app.s).index, sideBefore = G.SIDE_STAGE.done(app.s);
+    const wrongBefore = app.s.stats.wrong, phoneBefore = !!app.s.flags.phoneRinging;
     let r;
     try { r = fn(); } catch (e) {
       console.error(e);
@@ -380,6 +530,7 @@
       if (!sideBefore && G.SIDE_STAGE.done(app.s)) r.messages = r.messages.concat([{ text: TL('stageSide', { done: G.SIDE_STAGE.title }), kind: 'stage' }]);
     }
     say(r.messages);
+    sfxFor(r, wrongBefore, phoneBefore);
     if (r.ending) { finishGame(r.ending); return r; }
     if (r.ok) autosave();
     if (app.selected && !app.s.inv.includes(app.selected)) { app.selected = null; app.combining = false; }
@@ -479,6 +630,7 @@
       wrap.classList.add('enter');
       wrap.dataset.room = app.s.room;
       app.lastRoom = app.s.room;
+      Sound.ambient(app.s.room);
     }
     $('scene').innerHTML = Art.scene(app.s.room, { s: app.s, vis: visible, label: id => tr(E.hotspot(id).name) });
     updateTip(null);
@@ -751,7 +903,7 @@
             <button class="btn" type="button" data-next="${i}" aria-label="${tx('nextConst', { ring: T(rings[i]) })}">▶</button></div>`).join('')}</div>
           ${center(`<button class="btn primary" type="button" data-act="turn">${tx('setRings')}</button>`)}${fb()}</div></div>`,
         bind(root) {
-          const step = (i, d) => { sel[i] = order[(order.indexOf(sel[i]) + d + order.length) % order.length]; app.ui.feedback = []; autosave(); renderModal(); };
+          const step = (i, d) => { sel[i] = order[(order.indexOf(sel[i]) + d + order.length) % order.length]; Sound.play('tick'); app.ui.feedback = []; autosave(); renderModal(); };
           root.querySelectorAll('[data-prev]').forEach(b => { b.onclick = () => step(+b.dataset.prev, -1); });
           root.querySelectorAll('[data-next]').forEach(b => { b.onclick = () => step(+b.dataset.next, 1); });
           root.querySelector('[data-act=turn]').onclick = () => submit('dial', sel.slice());
@@ -772,12 +924,12 @@
           ${center(`<button class="btn primary" type="button" data-act="open" data-autofocus>${tx('unlock')}</button>`)}${fb()}
           <p class="lead" style="font-size:.85rem;text-align:center">${tx('lockKeys')}</p>`,
         bind(root) {
-          root.querySelectorAll('[data-up]').forEach(b => { b.onclick = () => { cur[+b.dataset.up] = (cur[+b.dataset.up] + 1) % 10; app.ui.feedback = []; renderModal(); }; });
-          root.querySelectorAll('[data-down]').forEach(b => { b.onclick = () => { cur[+b.dataset.down] = (cur[+b.dataset.down] + 9) % 10; app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-up]').forEach(b => { b.onclick = () => { cur[+b.dataset.up] = (cur[+b.dataset.up] + 1) % 10; Sound.play('tick'); app.ui.feedback = []; renderModal(); }; });
+          root.querySelectorAll('[data-down]').forEach(b => { b.onclick = () => { cur[+b.dataset.down] = (cur[+b.dataset.down] + 9) % 10; Sound.play('tick'); app.ui.feedback = []; renderModal(); }; });
           root.querySelector('[data-act=open]').onclick = () => submit(id, cur.join(''));
         },
         keys(e) {
-          if (/^[0-9]$/.test(e.key)) { cur.shift(); cur.push(+e.key); app.ui.feedback = []; renderModal(); return true; }
+          if (/^[0-9]$/.test(e.key)) { cur.shift(); cur.push(+e.key); Sound.play('tick'); app.ui.feedback = []; renderModal(); return true; }
           // 焦點在按鈕或「手上的文件」上時，Enter 照常按下它們
           if (e.key === 'Enter' && !(e.target && /^(BUTTON|SUMMARY)$/.test(e.target.tagName))) { submit(id, cur.join('')); return true; }
           return false;
@@ -831,7 +983,7 @@
           ${wheel ? '' : `<p class="notice">${tx('noWheel')}</p>`}${fb()}`,
         bind(root) {
           root.querySelectorAll('[data-valve]').forEach(g => {
-            const flip = () => { open[g.dataset.valve] = !open[g.dataset.valve]; E.submit(app.s, 'valves_set', open); app.ui.feedback = []; autosave(); renderModal(); };
+            const flip = () => { open[g.dataset.valve] = !open[g.dataset.valve]; Sound.play('tick'); E.submit(app.s, 'valves_set', open); app.ui.feedback = []; autosave(); renderModal(); };
             g.addEventListener('click', flip);
             g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
           });
@@ -859,6 +1011,7 @@
             const flip = () => {
               if (lit) return;
               cfg[g.dataset.mirror] = cfg[g.dataset.mirror] === '/' ? '\\' : '/';
+              Sound.play('tick');
               app.ui.mirrorReveal = false;
               const r = act(() => E.submit(app.s, 'mirrors', cfg), { noOpen: true });
               app.ui.feedback = r && r.solved && r.messages.length ? r.messages : [];
@@ -888,8 +1041,8 @@
           </div>
           ${center(`<button class="btn primary" type="button" data-act="set">${tx('thisMoment')}</button>`)}${fb()}</div></div>`,
         bind(root) {
-          root.querySelectorAll('[data-h]').forEach(b => { b.onclick = () => { c.h = ((c.h - 1 + +b.dataset.h + 12) % 12) + 1; app.ui.feedback = []; autosave(); renderModal(); }; });
-          root.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { c.m = (c.m + +b.dataset.m + 60) % 60; app.ui.feedback = []; autosave(); renderModal(); }; });
+          root.querySelectorAll('[data-h]').forEach(b => { b.onclick = () => { c.h = ((c.h - 1 + +b.dataset.h + 12) % 12) + 1; Sound.play('tick'); app.ui.feedback = []; autosave(); renderModal(); }; });
+          root.querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { c.m = (c.m + +b.dataset.m + 60) % 60; Sound.play('tick'); app.ui.feedback = []; autosave(); renderModal(); }; });
           root.querySelector('[data-act=set]').onclick = () => submit('clock', { h: c.h, m: c.m });
         },
       };
@@ -1194,6 +1347,8 @@
       title: T('menuTitle'),
       html: `<div class="list">
           <div class="lang-row"><span>${tx('language')}</span>${langSwitch()}</div>
+          ${soundRow('sfx', 'sfxLabel', Sound.sfxOn())}
+          ${soundRow('ambient', 'ambientLabel', Sound.ambientOn())}
           <button class="btn" type="button" data-go="save">${tx('saveLoad')}</button>
           <button class="btn" type="button" data-go="help">${tx('helpTitle')}</button>
           <button class="btn" type="button" data-go="gallery">${tx('galleryTitle')}</button>
@@ -1204,6 +1359,15 @@
         </div>`,
       bind(root) {
         syncLangButtons();
+        root.querySelectorAll('[data-sound]').forEach(b => {
+          b.onclick = () => {
+            const [key, val] = b.dataset.sound.split(':');
+            Store.setSetting(key, val);
+            if (key === 'ambient') Sound.ambient(app.screen === 'game' && app.s ? app.s.room : null);
+            if (key === 'sfx' && val === '1') Sound.play('item');   // 打開時給一聲，讓玩家知道音量
+            renderModal();
+          };
+        });
         root.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => openView({ view: b.dataset.go }); });
         const on = (a, f) => { const b = root.querySelector(`[data-act=${a}]`); if (b) b.onclick = f; };
         on('title', () => { app.ui.confirm = 'title'; renderModal(); });
@@ -1370,6 +1534,7 @@
     app.endingId = id;
     show('ending');
     renderEnding(id);
+    Sound.play(G.endings[id].fail ? 'endFail' : id === 'B' ? 'endGood' : 'endPlain');
     ($('btn-preend') || $('btn-end-title')).focus();
   }
   function renderEnding(id) {
@@ -1489,7 +1654,13 @@
         if (sinceSave > 15000) { sinceSave = 0; autosave(); }
       }
     }, 1000);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) autosave();
+      const c = Sound.ctx;
+      if (c) { try { if (document.hidden) c.suspend(); else c.resume(); } catch (e) { /* 忽略 */ } }
+    });
+    document.addEventListener('pointerdown', () => Sound.unlock(), true);
+    document.addEventListener('keydown', () => Sound.unlock(), true);
     window.addEventListener('pagehide', autosave);
   }
 
@@ -1509,5 +1680,5 @@
   else start((hot && hot.data) || {});
 
   // 提供給自動化測試的唯讀窺視口（不影響遊戲）
-  window.__stargazer = { get state() { return app.s; }, get screen() { return app.screen; }, get lang() { return LANG; } };
+  window.__stargazer = { get state() { return app.s; }, get screen() { return app.screen; }, get lang() { return LANG; }, get sfx() { return Sound.log.slice(); }, get ambientRoom() { return Sound.ambientRoom; }, sound: { names: Sound.names, rooms: Sound.rooms, measure: Sound.measure } };
 }());

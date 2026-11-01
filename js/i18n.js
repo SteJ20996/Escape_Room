@@ -323,6 +323,10 @@
 
     // 選單與說明
     menuTitle: L('選單', 'Menu'),
+    sfxLabel: L('音效', 'Sound effects'),
+    ambientLabel: L('環境音（雨聲、風聲）', 'Ambience (rain, wind)'),
+    soundOn: L('開', 'On'),
+    soundOff: L('關', 'Off'),
     saveLoad: L('存檔 / 讀檔', 'Save / Load'),
     toTitle: L('回到標題畫面', 'Back to the title screen'),
     toTitleConfirm: L('回到標題畫面？目前進度已自動存檔，可以用「繼續遊戲」回來。', 'Return to the title screen? Your progress is autosaved — choose "Continue" to come back.'),
@@ -337,6 +341,7 @@
       ['拿在手上', '讀文件時按「拿在手上」，它會攤開在畫面最下方，最多三份並排；解謎的視窗裡也看得到，不必來回切換。'],
       ['難度', '新手：五個房間，答錯會說明原因。資深：七個房間、更多更難的謎題，答錯只說「不對」，第一階段沒有提示；八個花盆挖錯三盆就失敗，整局作廢（手動存檔不受影響）。大師：資深的全部，加上互相牽連的線索、會騙人的假線索和另一個出口；沖洗只有三張廢片。'],
       ['提示', '右上角的「提示」顯示目前的階段目標；完成一個階段時它會亮起來。每個目標分三段，從方向到答案；每一段都要先確認，會公布答案的那一段，確認框會閃紅色。'],
+      ['聲音', '答對、拿到東西、記下線索、完成一個階段時會有短短的音效；也可以在「選單」打開雨聲、風聲等環境音。兩者都能隨時關掉，沒有任何謎題需要聽聲音才解得開。'],
       ['存檔', '每個動作後都會自動存檔；也可以手動存到三個欄位，或複製「存檔碼」把進度帶到別的地方。'],
       ['公平原則', '所有謎題的答案都能在遊戲裡找到（資深以上有一件事要問周伯），不需要任何外部知識；大師模式的假線索，一定有別的線索能拆穿。答錯不會有懲罰，也不會讓遊戲卡死——例外是資深以上的八個花盆（挖錯三盆就失敗，木牌上事先寫明），以及大師模式的沖洗（三張廢片用完就失敗，畫面上會倒數）。'],
       ['語言', '在標題畫面或「選單」裡可以隨時切換中文與英文，進度不受影響。'],
@@ -350,6 +355,7 @@
       ['In hand', 'While reading a document, press "Hold in hand" and it stays open at the bottom of the screen, up to three side by side. They also show inside puzzle windows, so you don\'t have to keep switching.'],
       ['Difficulty', 'Novice: five rooms, and wrong answers explain what went wrong. Veteran: seven rooms and more, harder puzzles; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game (your manual saves are kept). Master: all of Veteran, plus clues that depend on each other, fakes that lie to you, and another way out; the darkroom has only three scraps of film.'],
       ['Hints', 'Hints, at the top right, shows your current stage goal and lights up whenever you finish a stage. Each goal has three steps, from a nudge to the answer. You confirm each step first, and the confirmation flashes red when the next step gives away the answer.'],
+      ['Sound', 'Short sound effects play when you get something right, pick something up, note a clue or finish a stage; you can also turn on rain and wind ambience from the Menu. Both can be switched off at any time, and no puzzle needs sound to solve.'],
       ['Saving', 'The game autosaves after every action. You can also save to three slots, or copy a save code to carry your progress elsewhere.'],
       ['Fair play', 'Every answer can be found in the game (from Veteran up, one thing has to be asked of Old Zhou) — no outside knowledge needed — and every fake in Master mode can be exposed by another clue. Wrong answers are never punished and can never leave you stuck, with two exceptions: from Veteran up, digging up three wrong pots of the eight loses the game, as the sign on the shelf warns; and in Master mode, spoiling all three scraps of film in the darkroom loses the game (the screen counts them down).'],
       ['Language', 'Switch between Chinese and English any time from the title screen or the Menu. Your progress is kept.'],

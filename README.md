@@ -13,6 +13,7 @@
 - **存檔**：自動存檔、三個手動欄位、可攜帶的存檔碼、結局前的回溯點
 - **中文與英文**：標題畫面、遊戲中的「選單」或右上角按鈕隨時切換，進度與存檔不受影響；預設跟隨瀏覽器語言，也可以用網址 `?lang=en` 指定
 - **可跳過的操作教學**；右上角的**階段提示**會偵測你走到哪一階段，完成一個階段時亮起來告訴你下一步，卡關時可以一段一段展開提示
+- **聲音**：答對、答錯、拿到東西、記下線索、完成階段、電話鈴、結局都有短短的音效；選單裡可以打開依房間變化的雨聲、風聲、暗房電流聲（預設關閉）。全部用 Web Audio 即時合成，沒有任何音檔；沒有任何謎題需要聽聲音才解得開
 - 線索筆記、結局圖鑑（標出資深、大師模式達成的結局）；可用鍵盤操作；手機也能玩
 - 純 HTML／CSS／JavaScript，沒有任何相依套件，美術全部是內嵌 SVG（場景、謎題圖、物品圖示）
 
@@ -72,6 +73,7 @@ npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 
 - Three difficulties. **Novice**: 5 connected rooms, 11 puzzles (8 on the main path), wrong answers explain what went wrong. **Veteran**: adds the attic and the storeroom on the edge of the house, two new characters (Old Zhou the gardener and Lu Guan's daughter Qing), 4 new puzzles (a balance scale, signalling across the valley, a wall of photo frames, a music box), eight pots, six bottles of which only four are used, and sixteen mirrors whose light you can't see until you open the skylight; wrong answers only say "not right", there are no hints in the first stage, and digging up three wrong pots of the eight loses the game. **Master**: all of Veteran plus chained puzzles (the music box melody hides in the star dial's answer), a convincing fake clue in the darkroom, someone waiting outside the front door and another way out of the house to find, and only three scraps of film in the darkroom. A layered walkthrough (in Chinese) is in `docs/MASTER_WALKTHROUGH.md`.
 - Every puzzle can be reasoned out from in-game clues, and a puzzle only accepts answers once you hold its clues — typing in remembered answers on a replay doesn't work.
+- Short synthesized sound effects (right, wrong, pick-up, clue noted, stage complete, the telephone, endings) and optional per-room rain and wind ambience, all generated live with Web Audio — no audio files, and no puzzle needs sound.
 - Item combination, 6 endings (one only in Master), autosave + 3 slots + portable save codes, a skippable tutorial, and stage-aware hints that light up when you finish a stage.
 - **In Hand**: press "Hold in hand" on any document and up to three stay open side by side under the game — and at the bottom of puzzle windows — so you never have to flip back and forth.
 - Every puzzle is solvable from in-game clues alone. Switch language at any time from the title screen, the Menu, or the button at the top right; your progress is kept. Add `?lang=en` to the URL to start in English.

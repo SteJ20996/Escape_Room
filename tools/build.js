@@ -29,7 +29,7 @@ if (/src="js\/|href="css\//.test(head + body)) throw new Error('仍有未內嵌�
 
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
 const full = `<!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

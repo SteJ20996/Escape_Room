@@ -51,8 +51,8 @@
     if (q === 'zh' || q === 'en') return q;
     const saved = Store.getSetting('lang');
     if (saved === 'zh' || saved === 'en') return saved;
-    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    return /^zh/i.test(nav) ? 'zh' : 'en';
+    // 預設英文（不看瀏覽器語言）；玩家在標題畫面或選單選過中文之後，會記住這個選擇
+    return 'en';
   }
 
   function setLang(l, { persist = true } = {}) {

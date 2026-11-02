@@ -1,6 +1,6 @@
-<title>觀星者之屋 · The Stargazer's House</title>
+<title>The Stargazer's House · 觀星者之屋</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="瀏覽器密室逃脫：在亡師的老宅裡找回日、月、星三枚徽章，揭開一顆彗星的真名。A browser escape room in Chinese and English: recover the Sun, Moon and Star emblems from your late teacher's house and uncover the true name of a comet.">
+<meta name="description" content="A browser escape room in Chinese and English: recover the Sun, Moon and Star emblems from your late teacher's house and uncover the true name of a comet. 瀏覽器密室逃脫：在亡師的老宅裡找回日、月、星三枚徽章，揭開一顆彗星的真名。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&family=Noto+Serif+TC:wght@400;600;700&family=JetBrains+Mono:wght@500&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cormorant+Garamond:wght@600;700&family=Caveat:wght@500;600&display=swap">
@@ -571,17 +571,17 @@ html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase;
     <button class="btn small" type="button" data-lang="zh" lang="zh-Hant">中文</button><button class="btn small" type="button" data-lang="en" lang="en">English</button>
   </div>
   <div class="title-card">
-    <p class="title-eyebrow" data-i18n="eyebrow">密室逃脫</p>
-    <h1 class="title-main" data-game-title>觀星者之屋</h1>
-    <p class="title-sub" id="title-sub">最後的觀測</p>
+    <p class="title-eyebrow" data-i18n="eyebrow">An Escape Room</p>
+    <h1 class="title-main" data-game-title>The Stargazer's House</h1>
+    <p class="title-sub" id="title-sub">The Last Observation</p>
     <div class="title-menu">
-      <button class="btn primary" id="btn-new" type="button">新遊戲</button>
-      <button class="btn" id="btn-continue" type="button" data-i18n="continueGame">繼續遊戲</button>
-      <button class="btn" id="btn-load" type="button" data-i18n="loadGame">讀取存檔</button>
-      <button class="btn" id="btn-gallery" type="button" data-i18n="endingsGallery">結局圖鑑</button>
-      <button class="btn" id="btn-help" type="button" data-i18n="howToPlay">遊戲說明</button>
+      <button class="btn primary" id="btn-new" type="button">New Game</button>
+      <button class="btn" id="btn-continue" type="button" data-i18n="continueGame">Continue</button>
+      <button class="btn" id="btn-load" type="button" data-i18n="loadGame">Load Game</button>
+      <button class="btn" id="btn-gallery" type="button" data-i18n="endingsGallery">Endings</button>
+      <button class="btn" id="btn-help" type="button" data-i18n="howToPlay">How to Play</button>
     </div>
-    <p class="title-foot" id="title-foot">五個房間・十一道謎題・五種結局</p>
+    <p class="title-foot" id="title-foot">Three difficulties · up to seven rooms · six endings</p>
   </div>
 </div>
 
@@ -589,8 +589,8 @@ html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase;
   <div class="intro-card">
     <div class="intro-text" id="intro-text" aria-live="polite"></div>
     <div class="row">
-      <button class="btn primary" id="btn-intro-next" type="button">繼續</button>
-      <button class="btn ghost small" id="btn-intro-skip" type="button" data-i18n="skipIntro">跳過開場</button>
+      <button class="btn primary" id="btn-intro-next" type="button">Continue</button>
+      <button class="btn ghost small" id="btn-intro-skip" type="button" data-i18n="skipIntro">Skip intro</button>
     </div>
   </div>
 </div>
@@ -598,20 +598,20 @@ html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase;
 <div id="game" class="screen" hidden>
   <div class="app">
     <header class="topbar">
-      <span class="brand" data-game-title>觀星者之屋</span>
+      <span class="brand" data-game-title>The Stargazer's House</span>
       <span class="room-name" id="room-name" aria-live="polite"></span>
       <span class="progress" id="progress" data-i18n-aria="emblemProgress"></span>
       <span class="chip" id="chip-pages"></span>
-      <span class="chip" id="chip-plate" hidden data-i18n="plateChip">玻璃底片</span>
+      <span class="chip" id="chip-plate" hidden data-i18n="plateChip">Glass plate</span>
       <span class="chip" id="chip-time" data-i18n-title="playTime"></span>
       <span class="chip mode-chip" id="chip-mode"></span>
       <span class="spacer"></span>
       <div class="row">
-        <button class="btn small" id="btn-notes" type="button" data-i18n="notebook">線索筆記</button>
-        <button class="btn small" id="btn-save" type="button" data-i18n="save">存檔</button>
-        <button class="btn small" id="btn-menu" type="button" data-i18n="menu">選單</button>
+        <button class="btn small" id="btn-notes" type="button" data-i18n="notebook">Notebook</button>
+        <button class="btn small" id="btn-save" type="button" data-i18n="save">Save</button>
+        <button class="btn small" id="btn-menu" type="button" data-i18n="menu">Menu</button>
         <button class="btn small ghost lang-btn" id="btn-lang" type="button" data-i18n-title="switchLang">EN</button>
-        <button class="btn small hint-btn" id="btn-hints" type="button"><span class="bulb" aria-hidden="true">✦</span><span id="hint-label">提示</span></button>
+        <button class="btn small hint-btn" id="btn-hints" type="button"><span class="bulb" aria-hidden="true">✦</span><span id="hint-label">Hints</span></button>
       </div>
     </header>
     <div class="stage">
@@ -626,18 +626,18 @@ html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase;
       </div>
       <aside class="side-col">
         <section class="panel" aria-labelledby="inv-h">
-          <h2 id="inv-h" data-i18n="itemsPanel">物品</h2>
+          <h2 id="inv-h" data-i18n="itemsPanel">Items</h2>
           <div class="inv-grid" id="inventory"></div>
           <div class="item-detail" id="item-detail" hidden></div>
         </section>
         <section class="panel" aria-labelledby="log-h">
-          <h2 id="log-h" data-i18n="logPanel">紀錄</h2>
+          <h2 id="log-h" data-i18n="logPanel">Log</h2>
           <div class="log" id="log"></div>
         </section>
       </aside>
     </div>
     <section class="hand-panel empty" id="hand" aria-labelledby="hand-h">
-      <h2 id="hand-h" data-i18n="handTitle">拿在手上</h2>
+      <h2 id="hand-h" data-i18n="handTitle">In Hand</h2>
       <div class="hand-cards" id="hand-cards"></div>
     </section>
   </div>
@@ -652,16 +652,16 @@ html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase;
   <div class="tut-bubble" id="tut-bubble" role="dialog" aria-live="polite" aria-labelledby="tut-text">
     <p class="tut-count" id="tut-count"></p>
     <p class="tut-text" id="tut-text"></p>
-    <div class="row"><button class="btn small ghost" id="tut-skip" type="button" data-i18n="tutSkip">跳過教學</button><span class="spacer"></span><button class="btn small primary" id="tut-next" type="button" data-i18n="tutNext">下一步</button></div>
+    <div class="row"><button class="btn small ghost" id="tut-skip" type="button" data-i18n="tutSkip">Skip tutorial</button><span class="spacer"></span><button class="btn small primary" id="tut-next" type="button" data-i18n="tutNext">Next</button></div>
   </div>
 </div>
 
 <div class="modal-back" id="modal-back" hidden>
   <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-head">
-      <button class="btn small ghost" id="modal-back-btn" type="button" hidden data-i18n="back">← 返回</button>
+      <button class="btn small ghost" id="modal-back-btn" type="button" hidden data-i18n="back">← Back</button>
       <h2 id="modal-title"></h2>
-      <button class="btn small" id="modal-close" type="button" data-i18n="close">關閉</button>
+      <button class="btn small" id="modal-close" type="button" data-i18n="close">Close</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
   </div>
@@ -5645,8 +5645,8 @@ html:lang(en) .hand-panel h2 { letter-spacing: .16em; text-transform: uppercase;
     if (q === 'zh' || q === 'en') return q;
     const saved = Store.getSetting('lang');
     if (saved === 'zh' || saved === 'en') return saved;
-    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    return /^zh/i.test(nav) ? 'zh' : 'en';
+    // 預設英文（不看瀏覽器語言）；玩家在標題畫面或選單選過中文之後，會記住這個選擇
+    return 'en';
   }
 
   function setLang(l, { persist = true } = {}) {

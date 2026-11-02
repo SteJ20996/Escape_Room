@@ -94,13 +94,14 @@ const MASTER_POTS_CODE = (() => {
 const MODE_KEY = { novice: 'modeNovice', veteran: 'modeVeteran', master: 'modeMaster' };
 
 async function setup(browser, lang, viewport = { width: 1280, height: 860 }) {
-  // 用瀏覽器語言測試預設語言的偵測；之後仍透過標題畫面的語言按鈕確認一次
+  // 預設語言一律是英文，不看瀏覽器語言（中文瀏覽器也一樣）；玩家用標題畫面的語言按鈕切換，之後會記住
   const ctx = await browser.newContext({ viewport, locale: lang === 'zh' ? 'zh-TW' : 'en-US' });
   const page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   await page.goto('file://' + TARGET);
-  ok(await page.evaluate(() => window.__stargazer.lang) === lang, `瀏覽器語言 ${lang} 時預設語言應為 ${lang}`);
+  ok(await page.evaluate(() => window.__stargazer.lang) === 'en', `瀏覽器語言是 ${lang} 時，預設語言仍應為英文`);
+  ok(await page.evaluate(() => document.documentElement.lang) === 'en', '預設的 <html lang> 是 en');
   await page.click(`.title-lang [data-lang="${lang}"]`);
   ok(await page.locator('.title-main').innerText() === G.title[lang], '標題語言');
   return page;

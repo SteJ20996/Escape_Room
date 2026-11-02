@@ -11,7 +11,7 @@
 - **拿在手上**：讀文件時按一下，最多三份文件並排攤在遊戲畫面下方，解謎視窗裡也看得到，不必在筆記之間來回切換（三個難度都有）
 - **6 種結局**（其中一種只在大師模式出現），取決於你找到了什麼、又做了什麼選擇
 - **存檔**：自動存檔、三個手動欄位、可攜帶的存檔碼、結局前的回溯點
-- **中文與英文**：標題畫面、遊戲中的「選單」或右上角按鈕隨時切換，進度與存檔不受影響；預設跟隨瀏覽器語言，也可以用網址 `?lang=en` 指定
+- **中文與英文**：標題畫面、遊戲中的「選單」或右上角按鈕隨時切換，進度與存檔不受影響；預設是英文，選過中文之後會記住；也可以用網址 `?lang=zh` 直接以中文開啟
 - **可跳過的操作教學**；右上角的**階段提示**會偵測你走到哪一階段，完成一個階段時亮起來告訴你下一步，卡關時可以一段一段展開提示
 - **聲音**：答對、答錯、拿到東西、記下線索、完成階段、電話鈴、結局都有短短的音效；選單裡可以打開依房間變化的雨聲、風聲、暗房電流聲（預設關閉）。全部用 Web Audio 即時合成，沒有任何音檔；沒有任何謎題需要聽聲音才解得開
 - 線索筆記、結局圖鑑（標出資深、大師模式達成的結局）；可用鍵盤操作；手機也能玩
@@ -76,5 +76,5 @@ npm run build       # 重新產生 dist/stargazer.html 與 dist/artifact.html
 - Short synthesized sound effects (right, wrong, pick-up, clue noted, stage complete, the telephone, endings) and optional per-room rain and wind ambience, all generated live with Web Audio — no audio files, and no puzzle needs sound.
 - Item combination, 6 endings (one only in Master), autosave + 3 slots + portable save codes, a skippable tutorial, and stage-aware hints that light up when you finish a stage.
 - **In Hand**: press "Hold in hand" on any document and up to three stay open side by side under the game — and at the bottom of puzzle windows — so you never have to flip back and forth.
-- Every puzzle is solvable from in-game clues alone. Switch language at any time from the title screen, the Menu, or the button at the top right; your progress is kept. Add `?lang=en` to the URL to start in English.
+- Every puzzle is solvable from in-game clues alone. Switch language at any time from the title screen, the Menu, or the button at the top right; your progress is kept. The game starts in English and remembers your choice; add `?lang=zh` to the URL to start in Chinese.
 - Open `index.html` or the single-file `dist/stargazer.html` in any modern browser. No install needed.

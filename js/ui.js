@@ -954,7 +954,8 @@
           (confirm ? `<div class="confirm"><p style="margin:0">${tx('potConfirm', { pot: potName(confirm) })}</p>
             <div class="row"><button class="btn danger" type="button" data-act="dig-yes">${tx('potConfirmYes')}</button><button class="btn" type="button" data-act="dig-no" data-autofocus>${tx('thinkAgain')}</button></div></div>` : '') +
           // 花架示意：八盆其實排成一排，下面的卡片只是換行排列
-          (vet ? `<div class="pot-row" role="img" aria-label="${esc(T('potsRowLabel'))}"><span>${tx('potsLeftEnd')}</span>${G.variant(app.s).pots.map(p => `<b class="${dug.includes(p.id) ? 'dug' : ''}">${p.n}</b>`).join('')}<span>${tx('potsRightEnd')}</span></div>` : '') +
+          // 資深以上：畫出花架上的八盆（和場景一樣由左到右 1～8 號；挖過的盆顯示翻開的土）
+          (vet ? `<div class="pot-row"><span aria-hidden="true">${tx('potsLeftEnd')}</span>${Art.potsRowSvg(app.s, T('potsRowLabel'))}<span aria-hidden="true">${tx('potsRightEnd')}</span></div>` : '') +
           `<div class="pots ${vet ? 'eight' : ''}">${G.variant(app.s).pots.map(p => `<div class="pot pot-${p.id}"><h3>${vet ? tx('potNum', { n: p.n, name: cap(tr(p.name)) }) : tx('potName', { name: cap(tr(p.name)) })}</h3><q>${esc(tr(p.says))}</q>
             <button class="btn small" type="button" data-pot="${p.id}" ${confirm || dug.includes(p.id) ? 'disabled' : ''}>${tx(dug.includes(p.id) ? 'potDug' : 'digHere')}</button></div>`).join('')}</div>
           ${trowel ? '' : `<p class="notice">${tx('needTool')}</p>`}${fb()}`,

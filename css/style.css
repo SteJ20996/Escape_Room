@@ -472,10 +472,9 @@ textarea.code {
 
 /* 八個花盆、八個藥瓶 */
 .pots.eight { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-.pot-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 8px 10px 10px; border-bottom: 6px solid #5a3e22; border-radius: 4px; color: var(--dim); font-size: .85rem; }
-.pot-row b { display: grid; place-items: center; width: 30px; height: 26px; border-radius: 0 0 9px 9px; background: #8a5a36; color: #f6ead2; font-size: .9rem; }
-.pot-row b.dug { background: #4a3a2c; color: #9d8e7a; }
-.pot-row span { margin: 0 4px; white-space: nowrap; }
+.pot-row { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 0; color: var(--dim); font-size: .85rem; }
+.pot-row .pots-svg { flex: 0 1 440px; width: 100%; max-width: 440px; height: auto; }
+.pot-row span { white-space: nowrap; padding-bottom: 4px; }
 .pots.eight .pot q { font-size: 1rem; }
 .bottles.six { grid-template-columns: repeat(6, minmax(52px, 84px)); gap: 8px; }
 .badge-vet { margin-left: auto; font-size: .75rem; color: #f0a080; border: 1px solid #6a3a2a; border-radius: 999px; padding: 0 .6em; white-space: nowrap; }

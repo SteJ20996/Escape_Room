@@ -152,3 +152,48 @@ test('美術：每個難度只畫出這個難度有的物件（例如新手的�
     }
   }
 });
+
+test('美術：每個房間的圖都只引用自己定義的漸層與圖樣；狀態改變時畫面跟著變', () => {
+  const prev = global.self;
+  global.self = { GAME_DATA: G };
+  delete require.cache[require.resolve('../js/art.js')];
+  require('../js/art.js');
+  const Art = global.self.Art;
+  global.self = prev;
+  const { create } = require('./helpers');
+  const E = create(G);
+  const all = Object.fromEntries('greenhouseOpen phoneRinging trapdoorFound gateOpen clockSolved paintingMoved safeOpen lightOk waterOk wheelInstalled trapdoorOpen darkroomLit plateDeveloped eyepieceInstalled storeroomOpen atticOpen cabinetOpen photosSolved crankInserted tunnelFound tunnelOpen wasteSearched gridTaken keyDug'.split(' ').map(k => [k, true]));
+  const draw = (room, mode, flags) => Art.scene(room, { s: Object.assign(E.newState(mode), { room, flags }), vis: () => true, label: () => 'x' });
+  // 每一張圖是獨立的 <svg>：引用別的房間定義的漸層會變成透明（書房的紙鎮曾經因此看不見）
+  const missing = [];
+  for (const mode of G.MODES) for (const flags of [{}, all]) for (const room of G.roomOrder) {
+    const svg = draw(room, mode, flags);
+    const ids = new Set([...svg.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
+    for (const m of svg.matchAll(/url\(#([^)]+)\)/g)) if (!ids.has(m[1])) missing.push(`${mode} ${room}: #${m[1]}`);
+  }
+  assert.deepEqual([...new Set(missing)], []);
+  // 廢紙簍：拿走左半張便條之後少一個紙球
+  const balls = svg => (svg.match(/<g class="hs" data-hs="s_waste"[\s\S]*?<\/g>/)[0].match(/<circle /g) || []).length;
+  assert.equal(balls(draw('study', 'novice', {})), 2);
+  assert.equal(balls(draw('study', 'novice', { wasteSearched: true })), 1);
+  // 書桌上的方格紙要平放在桌面上（不能用以畫面原點為中心的 skewX，會把紙推出桌外）
+  const desk = draw('study', 'veteran', {}).match(/<g class="hs" data-hs="s_desk"[\s\S]*?<\/g>/)[0];
+  assert.ok(!/skewX/.test(desk));
+  for (const m of desk.matchAll(/<polygon points="([^"]+)"/g)) for (const pt of m[1].trim().split(/\s+/)) {
+    const x = +pt.split(',')[0];
+    assert.ok(x >= 356 && x <= 644, `書桌上的東西超出桌面：x=${x}`);
+  }
+  // 天文台牆上的星座圖：八個星座都寫上名稱（兩種語言）
+  for (const lang of ['zh', 'en']) {
+    Art.setLang(lang);
+    const poster = draw('observatory', 'novice', { gateOpen: true }).match(/<g class="hs" data-hs="o_poster"[\s\S]*?<\/g><\/g>|<g class="hs" data-hs="o_poster"[\s\S]*?<title>[\s\S]*?<rect class="hit"/)[0];
+    for (const id of G.CONSTELLATION_ORDER) assert.ok(poster.includes(`>${G.CONSTELLATIONS[id].name[lang]}</text>`), `${lang}：星座圖上沒有寫出 ${id}`);
+  }
+  Art.setLang('zh');
+  // 作答畫面的花架：資深以上畫出八盆，挖過的盆沒有花、土是翻開的
+  const s = Object.assign(E.newState('master'), { room: 'greenhouse', flags: { greenhouseOpen: true, potsDug: ['sage', 'mint'] } });
+  const row = Art.potsRowSvg(s, 'label');
+  assert.equal((row.match(/<text /g) || []).length, 8);
+  assert.equal((row.match(/fill="#6e4226"/g) || []).length, 2);
+  assert.ok(/role="img" aria-label="label"/.test(row));
+});

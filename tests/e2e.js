@@ -1304,8 +1304,11 @@ async function masterPotsRun(browser, lang) {
     ok(!t.includes(G.POTS_V.find(v => v.id === p.id).says[lang]), `${p.id} 盆不應顯示資深版的話`);
   }
   await P.shot('pots-master');
+  ok(await page.locator('#modal-body .pots-svg[role="img"]').count() === 1, '作答畫面畫出花架上的八盆');
+  ok(await page.locator('#modal-body .pots-svg path[fill="#6e4226"]').count() === 0, '還沒挖過任何一盆');
   await page.click(`#modal-body [data-pot="${G.POT_ANSWER_V}"]`);       // 背資深的答案
   await P.feedback(X(/還剩 2 次機會/, /2 chances left/));
+  ok(await page.locator('#modal-body .pots-svg path[fill="#6e4226"]').count() === 1, '花架上挖過的那一盆變成翻開的土');
   await page.click(`#modal-body [data-pot="${G.POT_ANSWER_M}"]`);
   await P.said(X(/黃銅鑰匙/, /brass key/));
   ok(await P.has('brass_key'), '挖到黃銅鑰匙');
